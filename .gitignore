@@ -1,0 +1,14 @@
+# Secrets and API keys
+.env
+.env.*
+!.env.example
+credentials.json
+*.pem
+*.key
+
+# Local agent settings
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
