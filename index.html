@@ -48,6 +48,10 @@
   .cell.big { background:#c99a5a; }
   .sum { display:grid; grid-template-columns: 1fr auto; gap:2px 10px; font-size:15px; }
   .sum b { font-weight:600; }
+  .log { max-height: 7.4em; overflow-y: auto; display:flex; flex-direction:column; gap:2px; font-size:15px; line-height:1.3;
+         padding: 6px 0; border-top: 1px solid #b9b1a0; border-bottom: 1px solid #b9b1a0; -webkit-overflow-scrolling: touch; user-select: text; }
+  .log > div { display:flex; gap:8px; }
+  .log .tm { flex: 0 0 2.9em; color: var(--sub); }
   .note { font-size:14px; color:var(--sub); line-height:1.35; }
   .bar { height:10px; background:#d6cfbf; box-shadow: inset 0 0 0 1px var(--ink); }
   .bar > div { height:100%; background: var(--ink); }
@@ -70,7 +74,7 @@ const WATERS = ['river','omut','lake'];
 const NAME = {river:'Река', omut:'Омут', lake:'Озеро', shop:'Магазин'};
 const WHERE = {river:'на реке', omut:'на омуте', lake:'на озере'};
 const TRAVEL = {river:1, omut:1, lake:2, shop:1};
-const RATE = {river:[0,0.35,1.1], omut:[0,0.4,1.4], lake:[0,0.35,1.7]};
+const RATE = {river:[0,0.37,1.16], omut:[0,0.42,1.47], lake:[0,0.37,1.8]};
 // weather is fixed for the whole day: 0 overcast, 1 sun, 2 rain, 3 wind, 4 fog
 const WEATHERS = ['overcast','sun','rain','wind','fog'];
 const WEATHER_P = [.25,.25,.2,.15,.15];
@@ -80,7 +84,15 @@ const LEVEL_P = {
   omut:[[.35,.35,.3],[.3,.35,.35],[.45,.35,.2],[.45,.35,.2],[.4,.35,.25]],
   lake:[[.3,.25,.45],[.65,.25,.1],[.5,.3,.2],[.85,.1,.05],[.45,.3,.25]],
 };
-const SHIFT_P = .25, RIPPLE = [.05,.45,.85], NEIGHBOR_P = .8, RUMOR_TRUE = .8;
+const SHIFT_P = .25, RUMOR_TRUE = .8;
+// events at the water: P(seen in an hour | bite level none / weak / good)
+const RIPPLE = [.1,.35,.6];     // small fish playing (weak sign)
+const BOIL = [.01,.05,.25];     // a predator chasing fry (strong sign)
+const BUBBLES = [.05,.2,.4];    // bubbles from the bottom, fish feeding
+const LOST = [0,.2,.35];        // a bite, but the fish came off
+const SCARE = .05;              // a pike passes the shore: the hour is empty at any level
+const MIDGE_UP = .5, MIDGE_ELSE = .04;  // midges at 8:00-9:00 foretell a better bite from 10:00
+const NEIGHBOR_P = .8, NEIGHBOR_SMART = .5;  // he fishes most days; half the time at the morning's best water
 const WEATHER_NAME = ['пасмурно', 'солнце', 'дождь', 'ветер', 'туман'];
 const WEATHER_TEXT = ['Пасмурно, тепло, тихо. Так весь день.', 'Солнце, с утра уже жарко. Так весь день.', 'Дождь, моросит и не перестанет до вечера.', 'Сильный холодный ветер, весь день.', 'Туман над водой, тихо. Так весь день.'];
 const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Может, и дома посидеть.', 'В туман на реке обычно берёт ровно.'];
@@ -99,27 +111,47 @@ function newSeason(){
 }
 function genDay(){
   const weather = pick(WEATHER_P);
-  const level = {}, catchT = {}, ripple = {};
+  const level = {}, catchT = {}, ripple = {}, boil = {}, bubbles = {}, lost = {}, scare = {}, midge = {};
   for (const w of WATERS){
     const a = pick(LEVEL_P[w][weather]); let b = a;
     if (rnd() < SHIFT_P) b = pick(LEVEL_P[w][weather]);
     level[w] = Array.from({length:HOURS}, (_,h)=> h<4 ? a : b);
-    catchT[w] = level[w].map(lv => poisson(RATE[w][lv]));
-    ripple[w] = level[w].map(lv => rnd() < RIPPLE[lv]);
+    const up = b > a;
+    catchT[w] = []; ripple[w] = []; boil[w] = []; bubbles[w] = []; lost[w] = []; scare[w] = []; midge[w] = [];
+    for (let h=0; h<HOURS; h++){
+      const lv = level[w][h], sc = rnd() < SCARE, n = poisson(RATE[w][lv]);
+      catchT[w].push(sc ? 0 : n); scare[w].push(sc);
+      ripple[w].push(rnd() < RIPPLE[lv]); boil[w].push(rnd() < BOIL[lv]); bubbles[w].push(rnd() < BUBBLES[lv]);
+      lost[w].push(!sc && rnd() < LOST[lv]);
+      midge[w].push((h===2 || h===3) && rnd() < (up ? MIDGE_UP : MIDGE_ELSE));
+    }
   }
-  const neighbor = rnd() < NEIGHBOR_P ? choice(WATERS) : null;
-  const nb = neighbor ? level[neighbor].map(lv => poisson(RATE[neighbor][lv])) : Array(HOURS).fill(0);
+  // the neighbour: comes at 6-8, leaves after two empty hours or with a full bucket
+  const nb = {w:null, arrive:null, leave:null, reason:null, present:Array(HOURS).fill(false), bites:Array(HOURS).fill(0)};
+  if (rnd() < NEIGHBOR_P){
+    if (rnd() < NEIGHBOR_SMART){ const top = Math.max(...WATERS.map(w=>level[w][0])); nb.w = choice(WATERS.filter(w=>level[w][0]===top)); }
+    else nb.w = choice(WATERS);
+    nb.arrive = Math.floor(rnd()*3);
+    let dry = 0, total = 0;
+    for (let h=nb.arrive; h<HOURS; h++){
+      nb.present[h] = true;
+      const n = scare[nb.w][h] ? 0 : poisson(RATE[nb.w][level[nb.w][h]]);
+      nb.bites[h] = n; total += n; dry = n ? 0 : dry+1;
+      if (h < HOURS-1 && dry >= 2){ nb.leave = h; nb.reason = 'empty'; break; }
+      if (h < HOURS-1 && h >= 4 && total >= 4){ nb.leave = h; nb.reason = 'full'; break; }
+    }
+  }
   // a fresh rumor for every hour the player may walk into the shop
   const rumor = Array.from({length:HOURS}, (_,h) => {
     if (rnd() < RUMOR_TRUE){ const top = Math.max(...WATERS.map(w=>level[w][h])); const w = choice(WATERS.filter(w=>level[w][h]===top)); return {w, lv: level[w][h]}; }
     return {w: choice(WATERS), lv: Math.floor(rnd()*3)};
   });
-  return { weather, level, catchT, ripple, neighbor, nb, rumor };
+  return { weather, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
 }
 function startDay(){
   S.D = genDay();
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.path = []; S.presence = {river:[],omut:[],lake:[]};
-  S.dry = 0; S.hoursHere = 0; S.rumorText = null; S.lastNb = null;
+  S.dry = 0; S.hoursHere = 0; S.log = [];
   S.phase = 'morning';
 }
 
@@ -132,7 +164,9 @@ function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function remaining(){ return HOURS - S.t; }
 const SAVE_KEY = 'wait-or-leave-v2';
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({S, seed})); }catch(e){} }
-function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){ S=v.S; seed=v.seed; return true; } }catch(e){} return false; }
+function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){ S=v.S; seed=v.seed;
+  if (S.D && !S.D.boil){ if (S.phase === 'evening') S.D.nb = {w: S.D.neighbor || null}; else startDay(); }  // saved before water events existed
+  return true; } }catch(e){} return false; }
 function toast(text, ms=1300){ const el=$('toast'); el.textContent=text; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
 function btn(label, sub, onclick, cls='secondary', disabled=false){
   const b = document.createElement('button'); b.type='button'; b.className=cls; b.disabled=disabled;
@@ -180,16 +214,14 @@ function render(){
 
   else if (S.phase==='shop'){
     setScene('shop');
-    add(`<div class="meta"><span>${todayCatch()}</span></div>
-      <div class="lines">${S.rumorText}</div>`);
+    add(`<div class="meta"><span>${todayCatch()}</span></div>${journal()}`);
     actions.appendChild(moveButtons());
   }
 
   else if (S.phase==='water'){
     setScene(S.loc);
-    const sig = signals();
-    add(`<div class="meta"><span>${todayCatch()}</span></div>
-      <div class="lines">${sig.map(s=>`<div>· ${s}</div>`).join('')}</div>`);
+    const quiet = S.hoursHere === 0 ? '' : S.dry === 0 ? 'только что клевало' : `тихо ${S.dry} ${plural(S.dry,'час','часа','часов')}`;
+    add(`<div class="meta"><span>${todayCatch()}</span><span>${quiet}</span></div>${journal()}`);
     actions.appendChild(btn('Сидеть ещё час', '', sit, 'primary', S.t >= HOURS));
     actions.appendChild(moveButtons());
   }
@@ -201,20 +233,29 @@ function render(){
   }
 
   P.appendChild(actions);
+  scrollLog();
+}
+function logAdd(t, text){ S.log.push({t: clock(t), text}); }
+function journal(){
+  // the time is written only on the first line of each hour
+  return `<div class="log" id="log">${S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('')}</div>`;
+}
+function scrollLog(){ const el = $('log'); if (el) el.scrollTop = el.scrollHeight; }
+// what is seen on the water at the start of hour t
+function lookAround(){
+  const w = S.loc, D = S.D, t = S.t, nb = D.nb;
+  if (nb.w === w && nb.present[t]){
+    if (nb.arrive === t && S.hoursHere > 0) logAdd(t, 'Пришёл Михалыч, сел рядом.');
+    else if (S.hoursHere === 0) logAdd(t, nb.arrive === t ? 'Михалыч тоже пришёл сюда.' : 'Михалыч уже здесь.');
+  }
+  let seen = false;
+  if (D.boil[w][t]){ logAdd(t, 'У камыша бой: гоняют малька.'); seen = true; }
+  if (D.bubbles[w][t]){ logAdd(t, 'Со дна идут пузыри.'); seen = true; }
+  if (D.ripple[w][t]){ logAdd(t, choice(['Мелочь играет, круги по воде.','Плеснуло у берега.','Рыба играет у травы.'])); seen = true; }
+  if (D.midge[w][t]){ logAdd(t, 'Над водой мошкара.'); seen = true; }
+  if (!seen) logAdd(t, 'Вода гладкая, ни всплеска.');
 }
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
-
-function signals(){
-  const w = S.loc, D = S.D, t = Math.min(S.t, HOURS-1), out = [];
-  if (S.hoursHere === 0) out.push('Только пришёл');
-  out.push(D.ripple[w][t] ? choice(['Круги на воде, совсем рядом','Плеснуло у камыша','Рыба играет у берега']) : 'Вода гладкая, ни всплеска');
-  if (D.neighbor === w){
-    const prev = S.lastNb;
-    out.push(prev === null ? 'Михалыч тоже здесь, только закинул' : prev > 0 ? 'У Михалыча клюнуло!' : 'Михалыч рядом — у него пусто');
-  }
-  if (S.hoursHere > 0) out.push(S.dry === 0 ? 'Только что клевало' : `У тебя тихо уже ${S.dry} ${plural(S.dry,'час','часа','часов')}`);
-  return out;
-}
 
 // ---------- actions ----------
 function go(dest){
@@ -222,18 +263,18 @@ function go(dest){
   const tt = TRAVEL[dest];
   if (S.t + tt >= HOURS) return;
   S.path.push(`${clock(S.t)} → ${NAME[dest].toLowerCase()}`);
-  S.t += tt; S.loc = dest; S.dry = 0; S.hoursHere = 0; S.lastNb = null;
-  if (dest === 'shop'){ S.rumorText = rumorText(); S.phase='shop'; }
-  else S.phase='water';
+  S.t += tt; S.loc = dest; S.dry = 0; S.hoursHere = 0;
+  if (dest === 'shop'){ logAdd(S.t, 'Магазин. Бабки на лавке.'); rumorLines().forEach(x=>logAdd(S.t, x)); S.phase='shop'; }
+  else { logAdd(S.t, `${NAME[dest]}. Закинул удочку.`); S.phase='water'; lookAround(); }
   save(); render();
 }
-function rumorText(){
+function rumorLines(){
   const {w, lv} = S.D.rumor[Math.min(S.t, HOURS-1)];
   const a = lv===2 ? `Баба Нюра: «Колька только что ${WHERE[w]} во какую рыбину взял!»`
           : lv===1 ? `Баба Нюра: «Говорят, ${WHERE[w]} клюёт помаленьку».`
                    : `Баба Нюра: «${cap(WHERE[w])} пусто, Петрович весь день просидел зазря».`;
   const b = choice(['Баба Валя: «Да брешет он».','Баба Валя: «Ну-ну».','Баба Валя: «Сходи да проверь».','Баба Валя молча кивает.']);
-  return `<div>${a}</div><div>${b}</div>`;
+  return [a, b];
 }
 let busy = false;
 function sit(){
@@ -244,11 +285,18 @@ function sit(){
   document.querySelectorAll('button').forEach(b=>b.disabled=true);
   setTimeout(()=>{
     $('waiting').classList.remove('on');
+    const D = S.D, nb = D.nb;
+    if (D.scare[w][h]) logAdd(h+1, 'Прошла щука, мелочь врассыпную.');
     if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n;
-      toast(`${n > 1 ? fishWord(n) : 'Рыба'} +${sum} ₽`); S.dry = 0; }
-    else { toast('Тихо'); S.dry++; }
-    S.lastNb = S.D.neighbor === w ? S.D.nb[h] : null;
+      const what = `${n > 1 ? fishWord(n) : 'Рыба'} +${sum} ₽`; toast(what); logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
+    else { toast('Тихо'); logAdd(h+1, 'Тихо.'); S.dry++; }
+    if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но сошла.');
+    if (nb.w === w && nb.present[h]){
+      logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
+      if (nb.leave === h) logAdd(h+1, nb.reason === 'empty' ? 'Михалыч сматывает удочки: «Пустое дело».' : 'Михалыч уходит с полным ведром.');
+    }
     S.t++; S.hoursHere++;
+    if (S.t < HOURS) lookAround();
     busy = false;
     if (S.t >= HOURS){ setTimeout(()=>{ S.path.push(`${clock(HOURS)} — пора домой`); endDay(); }, 900); }
     save(); render();
@@ -258,6 +306,7 @@ function goHome(){
   const r = remaining(); const pay = r*WAGE;
   S.earnWork += pay; S.money += pay;
   S.path.push(`${clock(S.t)} → домой${r>0 ? `, работа ${r} ч` : ''}`);
+  if (S.log) logAdd(S.t, r>0 ? `Домой. Работа ${r} ${plural(r,'час','часа','часов')}, +${pay} ₽.` : 'Домой.');
   S.t = HOURS; endDay();
 }
 function endDay(){
@@ -287,7 +336,9 @@ function eveningHTML(){
   }
   const verdict = earned >= best.val ? 'Лучше было не придумать.' : earned >= HOURS*WAGE ? 'День не зря.' : 'Сегодня дома вышло бы больше.';
   const wLine = `Погода: ${WEATHER_NAME[S.D.weather]}.`;
-  const nbLine = S.D.neighbor ? `Михалыч сидел ${WHERE[S.D.neighbor]}.` : 'Михалыч сегодня не выходил.';
+  const nb = S.D.nb;
+  const nbLine = !nb.w ? 'Михалыч сегодня не выходил.'
+    : `Михалыч сидел ${WHERE[nb.w]}${nb.reason === 'empty' ? ' и ушёл пустым' : nb.reason === 'full' ? ' и ушёл с полным ведром' : ''}.`;
   return `<div class="title">Итог дня ${S.day}</div>
     <div class="sum"><span>Рыба</span><b>+${S.earnFish} ₽</b><span>Работа дома</span><b>+${S.earnWork} ₽</b>
     <span>Всего</span><b>+${earned} ₽</b><span>Если бы весь день дома</span><b>+${HOURS*WAGE} ₽</b>
