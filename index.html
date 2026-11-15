@@ -358,7 +358,7 @@ function render(){
   if (S.phase==='intro'){   // the backstory, once, before the very first day
     setScene('story');
     add(`<div class="lines story">
-      <p>Река, поля, лес. Среди них затерялась деревенька.</p>
+      <p>Река, поля, лес. Среди этой сибирской природы затерялась деревенька.</p>
       <p>Сколько вы живете уже в ней? 10 лет? Или все 50? Никто уже не помнит, да и не важно.</p>
       <p>А что важно? В этом и суть игры. Понять, что важно, а что нет.</p></div>`);
     actions.appendChild(btn('Начать день', '', ()=>{ startDay(); save(); render(); }, 'primary'));
