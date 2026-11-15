@@ -98,26 +98,35 @@ const NAME = {river:'Река', omut:'Омут', lake:'Озеро', shop:'Маг
 const WHERE = {river:'на реке', omut:'на омуте', lake:'на озере'};
 const TRAVEL = {river:1, omut:1, lake:2, shop:1};
 const RATE = {river:[0,0.37,1.16], omut:[0,0.42,1.47], lake:[0,0.37,1.8]};
-// weather is fixed for the whole day: 0 overcast, 1 sun, 2 drizzle, 3 wind, 4 fog, 5 downpour
+// weather is announced in the morning and may step once, at 11:00: 0 overcast, 1 sun, 2 drizzle, 3 wind, 4 fog, 5 downpour
 const WEATHERS = ['overcast','sun','rain','wind','fog','downpour'];
 const WEATHER_P = [.25,.25,.12,.15,.15,.08];
+const CHANGE_HOUR = 5, CHANGE_P = .25;  // at 11:00 the weather may step to a neighbouring one; fog always lifts
+// where a step can go, [weather, chance]; after a step every water re-rolls its bite level from the new weather
+const NEXT = [[[2,.45],[1,.35],[3,.2]], [[0,.7],[3,.3]], [[0,.55],[5,.45]], [[0,.6],[1,.4]], [[1,.6],[0,.4]], [[2,1]]];
 // bite level prior (none / weak / good) per water, one row per weather
 const LEVEL_P = {
   river:[[.2,.5,.3],[.3,.45,.25],[.15,.35,.5],[.4,.4,.2],[.15,.45,.4],[.6,.3,.1]],
   omut:[[.35,.35,.3],[.3,.35,.35],[.45,.35,.2],[.45,.35,.2],[.4,.35,.25],[.55,.3,.15]],
   lake:[[.3,.25,.45],[.65,.25,.1],[.5,.3,.2],[.85,.1,.05],[.45,.3,.25],[.75,.2,.05]],
 };
-const SHIFT_P = .25, RUMOR_TRUE = .8;
+const RUMOR_TRUE = .8;
 // events at the water: P(seen in an hour | bite level none / weak / good)
 const RIPPLE = [.1,.35,.6];     // small fish playing (weak sign)
 const BOIL = [.01,.05,.25];     // a predator chasing fry (strong sign)
 const BUBBLES = [.05,.2,.4];    // bubbles from the bottom, fish feeding
 const LOST = [0,.2,.35];        // a bite, but the fish came off
 const SCARE = .05;              // a pike passes the shore: the hour is empty at any level
-const MIDGE_UP = .5, MIDGE_ELSE = .04;  // midges at 8:00-9:00 foretell a better bite from 10:00
+const MIDGE = [.04,.15,.3];     // midges swarm over the water, fish feed at the surface
+const CALM = [0,1,4];           // midges only in still weather: overcast, sun, fog
 const NEIGHBOR_P = .8, NEIGHBOR_SMART = .5;  // he fishes most days; half the time at the morning's best water
 const WEATHER_NAME = ['пасмурно', 'солнце', 'морось', 'ветер', 'туман', 'ливень'];
-const WEATHER_TEXT = ['Пасмурно, тепло, тихо. Так весь день.', 'Солнце, с утра уже жарко. Так весь день.', 'Дождь, моросит и не перестанет до вечера.', 'Сильный холодный ветер, весь день.', 'Туман над водой, тихо. Так весь день.', 'Ливень, льёт стеной и не перестанет до вечера.'];
+const WEATHER_TEXT = ['Пасмурно, тепло, тихо.', 'Солнце, с утра уже жарко.', 'Дождь, моросит.', 'Сильный холодный ветер.', 'Туман над водой, тихо.', 'Ливень, льёт стеной.'];
+// the journal line when the weather steps at 11:00, by 'from-to'
+const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1-3':'Поднялся ветер, гнёт деревья.', '0-2':'Заморосило.',
+  '0-1':'Облака разошлись, выглянуло солнце.', '0-3':'Поднялся ветер, гнёт деревья.', '2-0':'Дождь перестал.',
+  '2-5':'Дождь припустил, льёт стеной.', '3-0':'Ветер стих, небо серое.', '3-1':'Ветер стих, выглянуло солнце.',
+  '4-1':'Туман сошёл, выглянуло солнце.', '4-0':'Туман поднялся, небо серое.', '5-2':'Ливень стих, моросит.'};
 const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Может, и дома посидеть.', 'В туман на реке обычно берёт ровно.', 'В ливень поплавок колотит каплями, рыба не берёт. Лучше переждать дома.'];
 
 // ---------- daylight ----------
@@ -232,20 +241,21 @@ function newSeason(){
   S = { day:1, money:0, history:[], phase:'intro' };
 }
 function genDay(){
-  const weather = pick(WEATHER_P);
+  const weather = pick(WEATHER_P);   // the morning
+  let later = weather;
+  if (weather === 4 || rnd() < CHANGE_P){ const nx = NEXT[weather]; later = nx[pick(nx.map(x=>x[1]))][0]; }
+  const weathers = Array.from({length:HOURS}, (_,h)=> h < CHANGE_HOUR ? weather : later);
   const level = {}, catchT = {}, ripple = {}, boil = {}, bubbles = {}, lost = {}, scare = {}, midge = {};
   for (const w of WATERS){
-    const a = pick(LEVEL_P[w][weather]); let b = a;
-    if (rnd() < SHIFT_P) b = pick(LEVEL_P[w][weather]);
-    level[w] = Array.from({length:HOURS}, (_,h)=> h<4 ? a : b);
-    const up = b > a;
+    const a = pick(LEVEL_P[w][weather]), b = later === weather ? a : pick(LEVEL_P[w][later]);
+    level[w] = Array.from({length:HOURS}, (_,h)=> h < CHANGE_HOUR ? a : b);
     catchT[w] = []; ripple[w] = []; boil[w] = []; bubbles[w] = []; lost[w] = []; scare[w] = []; midge[w] = [];
     for (let h=0; h<HOURS; h++){
       const lv = level[w][h], sc = rnd() < SCARE, n = poisson(RATE[w][lv]);
       catchT[w].push(sc ? 0 : n); scare[w].push(sc);
       ripple[w].push(rnd() < RIPPLE[lv]); boil[w].push(rnd() < BOIL[lv]); bubbles[w].push(rnd() < BUBBLES[lv]);
       lost[w].push(!sc && rnd() < LOST[lv]);
-      midge[w].push((h===2 || h===3) && rnd() < (up ? MIDGE_UP : MIDGE_ELSE));
+      midge[w].push(CALM.includes(weathers[h]) && rnd() < MIDGE[lv]);
     }
   }
   // the neighbour: comes at 6-8, leaves after two empty hours or with a full bucket
@@ -268,7 +278,7 @@ function genDay(){
     if (rnd() < RUMOR_TRUE){ const top = Math.max(...WATERS.map(w=>level[w][h])); const w = choice(WATERS.filter(w=>level[w][h]===top)); return {w, lv: level[w][h]}; }
     return {w: choice(WATERS), lv: Math.floor(rnd()*3)};
   });
-  return { weather, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
+  return { weather, weathers, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
 }
 function startDay(){
   S.D = genDay();
@@ -289,6 +299,7 @@ function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({S, seed}));
 function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){ S=v.S; seed=v.seed;
   if (S.D && !S.D.boil){ if (S.phase === 'evening') S.D.nb = {w: S.D.neighbor || null}; else startDay(); }  // saved before water events existed
   if (S.D && S.D.level && S.D.level.river.length !== HOURS){ if (S.phase === 'evening') S.day++; startDay(); }  // saved when the day was 8 hours long
+  if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
   return true; } }catch(e){} return false; }
 function toast(text, ms=1300){ const el=$('toast'); el.textContent=text; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
 function btn(label, sub, onclick, cls='secondary', disabled=false){
@@ -296,8 +307,10 @@ function btn(label, sub, onclick, cls='secondary', disabled=false){
   b.innerHTML = sub ? `${label}<br>${sub}` : label; b.onclick = onclick; return b;
 }
 let sceneKey = null;
+// the weather at the current hour: the morning's until 11:00, then maybe the next one
+function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOURS-1)] : S.D.weather; }
 function setScene(img){
-  const v = IMG[img], w = WEATHERS[S.D ? S.D.weather : 0];
+  const v = IMG[img], w = WEATHERS[S.D ? nowWeather() : 0];
   $('bg').alt = NAME[img] || ''; $('bg').style.filter = 'none';
   if (S.D && DAYLIGHT[img] && DAYLIGHT[img].includes(w)){   // re-lit for the hour; keeps the last picture until ready
     const h = START + Math.min(S.t, HOURS), key = `${img}/${w}/${h}`;
@@ -379,15 +392,16 @@ function scrollLog(){ const el = $('log'); if (el) el.scrollTop = el.scrollHeigh
 // what is seen on the water at the start of hour t
 function lookAround(){
   const w = S.loc, D = S.D, t = S.t, nb = D.nb;
+  if (D.weathers && t === CHANGE_HOUR && D.weathers[t] !== D.weathers[t-1]) logAdd(t, CHANGE_TEXT[`${D.weathers[t-1]}-${D.weathers[t]}`]);
   if (nb.w === w && nb.present[t]){
     if (nb.arrive === t && S.hoursHere > 0) logAdd(t, 'Пришёл Михалыч, сел рядом.');
     else if (S.hoursHere === 0) logAdd(t, nb.arrive === t ? 'Михалыч тоже пришёл сюда.' : 'Михалыч уже здесь.');
   }
   let seen = false;
-  if (D.boil[w][t]){ logAdd(t, 'У камыша бой: гоняют малька.'); seen = true; }
-  if (D.bubbles[w][t]){ logAdd(t, 'Со дна идут пузыри.'); seen = true; }
-  if (D.ripple[w][t]){ logAdd(t, choice(['Мелочь играет, круги по воде.','Плеснуло у берега.','Рыба играет у травы.'])); seen = true; }
-  if (D.midge[w][t]){ logAdd(t, 'Над водой мошкара.'); seen = true; }
+  if (D.boil[w][t]){ logAdd(t, 'У камыша раз за разом плещет, мелочь выпрыгивает из воды.'); seen = true; }
+  if (D.bubbles[w][t]){ logAdd(t, 'По воде медленно ползёт цепочка мелких пузырьков.'); seen = true; }
+  if (D.ripple[w][t]){ logAdd(t, choice(['По тихой воде тут и там расходятся круги.','У берега плеснуло, пошли круги.','У травы тихонько плеснуло.'])); seen = true; }
+  if (D.midge[w][t]){ logAdd(t, 'Над водой столбиками вьётся мошкара.'); seen = true; }
   if (!seen) logAdd(t, 'Вода гладкая, ни всплеска.');
 }
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
@@ -421,11 +435,11 @@ function sit(){
   setTimeout(()=>{
     $('waiting').classList.remove('on');
     const D = S.D, nb = D.nb;
-    if (D.scare[w][h]) logAdd(h+1, 'Прошла щука, мелочь врассыпную.');
+    if (D.scare[w][h]) logAdd(h+1, 'У травы громко плеснуло, мелочь брызнула врассыпную.');
     if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n;
       const what = `${n > 1 ? fishWord(n) : 'Рыба'} +${sum} ₽`; toast(what); logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
     else { toast('Тихо'); logAdd(h+1, 'Тихо.'); S.dry++; }
-    if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но сошла.');
+    if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
     if (nb.w === w && nb.present[h]){
       logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
       if (nb.leave === h) logAdd(h+1, nb.reason === 'empty' ? 'Михалыч сматывает удочки: «Пустое дело».' : 'Михалыч уходит с полным ведром.');
@@ -470,7 +484,8 @@ function eveningHTML(){
     }
   }
   const verdict = earned >= best.val ? 'Лучше было не придумать.' : earned >= HOURS*WAGE ? 'День не зря.' : 'Сегодня дома вышло бы больше.';
-  const wLine = `Погода: ${WEATHER_NAME[S.D.weather]}.`;
+  const wd = S.D.weathers || [S.D.weather], wl = wd[wd.length-1];
+  const wLine = wl === S.D.weather ? `Погода: ${WEATHER_NAME[S.D.weather]}.` : `Погода: ${WEATHER_NAME[S.D.weather]}, с ${clock(CHANGE_HOUR)} ${WEATHER_NAME[wl]}.`;
   const nb = S.D.nb;
   const nbLine = !nb.w ? 'Михалыч сегодня не выходил.'
     : `Михалыч сидел ${WHERE[nb.w]}${nb.reason === 'empty' ? ' и ушёл пустым' : nb.reason === 'full' ? ' и ушёл с полным ведром' : ''}.`;
