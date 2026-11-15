@@ -1,6 +1,6 @@
 {
  "name": "Уйти или остаться",
- "short_name": "Рыбалка",
+ "short_name": "Уйти или остаться",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",
