@@ -12,32 +12,57 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <title>Уйти или остаться</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --paper:#e6e0d2; --ink:#2b2925; --sub:#5a554c; --line:#2b2925; --red:#b5452f; }
+/* Rybalka Pixel: Pixelify Sans (c) 2021 The Pixelify Sans Project Authors, SIL OFL 1.1; modified: subset; Cyrillic О П К У Э Ш Щ в д з ь ы ъ and digit 5 redrawn to read as Russian letters; ruble sign and arrow added */
+@font-face { font-family:'Rybalka Pixel'; font-style:normal; font-weight:400; font-display:block;
+  src:url(data:font/woff2;base64,d09GMgABAAAAABogAA8AAAAAWFQAABnHAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGl4bo24chEAGYACDFhEICuY8zUQBNgIkA4YYC4MOAAQgBZBAByAMBxtGSRVsXGWGjQMA9nXnKOrUIlUcRfVmtOD/jwecjHF03LQqYcGCS6KmBrcSXWxKKJdQdCI4WO6actuzsVi0XA/sgdiHF4c4ogLuY9bt+UVtD2HGR4F5Pd6gruk2TSsGtQ9DUdwrlPo/dv02tifsyx6hsU9yCaL9+M3eu6/S1dJPJkkciC4hkkwblKSRpKGLJhpV7P34nf2fZDJKrSm0mNZ7AbC718LfA9AG+Ecm+P90VpkWzqyicjXZKHwI8ReIFcB//x/Qiw8A+KSLV/XzJypXoLx8HF4+DoeHw686PCa/9jl5yTuYSY6olV+Ygqxd4ahAu1dCZVpYtMkj1R69lRanXbpEnRcVJ+pU1A8/rvW/SnNNUMtYxmo7KyBB1noDIaYemTT/NXH6t9GIrNWSncKNYw4zZE07S3I4wmzpcAcf7hyu6atJQNuyWu5aTvIjkKUpwu+AFAFJYMUvR3oOPbAD9N+WKX76bu3ZHa6MDJ3C0xEIQdbs3G7mvkYjw7mK0xqqe5d2DZCTCQoLjYJagaXiAGjxMBgAcP7/qb5Ur47/2O6Gf7lrALYnYAtg+V5JN9LNi2w5U/7TvyvJX47/2PXTk3Jkx+leE5aWFeB1eFEB6ykihVUnMtP6jcMOxpr3tR7Q3/oKS3VDT44ZmKKpGKkYI/IQEZPs9fG125jY0bkZESNGQAQTR/vzjwmgHhgEEgLxQ4KCkLAspERFmBrLSiKRyTBdAbH7xngLGIdCUQlQGv80Ut8CagUk4eU6q2NCfba7shNqBNA/t53p7dkJASw3EDjBaO19nbLz4ZPu1ubgV8ShInoam+luHMB16Dx6WpzpZT+RDsFfMwFGZsqYh6QaS9l27F6OcDLXiR/DreXOcx+5HzPz5fgx9Dnr+acCCMPCPNEullFKtXQ3nUdz9DQdct8xPXqcPw2Y0tZ+A5U4hECHZeCmIfFzCCngUSwrYLIpZNNMFzfTHEmbbZV1wgnlUYyeFeZmvWwl3JIt1dIt07KNsMEOIx1FdEFlGVB9JFnZfqwApQ4LxzAIWHDgITixdSvtKlpKYULtNOa0Cjqnr1w0DJNqsBgn7Gcdy+mJa7mdh51U+73ejy9CP+GIXNFSUApX8ZJXbCVcPKtT3/SbMWTd5IWZZ+eInHalhpXYhr3uRKV80mf6eL6ryCFgwrKxasiz3ivJSSayyjMtPnewZL5KpR3sQqOf0bdzsDoVI9wRHpVE1CEigigKXGHFFTNkxFwcmggaFEJ2U3A2R0oZK7ENe1Vt1Qk4q71MEebEetismXp5Yb4pdWS+2YKpEKjNEVQmSDWG1rlOgAlsGGEHWKzYmpd0pUcpoLoaSqUacYm9C1OnF4nGRUsixtAuFBxeYMA6nqGBDgYjLGY0Bt2JZfR4t7VanQzFOBNGJL2qMQy2EhdNEXVoWwUw6lGaZjcYXzdbk0++oT/h3Kdm08y7uEbCnmg0dMS0ywY2Y0vn1px4Q1KVaJ0LJtIHiDJa3G2cx2e7EZfQprq08JtlKcvFj7Mq5VVvDPZ6JN9UC2HRVZjBLRmfxLYcNh1wVhoEgTttW1VcKw6MXT2AqhQtxSimDIEqFtqwCkUq09yXtOHTkF660YqjqmHOceheg9d6xhdjmsY/EUJ45fVC86BAC3IhY5ouCTEWQkbqQVzBhOzFHcina3IXuYMgaGt4v3fi7tSE4QPGp8u6AyjVSpOEaMIIosh9kSJs2MdVFa3357ecV8DBHQey3ULGQ8rSqmViSo/QqUHWW8o+bmiC7nenHygtQGCkk1wiPhUKLmrvgEqTtkpN406Fbd5RZLOg1Q8Su1dEmhix8Xg/txysbeyY7qKp8VP4TXaE0ySMxx6dOWAEGMg+BuScCteoRgWlOIrZg3rJe+67VV2R+MAWC8WgjyALOf8tl+ezvcNO7q9p3aTb4VTcyXLD1t/wgLV7UTCbhTfivSVg78/hYvC2lOXrUXKeeeTkkixnD1+h+JWikVjpDrQPm5psn3tcFbSnSp4IDjkrep4qFc+r0EqlFnpu+wFDTvGRVDkxWyOpdX2lVZzWOmqIo5FIsVKz0X7DFUN6iVzokbePexWT41GDwjkUF1O/3bWBk+mL9r1KUeEs0jIFM7qW2hQj4D9Ojo8tEbdKGcVNtgaGbcTvtAIBoYrrq7xiaJCEEroMGv69ySi3JBXalKgJ4t3/nCCSgmAMQiCiFJRU1DR0DIxMLBxc3CRePn4hYRFRBYrJYuISUjImm2Ka6WaaZbY5clbabIuttjkBK4IgWhjGYzB0iP5ZkR4lYgoaKGmkokhDTEfMQIZRTKQspBw0c9HCTSeJNl4iPqr4SYTICtMuopyjiBSDiEyHGNXi1EiQlSIrQ6vJxKZQNI28mWTMomg2eXOI5aiwcrvCZlspbduqgMmQKgJQDCMyWCPGkcETE8gQqaMgS0mBiiw1GRpiWrJ0xPTKAhNRlCKIEAknygjbNBJVPCAh2SFIaeSKHpFX6CSKywTVNI1oRd/JQ1IlHsVIIC6V4oQTdeTspb/nnHASAwG1Znn8nz7Ua/HiCcJChzGCDkv9I4JqS/uw0WG1f19Y36w2muxs1uU9rI0Oe/bLm0CZBybnZrVEgGcZx4ZbCe5IT8tNhG6fUnR8BCaJ9Nn+HCcqnB1KzES1D1vrAAEkbRJY4QR9KsbTympgmiW2RhFgAnQpjUut7FhBRV+S+A10Dwc4RYEEjtIG9+sxjhnask+CYkUJEeRse9iIlRdubQ3y+aOwtCqoo5N+CErPzmcRxnqzLbgvTTdvaZq5N0+FEPMpY66utnhzdKFh+iWnWY0vPcuaYmr/8gyzEESavSvbBLc6+USUw2DS8kcSUQK7CoN+FS2MT5GQVA4tAxak53gBgJvHUyE+QtLf8Hb4JbgAsML8rzC+OnGZ1K1nVv//JUDxEHkBZEC8wOcBdOZG4dhsx0AkMaM8aeIfyy6mvGo66Ka/CabYbJ9TznmVETGRIpIhtUlT0lwySjbJLYWkC16zN+fT5wHoFFdBdR11N8BEie1aYibFJEvqnM4gWSXn566D8jJAefZ5UP4EpFz+t/z/v/1/iwD+Ft4+XPt5yecVAF8ufu7T5k+pj7sAqQDsGzhIjh8J+8llwP1x/+u7VjlinVMuO+6o7XZY67RSm+WsV2aFC845b7Vjdttgj0u2uWanE3a5qKZaaqujrnrqa0BjkoYaaayJppppobmWWmmrjdZGGmGU0cYZa4zxJphon/32QlAJNEC4CYibADEG0PwDoPUBgFZgFCBdisaha0YWa+ksshdXXtpvcx7YqepnXbSIs9k3s26d7btIfCGVSWbgiZOIbBdwbPvuLrFH1S1eTWFUuYIfsaw4KXpds27uV9Rh1HJkXKAzel/O8ahwOuVGbyUg8ga9GEfxwluxz/5z5UtL1VBdjJsBnsWus0LGhR4DO4o/ohonmB/jNhek2ZvcM+MdfOrwXM0CMwmMoXwY1u5yL5wFzLsRlykw8PLyiTfPs3F8F8Fn3+Q83Ysf+BxiZ3DkKXbVz8g70/BVMDclL97w52tvq56Dy0jgkNISfo1D4DMWphSYs7c9TyvL4WUr4ywaeslsBjLL5FPl41B2bKqloi6pR+CX1extdRT0bMP3ry9QYWKHdVKA3WGzy5umgxlN41Ax7Aorzl6H5kGxB/Lnd6MiwOqDQNrNeuIoelad5WDik1ctOtGC/4nvEHjinu3DWCESKhwBkyUiexn2C1yoWGrcHHS5vMWDNdLI34ngVxihJUSEB2VaO4+1KcwAXgJjDTjwiUjQhg9E+pzY1E2ZgqtmRCVbi2tjiU9leUB0RRCjXe2tCXdrWJCAr3GP9JoYvCCFMxCwbJ2xH/HUnRcXd6Pzyw1mm6LNGR08NYPGVDlX00SFp9SMwSYPlcA5Kt2x7yqTVRBZwCOg97DfIzlcaHQvGaWe6rZD0Ebc1vG7gPNqK7sIxhbZ4PKKzXaXbMWiy98MJUHyCdhKUdxOwfSp0O3KOJapxyzXHEmLQ8l3dpJ2GXRh0AvpRKLJMAEUAyVYW1J986C7lNJEHWTrUucPOl/MxAm93Oqi3qphtxsig7s9K6sewaCua8Ar5aXrY/2t3xMK33YEUhQT9QMBQsR8v5dSn3dlX76Ug7CVBlRTqqb3coOnwftkMrQEtTSdkvu/eoWTrs/qBPisKHjSKOEZE01AbyM1vs860JTOA02+XAkJwACB+JAPojdaG2fC0zI+vGeb5maydXAeGCfZZMs0W0fZs98Xyj342UD9SDvB7cVy/dlSC7DKZrkhK8/xFvEZuXBY2ABHIWsid0RvbqBsHlE2/mbdxmc7zI9dJYviU12TX7NvhPqW6V87sk0lIozcho9zIMDYlepH5Xt8vX4sPlkQaHklxxBQcCh+3UXckLEwE9MRf52VyPPrVUIa7X4KpcUagxxG4Ml5mDGl4a5nbYy4STBT9PQnbYkvxz4+sOF6siFzFlPUhXgpSubn+YurjVHCGhArv3ofFZa3MuiyEYC34LDV8F1f1m/6qjCIX++FHGFTRKvFJGiXg0dQ33M5pfHyaoUDJM08FRZ7wR28Z8Ij7h7cCqCMpKmTn2OaQtKp2vnsd9hX6Vd28RPf6YoppSaaUKoG8nEADWqCCY0Zh1ItRElF4b13rE6wHIi1C9neJN4UCR02sCN/p/gAOiJpv6e6P+9ouYl8v1E6iaIqw0ifqhNrzJ3JmIyxNL/S/L7eEuZqomtZjEUA40u/W9kURvUnYSWa/kcd4pjcSAnz6ewzBkOC+LjhYrUm4OIfdv+v6Lei/7ZwK4RfJ+cgggORyV0ms6r8mahNJCZLhByowgyNNmND5UimPvKJdKl1A3lIenetKuQdNbRSxYQ5WZR2FpBOr9/aOpKJj3wq4dgv1Te2Vr1vExBM5EI/xE9hpeGgldvhlFRCtjgErrE5ZCxC7Zi9PKT4Fi+/eMsWYJkSDUMUtJ7IaAO6X0gw0OEUN0k5Xb8sTKYzAwa1bCMYGGWVGegGjX2CyJT1ScABTePIOU+SeUBvoP/T6w1UVpVnStFoFBoQ/ElQQFF5nc/WMwFZSwabfRH/+ZghU0UYZjBQ4WzsIN5KDU1s7f26EU+l6aZgaxN59LgT9tn21HE9003QL6C9WW6XGx807RQRk/GJR1kd9qRpMPwKytpZ6tyBe34o7BEGqImJMOKS2y7Xu5EhikUJtkSoEkk86tdMQGqmeQTgyni9ckm8dqoMaRHaKFMwFWNyPAYjRwtnxrHejRUZT3Wo1Z59IM1XEklVqioYU/BqMVmBZG5SA3KQ6mlZXFSHHsP0XJwSbZVzbs9hZk1VrFyGhIxKY54HvDbp6NDDWYNy4ENVPXTm4O748ivVoHEM1LPxL7GN01jIeX+Iy8uYNsW8pOK5Cwyh+n215cKdh39X7uEF3VU3/ed6k/1GsZBtN1BABCzYl7SC4WK/pYJFZrOVdqVcUkBUtfMcy9jNV43bOngMeTCT4cANKwKmWonTmHTdPNEx0stg36CACDYXtkO2FctQObShJHa7CpeLZZ5CH6Ng9Ao76boKJlhpZ8VtM3huI5MsypRrzFC000N3e04Vbm+ixQ0MKrb7Ut+XJr8FjS9r/VP9pnKe25aM9xd5blufVV2Qa+Qm2wDPIxwVTfE5JuDNl/7G1/IHfA0LmZEwT0tTGSwvIG+sJAsNU0A3BQDUKBEctZ5v6dt8GZ7U5Q4FgOZqgIy1xSFfO9c591fJBfM3JjPVJ9ugXqzf9SvJ1RGSqN099LJGsVZw2qM1tw9VVNwyK55L4ZMNM/KkcebpVvpdeDr888jDhYf/PHNjYaOYLV1eVu79y+wQz/m6OfXZNqjLuntz5powmMoLNdOmbf7StDu+rHl79hoC9paeydC0YIVKMcPqz/Lw2YIC9ic6aXmOWXej2cTF5iiZ73d932S89c1qBP+NKkbFQ0XRr2QRzALrl/2G2WaAZir5fYJ/uzNd2+fcVD/xutpHthpio41Ntlwn27JQ0FKb38qqWIh9arR88rXwH2aFioWiAMcE1G24Mt/xq+L6fnffeFOElefeeGOEyKPirw6mXsuVchrcNM18WsKtc8TcGy4OD0+450Y3BYLMZmf4CIXJkii/lZGBZ68lcRTSngKIWrWsYbiL82bByh9ZZKWNcf6iW6FNccVS7DxbP3uTOQ+YHap9ny9O/uFOsZPp5QZ6gCy/KMhM/XvxMC91LMds0SUy4XrzCCb5NqCRfO2Oh60guplIRO10WfeDdku9+3TwfxDct8ALjwTit6sf6X399y2nbvn6v7tO3SXn2Ag+eg8XxTN16NOcO7LjTk4r+0SQ1268Xlc3UKRqAO/kqoCEhPsVlaN8VlRFpO9MRXmxanuCyVIMHrvrC4vJwgyXv6ZtkKnsGXydyA4p2pkX5vWc32zCqs+jUv0UJ9tYXdbPZcQyhvVbZxZae/QMxUjAsXVLpaw7BC9vNt5hVOSZmmbD1apub8IvtVrsBly6s9QI4RC7UY3hNpSTkVRPhBRh5xsH4L3Oj0ZuFps5Hv2iuSMU/4bO4POmDv15H7NFh5QCMkRlelrGGcR+T2uMUcRJhAI51t8xozsdKMvCa5zDrf4+CxY0UA7Nnt5yve5mmVMDjqOhIB4wSCgKIryt77IvmjnIzBfArP/8r3wGJHnoImWfjEkpjeThMoQBE25SWl9Ca0k/1xdlBEBv00NlM2YEL69SCI9o0GzGP6GQkIcG1ZXU4zwAREnMFJiQSGnU0izGAgxZ7TFIqBf30VZPq91lciu4CB1lZWnn+47LiQvRSRP0HSGPW3FsywtMCM+BVm06IO1IqVihS8+UZvKGcWrA8793HNrEhdmKDMAcyk/xaMexDZqiV48mYbW+dcLgdZOq9St7oQuvErsPe8Pr5tRVipxQEptl72b/sGyFd8m1cxqHIK/0sA9fdnwdu7dxKMTdx25vYN/h7cehT+SA2wDOQeYFwwWi6PZG4qnrZtXEToBCMMVKagctNEcPkkPw8jRzmZUSHF/BUUqjNEnFuZu3hzdvF+NLn3Hc1odlobe4us0Uf/TeNxt37PD2xQEaYITD8iYJ7Tcj4dqULNqP5ChdCFNG2PyAeBYDCtGAod/EWgrK0FABbw9DVMVo8tFtRZrKbTc4kaIfHOI+6CagBRpbv9qzuOH3QTumsxACs1pNY4fDSNN/hstw6jPT5PIMDHTFNO4epVOG1AgX3gbI8GkMwtspiAw4pz+J0yc83ZG/AaBnDPAFIinmW9afULJAg/62mug30JgRRcXwxpM3zwEhT7MzAM9zYZBA/vgixKJX6Hsv3lC74ZLeS6Yqz70aXOVPIJezcxdzs7vXvbVvYdNC9SwDaYqWCMMWKbSPoxMHW2UpPPq2QktNP/T0vwKob4r8O3j2rz3d2rMCFZ2W7viXQyTcD4zgEOwGXyGAeH/i58xmYzf21P8sBtXjJpuv3nPP1s17dgdzFLduwZ5btry5sPZbC6LkPN588Wn62G62Ijbv+yeYyIACsVnmnCFCACl72qg+WWyf3PTh3EXApY8uvQgFUdds2GjVkpI1CEYYgkyWQjI0DIQq39jJY8ZOiTsG49s3JZFTYsdisjQzhwgFk7b0cyfxb37UQAUZZ9SXP8l1WH4piKQH+PC3ZgQtSXD9EAAqXXlLKuEqgOxNTrMPnC4PW9NwqJSU8DBtyD+8f9Sb/ffFhB/8O/WTqqlf8jMgIMD38aJNXTWVfhMY5ksAvnaMiAPwraPfI6/zVdeQsQKohAEC/P9iKV8tGUnAEOr5cr9JF6BXagCV5iuLMqrN/E58/gR27F3Ox7k/fqDi65L0jVaD5OgvTswx/InvJ2/X8ZE3hr7T+VWlfn7l/RaW41mYmf48Bos6o++7j9ZtrZD21S+aR6ufpxZxMVwsEYPFedFPHBD3jE/z3AYwOqmIUCgyM2EQhZa6dPMMH2qiMViiNLq/Q5zNjNnNHY+d9dInUGl0KHYo+oO7aA2UclCDbm+etx5sBzVZDJbd7rLm4MNSh+4JlYAjgKkM4g+gkrygZlhKuD7S+pOanMVAWQTwDKzyiN3xPKb2MM+o4n2eKAh7ntUmauU5kVib562Nq3lBUeqUF/nSvDxNV/HevMKsikF5pSoVP+ZV4ePkX4datupEtoaOG3uCawopyCnIQ44aIFsRgSlYjBywLTlbe44OROSt+r7SHI/Hn+IfpVzZkJXFxavWf2QQd61UwItnoKKs8uS/wS97/cIPbBrY5KH3wH2z3svLyE1DTf+b6Y6FKtJ4tfgbcdVaoUflDJ6fWDg20mckNU8CRV58qCQxJnbji7K4gQtXeT2mYG2zYYrZlquWYBD4yMKXoUEyXuU2gYwo9/3lGLsVgk3mpDU0cfw5Qr2YvoU2mIkfC/kt2C4OlQJ9UxASuY8Njx/rhMb4V1dgYDJLPgC3quPyxdbio57zS/UGq4FyreY12KmfuDl2V16/8awBKeWwYuJO2kSDLkvwLFGD5niOMn+4qRAtcMb1RBQoJIelX2yaeryh5VapssR3Pl3yTMrRkb3zePBBy1n4ZMk3XYAJHtLUKssY0oqBZmGBUQk+ntxnymHx4jJ0K0amujmMAJAwSdC5iEldB9rYXxyuKpRKigyv4CwFu7xWapsh5JHDfIWQ3R3Md2G0VkJYbZwjq8Thc/0MK2YiKVkquGNYAqTK8UPJLFWvM/3DomnVilpcX8pzpmXYwgSIyBj8XkBdxbU8BCtC9l4W8z9k4sS4dY2LM/7G0uo3dkQlwOn3cVpk2GUwQL/S361YVTISWEWSJEk3LJainCn/a4NnbSar7XL67ezymYLRp5ef/ajFAA==) format('woff2'); }
+@font-face { font-family:'Rybalka Pixel'; font-style:normal; font-weight:500; font-display:block;
+  src:url(data:font/woff2;base64,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) format('woff2'); }
+@font-face { font-family:'Rybalka Pixel'; font-style:normal; font-weight:600; font-display:block;
+  src:url(data:font/woff2;base64,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) format('woff2'); }
+  :root { --paper:#e6e0d2; --ink:#2b2925; --sub:#5a554c; --line:#2b2925; --red:#b5452f;
+          --top: env(safe-area-inset-top, 0px); --bot: env(safe-area-inset-bottom, 0px);
+          --reserve: 292px;     /* room the panel keeps under the scene on a day screen */
+          --eve: 404px;         /* on the evening: the sums, the hour grid and the buttons */
+          --ask: 0px; }         /* and the restart question with its buttons, while it is asked (.wrap.ask) */
   * { box-sizing: border-box; }
-  html, body { margin:0; background:#1d1c1a; color:var(--ink); font-family:'Pixelify Sans', monospace; }
-  body { padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); -webkit-tap-highlight-color: transparent; user-select: none; }
-  .wrap { max-width: 430px; margin: 0 auto; min-height: 100vh; background: var(--paper); display:flex; flex-direction:column; }
-  .scene { position: relative; width: 100%; aspect-ratio: 130 / 180; overflow: hidden; background:#9ea7a8; }
-  .scene img { width:100%; height:100%; display:block; image-rendering: pixelated; transition: filter .6s; }
-  .hud { position:absolute; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:8px; }
+  html, body { margin:0; background:#1d1c1a; color:var(--ink); font-family:'Rybalka Pixel', monospace; }
+  body { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  b, strong { font-weight:600; }
+  /* The page is the screen: the safe areas are padding inside .wrap (the strip under the status bar stays dark),
+     and on a day screen .wrap is exactly the screen's height, so the buttons are always on it */
+  .wrap { max-width: 430px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding-top: var(--top);
+          background: linear-gradient(#1d1c1a, #1d1c1a) top / 100% var(--top) no-repeat, var(--paper); display:flex; flex-direction:column; }
+  .wrap.fit { height: 100vh; height: 100dvh; }
+  /* On a short screen the scene gives up its top (the sky; in the izba its bottom, the table), at most a quarter of it
+     (more on a very short screen and on the evening, below) */
+  .scene { position: relative; flex: none; width: 100%; aspect-ratio: 130 / 180; overflow: hidden; background:#9ea7a8;
+           max-height: max(calc(min(100vw, 430px) * 1.04), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
+           max-height: max(calc(min(100vw, 430px) * 1.04), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
+  /* the evening scrolls, but its first screen shows the sums and the hour grid above the buttons: the scene gives way */
+  .wrap.eve .scene { max-height: max(calc(min(100vw, 430px) * .6), calc(100vh - var(--top) - var(--bot) - var(--eve) - var(--ask)));
+                     max-height: max(calc(min(100vw, 430px) * .6), calc(100dvh - var(--top) - var(--bot) - var(--eve) - var(--ask))); }
+  .wrap.ask { --ask: 36px; }
+  @media (max-width: 371px) { .wrap.ask { --ask: 56px; } }   /* the question takes two lines */
+  .scene img { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; object-position:center bottom; image-rendering: pixelated; }
+  .scene img.top { object-position:center top; }
+  .hud { position:absolute; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:8px; z-index:3; }
   .chip { background: var(--paper); padding:6px 10px; font-size:16px; font-weight:600; box-shadow: 0 0 0 2px var(--ink); }
   .chip small { display:block; font-size:12px; font-weight:400; margin-top:2px; color:var(--sub); }
   #hudMoney { text-align:right; }
   .toast { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); background:var(--paper); box-shadow:0 0 0 2px var(--ink);
-           padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; }
+           padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; z-index:3; }
   .toast.show { opacity:1; }
-  .waiting { position:absolute; inset:0; background: rgba(43,41,37,.0); transition: background .4s; pointer-events:none; }
-  .waiting.on { background: rgba(43,41,37,.18); }
-  .panel { flex:1; padding: 14px 16px 18px; display:flex; flex-direction:column; gap:10px; border-top: 3px solid var(--line); }
+  .panel { flex:1 1 auto; min-height:0; padding: 14px 16px 0; display:flex; flex-direction:column; gap:10px; border-top: 3px solid var(--line); }
+  .panel.busy { pointer-events:none; }   /* while an hour passes: no taps, and nothing on screen changes */
   .meta { display:flex; justify-content:space-between; gap:8px; font-size:14px; color:var(--sub); }
   .lines { display:flex; flex-direction:column; gap:4px; font-size:16px; line-height:1.3; }
   .title { font-size:20px; font-weight:600; }
-  .actions { margin-top:auto; display:flex; flex-direction:column; gap:8px; }
+  /* the buttons stay at the bottom of the screen even when the page above them is longer (the evening) */
+  .actions { margin-top:auto; display:flex; flex-direction:column; gap:8px; position:sticky; bottom:0; z-index:1;
+             background:var(--paper); padding: 4px 0 calc(18px + var(--bot)); }
   .grid { display:grid; gap:6px; }
-  button { font-family:'Pixelify Sans', monospace; color:var(--ink); cursor:pointer; }
+  button { font-family:'Rybalka Pixel', monospace; color:var(--ink); cursor:pointer; touch-action: manipulation; }
   button:disabled { opacity:.35; cursor:default; }
   .primary { min-height:54px; background:var(--ink); color:var(--paper); border:none; font-size:18px; font-weight:600; }
   .secondary { min-height:50px; background:transparent; border:2px solid var(--ink); font-size:14px; line-height:1.15; padding:4px; }
@@ -48,37 +73,65 @@
   .cell.you { box-shadow: inset 0 0 0 2px var(--ink); }
   .cell.f { background:#9fb0a2; }
   .cell.big { background:#c99a5a; }
+  .cell.na { background: repeating-linear-gradient(135deg, #d6cfbf 0 2px, transparent 2px 6px); opacity:.7; }   /* still on the way there */
   .sum { display:grid; grid-template-columns: 1fr auto; gap:2px 10px; font-size:15px; }
   .sum b { font-weight:600; }
-  .log { max-height: 6.7em; overflow-y: auto; display:flex; flex-direction:column; gap:2px; font-size:15px; line-height:1.3;
-         padding: 6px 0; border-top: 1px solid #b9b1a0; border-bottom: 1px solid #b9b1a0; -webkit-overflow-scrolling: touch; user-select: text; }
+  /* the journal shows up to about five lines; on a short screen it gives way down to three (journal() sets min-height) */
+  .log { flex: 0 1 auto; max-height: 6.7em; overflow-y: auto; display:flex; flex-direction:column; gap:2px; font-size:15px; line-height:1.3;
+         padding: 6px 0; border-top: 1px solid #b9b1a0; border-bottom: 1px solid #b9b1a0; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
   .log > div { display:flex; gap:8px; }
   .log .tm { flex: 0 0 2.9em; color: var(--sub); }
   .note { font-size:14px; color:var(--sub); line-height:1.35; }
-  .bar { height:10px; background:#d6cfbf; box-shadow: inset 0 0 0 1px var(--ink); }
-  .bar > div { height:100%; background: var(--ink); }
   .splash { position:fixed; inset:0; z-index:10; background:#55663f; display:flex; justify-content:center; }
   .splash[hidden] { display:none; }
   .splash .frame { position:relative; width:100%; max-width:430px; height:100%; overflow:hidden; }
   .splash img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center bottom; image-rendering:pixelated; }
-  .splash .name { position:absolute; top:calc(env(safe-area-inset-top) + 7.5%); left:16px; right:16px; text-align:center; font-size:38px; font-weight:600; line-height:1.1; }
+  /* the title is light like the tag, with a dark pixel outline: it lies on the forest on a short screen and on the
+     sky on a tall one (or half on each), and reads on both */
+  .splash .name { position:absolute; top:calc(env(safe-area-inset-top) + 7.5%); left:16px; right:16px; text-align:center; font-size:38px; font-weight:600; line-height:1.1;
+                  color:#f3efe4; --o:rgba(43,41,37,.85);
+                  text-shadow: 2px 0 0 var(--o), -2px 0 0 var(--o), 0 2px 0 var(--o), 0 -2px 0 var(--o),
+                    2px 2px 0 var(--o), -2px 2px 0 var(--o), 2px -2px 0 var(--o), -2px -2px 0 var(--o), 0 4px 0 rgba(0,0,0,.3); }
   .splash .start { position:absolute; bottom:calc(env(safe-area-inset-bottom) + 86px); left:50%; transform:translateX(-50%); width:200px; min-height:54px;
                    background:var(--paper); color:var(--ink); border:3px solid var(--ink); box-shadow:0 4px 0 rgba(0,0,0,.35); font-size:20px; font-weight:600; }
   .splash .tag { position:absolute; bottom:calc(env(safe-area-inset-bottom) + 36px); left:16px; right:16px; text-align:center; color:#f3efe4;
                  font-size:18px; font-weight:500; text-shadow:0 2px 0 rgba(0,0,0,.35); }
   .story { gap:8px; }
   .story p { margin:0; }
+  /* too low for the scene and the panel together (a phone on its side): the page scrolls as it used to */
+  @media (max-height: 540px) { .wrap.fit { height: auto; } }
+  /* a phone with the browser's bars: a little less air in the panel, so the scene keeps more of its picture */
+  @media (max-height: 800px) {
+    :root { --reserve: 256px; --eve: 376px; }
+    .panel { padding-top: 10px; gap: 8px; }
+    .actions { gap: 6px; padding: 2px 0 calc(12px + var(--bot)); }
+    .primary { min-height: 48px; }
+    .secondary { min-height: 46px; }
+    .link { min-height: 36px; }
+  }
+  /* a short phone in its browser (an iPhone SE in Safari): the scene may give up more of the picture, so that a day
+     screen with the journal at its three lines still fits the screen */
+  @media (max-height: 620px) {
+    :root { --reserve: 266px; }
+    .scene { max-height: max(calc(min(100vw, 430px) * .8), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
+             max-height: max(calc(min(100vw, 430px) * .8), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
+    /* and the evening's scene may shrink to a strip, so the whole hour grid and the question stay above the buttons */
+    .wrap.eve .scene { max-height: max(calc(min(100vw, 430px) * .4), calc(100vh - var(--top) - var(--bot) - var(--eve) - var(--ask)));
+                       max-height: max(calc(min(100vw, 430px) * .4), calc(100dvh - var(--top) - var(--bot) - var(--eve) - var(--ask))); }
+  }
+  .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="wrap" id="wrap">
   <div class="scene">
     <img id="bg" alt="">
-    <div class="waiting" id="waiting"></div>
+    <img id="bg2" alt="" aria-hidden="true">
     <div class="hud"><div class="chip" id="hudTime"></div><div class="chip" id="hudMoney"></div></div>
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
   <div class="panel" id="panel"></div>
+  <div class="sr" id="say" role="log" aria-live="polite"></div>
 </div>
 <div class="splash" id="splash" hidden>
   <div class="frame">
@@ -117,7 +170,7 @@ const LEVEL_P = {
   omut:[[.35,.35,.3],[.3,.35,.35],[.45,.35,.2],[.45,.35,.2],[.4,.35,.25],[.55,.3,.15]],
   lake:[[.3,.25,.45],[.65,.25,.1],[.5,.3,.2],[.85,.1,.05],[.45,.3,.25],[.75,.2,.05]],
 };
-const RUMOR_TRUE = .8;
+const RUMOR_TRUE = .7;   // the village tells the truth about the best water this often, else a made-up story
 // events at the water: P(seen in an hour | bite level none / weak / good)
 const RIPPLE = [.1,.35,.6];     // small fish playing (weak sign)
 const BOIL = [.01,.05,.25];     // a predator chasing fry (strong sign)
@@ -134,13 +187,13 @@ const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1
   '0-1':'Облака разошлись, выглянуло солнце.', '0-3':'Поднялся ветер, гнёт деревья.', '2-0':'Дождь перестал.',
   '2-5':'Дождь припустил, льёт стеной.', '3-0':'Ветер стих, небо серое.', '3-1':'Ветер стих, выглянуло солнце.',
   '4-1':'Туман сошёл, выглянуло солнце.', '4-0':'Туман поднялся, небо серое.', '5-2':'Ливень стих, моросит.'};
-const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Может, и дома посидеть.', 'В туман на реке обычно берёт ровно.', 'В ливень поплавок колотит каплями, рыба не берёт. Лучше переждать дома.'];
+const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Разве что омут под лесом.', 'В туман на реке обычно берёт ровно.', 'В ливень поплавок колотит каплями, рыба не берёт. Лучше переждать дома.'];
 
 // ---------- daylight ----------
-// The scene is re-lit for the hour in the browser, the way fisherman-lab/art/tools/daytime.py does it:
+// The scene is re-lit for the hour in the browser, the way should_I_lab/art/tools/daytime.py does it:
 // the overcast picture is the clean scene, its palette colours tell sky, water, windows and the lamp apart.
 // Keep the numbers here and in daytime.py the same.
-const DAYLIGHT = {river: WEATHERS, lake: WEATHERS, omut: WEATHERS, shop: WEATHERS, home: WEATHERS};
+const RELIT = new Set(['river', 'lake', 'omut', 'shop', 'home']);   // the outdoor scenes, re-lit for the hour in every weather
 const DAY_KEYS = {   // hour: sky tint, land tint, glow colour and strength low in the sky
   6:  {sky:[.62,.66,.78], land:[.56,.60,.70], glow:[196,200,210], g:.20},
   8:  {sky:[.86,.89,.95], land:[.82,.85,.92], glow:[206,208,212], g:.06},
@@ -159,12 +212,27 @@ const SKY_C = keySet([[158,167,168],[174,181,179],[192,197,192],[147,156,158],[1
 const WATER_C = keySet([[116,131,138],[142,156,161],[95,109,115],[195,204,206],[62,74,78],[52,63,67],[78,92,96],[44,54,50],
   [128,142,146],[154,166,168],[104,118,122]]);
 const WIN = [125,116,104], LAMP = rgbKey(97,95,89);
-const LIT = {   // what lights up in the evening, per scene; skip boxes [x, y, w, h] stay dark (the home's attic window)
-  home: {c: keySet([WIN, [60,58,56]]), skip: [[60,97,5,5]]},
+const LIT = {   // what lights up in the evening, per scene; skip boxes [x, y, w, h] stay dark
+  home: {c: keySet([WIN, [60,58,56]]), skip: [[60,97,5,5]]},   // not the attic window
   shop: {c: keySet([WIN, [97,95,89]]), skip: []},
+  river: {c: keySet([WIN]), skip: [[37,72,3,3]]},              // not the izba with the hole in its roof: nobody lives there
 };
 const LIT_DEFAULT = {c: keySet([WIN]), skip: []};
 const SUN_BAKED = {x0:96, x1:113, y0:7, y1:25, sky:[112,160,198]};   // where weather.py put the sun of the sunny picture
+// On a sunny day the water glints gather under the sun and follow it, as daytime.py has them (weather.sun with
+// glint_x): the chance of a glint per water pixel falls off with the distance from the sun's x. The sunny picture
+// comes with glints scattered evenly; they are put back to the water under them: weather.sun paints a water pixel
+// from its clean colour alone (warmed, then mixed with the sky's blue), so the picture's other pixels of that clean
+// colour tell what lies under a glint. daytime.py draws its glints at random; here each pixel has a fixed number
+// instead, so a glint stays in place from hour to hour while the patch moves with the sun.
+const GLINT = rgbKey(250,246,222), GLINT_C = [250,246,222], SUN_WATER = [96,146,178];
+const sunWater = c => mix3([clamp8(c[0]*1.10 + 4), clamp8(c[1]*1.06 + 2), clamp8(c[2]*.92)], SUN_WATER, .45);   // if no other pixel tells
+const glintP = (x, sx) => .002 + .03*Math.exp(-(((x - sx)/14)**2));
+function pixelNoise(s, x, y){   // a fixed number in [0, 1) for every pixel of a scene
+  let v = (Math.imul(s, 73856093) ^ Math.imul(x, 19349663) ^ Math.imul(y, 83492791)) >>> 0;
+  v = Math.imul(v ^ (v >>> 16), 0x45d9f3b); v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
+  return ((v ^ (v >>> 16)) >>> 0) / 4294967296;
+}
 function dayLight(h){
   const ks = Object.keys(DAY_KEYS).map(Number).sort((a,b)=>a-b);
   const lo = Math.max(...ks.filter(k=>k<=h)), hi = Math.min(...ks.filter(k=>k>=h));
@@ -187,14 +255,26 @@ function pixels(src){
     const x = c.getContext('2d'); x.drawImage(im, 0, 0); ok({c, x, d: x.getImageData(0, 0, c.width, c.height)}); };
     im.onerror = fail; im.src = src; });
 }
+// frames are kept as promises, so a frame asked for again while it is being drawn is drawn once
 const litCache = {};
-async function litScene(loc, weather, h){
+function litScene(loc, weather, h){
   const key = `${loc}/${weather}/${h}`;
-  if (litCache[key]) return litCache[key];
+  if (!litCache[key]){
+    if (Object.keys(litCache).length >= 60) for (const k in litCache) delete litCache[k];   // a long session: start over
+    litCache[key] = drawLit(loc, weather, h).catch(e => { delete litCache[key]; throw e; });
+  }
+  return litCache[key];
+}
+async function drawLit(loc, weather, h){
   const clean = (await pixels(IMG[loc].overcast)).d.data, out = await pixels(IMG[loc][weather]);
   const d = out.d.data, W = out.c.width, H = out.c.height, L = dayLight(h), waterTint = lerp3(L.land, L.sky, .6);
   const spec = LIT[loc] || LIT_DEFAULT, haze = weather === 'fog' ? .4 : 0, sun = weather === 'sun';
-  const isSky = new Uint8Array(W*H), isLit = new Uint8Array(W*H), lamps = [];
+  const sunX = sunPath(h)[0], noise = [...loc].reduce((a, ch) => a*31 + ch.charCodeAt(0), 7);
+  const isSky = new Uint8Array(W*H), isLit = new Uint8Array(W*H), lamps = [], under = new Map();
+  if (sun) for (let y = 84; y < H; y++) for (let x = 0; x < W; x++){   // the sunny water of each clean colour
+    const i = (y*W + x)*4, k = rgbKey(clean[i], clean[i+1], clean[i+2]);
+    if (WATER_C.has(k) && rgbKey(d[i], d[i+1], d[i+2]) !== GLINT) under.set(k, [d[i], d[i+1], d[i+2]]);
+  }
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
     const p = y*W + x, i = p*4, k = rgbKey(clean[i], clean[i+1], clean[i+2]);
     isSky[p] = y < 92 && SKY_C.has(k);
@@ -208,6 +288,10 @@ async function litScene(loc, weather, h){
       if (sun && x >= SUN_BAKED.x0 && x <= SUN_BAKED.x1 && y >= SUN_BAKED.y0 && y <= SUN_BAKED.y1) c = SUN_BAKED.sky;   // drop the baked sun
       c = mix3(tint3(c, L.sky), L.glow, Math.min(1, Math.max(0, (y-40)/52) * L.g));
     } else if (y >= 84 && WATER_C.has(k)){
+      if (sun){   // the glints of the hour, gathered under the sun
+        if (rgbKey(...c) === GLINT) c = under.get(k) || sunWater([clean[i], clean[i+1], clean[i+2]]);
+        if (pixelNoise(noise, x, y) < glintP(x, sunX)) c = GLINT_C;
+      }
       c = mix3(tint3(c, waterTint), L.glow, L.g*.35);
     } else c = tint3(c, L.land);
     d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2];
@@ -231,7 +315,7 @@ async function litScene(loc, weather, h){
     }
   }
   out.x.putImageData(out.d, 0, 0);
-  return litCache[key] = out.c.toDataURL();
+  return out.c.toDataURL();
 }
 
 // The izba from inside is lit the way daytime.py's izba_light does it, and the cuckoo clock and the calendar are
@@ -258,10 +342,12 @@ const FONT3 = glyphs({'П':'XXX X.X X.X X.X X.X', 'Н':'X.X X.X XXX X.X X.X', '�
 // day 1 is Sunday the 15th, then the days go by a real calendar from 15 June; the month is not shown
 function dateOf(day){ const t = new Date(Date.UTC(2025, 5, 14 + day)); return [String(t.getUTCDate()), WEEKDAY[t.getUTCDay()], t.getUTCDay() === 0]; }
 let izCache = {}, izMask = null;
-async function izbaScene(open, weather, h, day){
+function izbaScene(open, weather, h, day){
   const key = `${open}/${weather}/${h}/${day}`;
   if (izCache.day !== day) izCache = {day};   // a new day: yesterday's pictures are not needed
-  if (izCache[key]) return izCache[key];
+  return izCache[key] || (izCache[key] = drawIzba(open, weather, h, day).catch(e => { delete izCache[key]; throw e; }));
+}
+async function drawIzba(open, weather, h, day){
   izMask = izMask || pixels(IMG.izbaMask);
   const m = (await izMask).d.data, out = await pixels(IMG[open ? 'izba' : 'izbaClosed'][weather]);
   const d = out.d.data, W = out.c.width, H = out.c.height, lt = IZ_LIGHT[weather];
@@ -314,7 +400,7 @@ async function izbaScene(open, weather, h, day){
     }
   }
   out.x.putImageData(out.d, 0, 0);
-  return izCache[key] = out.c.toDataURL();
+  return out.c.toDataURL();
 }
 // ---------- end daylight ----------
 
@@ -363,16 +449,24 @@ function genDay(){
       if (h < HOURS-1 && h >= 4 && total >= 4){ nb.leave = h; nb.reason = 'full'; break; }
     }
   }
-  // a fresh rumor for every hour the player may walk into the shop
-  const rumor = Array.from({length:HOURS}, (_,h) => {
-    if (rnd() < RUMOR_TRUE){ const top = Math.max(...WATERS.map(w=>level[w][h])); const w = choice(WATERS.filter(w=>level[w][h]===top)); return {w, lv: level[w][h]}; }
-    return {w: choice(WATERS), lv: Math.floor(rnd()*3)};
-  });
+  // one rumor per weather period, from the levels at its first hour: until 11:00 and after; if the weather holds,
+  // the morning's rumor holds all day. True: the best water and its level, or nowhere when no water bites.
+  // Made up: a random level, a random water (nowhere for level 0).
+  const rumorAt = h => {
+    if (rnd() < RUMOR_TRUE){
+      const top = Math.max(...WATERS.map(w=>level[w][h]));
+      return top ? {w: choice(WATERS.filter(w=>level[w][h]===top)), lv: top} : {w: null, lv: 0};
+    }
+    const lv = Math.floor(rnd()*3);
+    return lv ? {w: choice(WATERS), lv} : {w: null, lv: 0};
+  };
+  const rumorA = rumorAt(0), rumorB = later === weather ? rumorA : rumorAt(CHANGE_HOUR);
+  const rumor = Array.from({length:HOURS}, (_,h) => h < CHANGE_HOUR ? rumorA : rumorB);
   return { weather, weathers, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
 }
 function startDay(){
   S.D = genDay();
-  S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.path = []; S.presence = {river:[],omut:[],lake:[]};
+  S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
   S.phase = 'izba';
   logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
@@ -387,38 +481,106 @@ function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function remaining(){ return HOURS - S.t; }
 const SAVE_KEY = 'wait-or-leave-v2';
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({S, seed})); }catch(e){} }
-function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){ S=v.S; seed=v.seed;
-  if (S.D && !S.D.boil){ if (S.phase === 'evening') S.D.nb = {w: S.D.neighbor || null}; else startDay(); }  // saved before water events existed
-  if (S.D && S.D.level && S.D.level.river.length !== HOURS){ if (S.phase === 'evening') S.day++; startDay(); }  // saved when the day was 8 hours long
+function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){
+  if (v.S.phase === 'winter') return false;   // the old 35-day season ended in winter: a new game
+  S = v.S; seed = Number.isFinite(v.seed) ? v.seed >>> 0 : Math.floor(Math.random()*1e9);   // a broken seed would hang rnd()
+  // saved when the day was 8 hours long (water events came later in those days too): the evening goes on to a
+  // new day, a day in progress starts again without what it had earned
+  if (S.D && (!S.D.boil || (S.D.level && S.D.level.river.length !== HOURS))){
+    if (S.phase === 'evening') S.day++; else S.money -= (S.earnFish || 0) + (S.earnWork || 0);
+    startDay();
+  }
   if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
   if (S.phase === 'morning'){ S.phase = 'izba'; S.curtain = false; }  // saved before the izba had a curtain and a yard
+  delete S.path;   // the route was kept once and never shown
   return true; } }catch(e){} return false; }
+// another tab or the installed app saved the game: take its state, unless an hour is passing here
+function onStorage(e){
+  if (e.key !== SAVE_KEY || busy) return;
+  if (!load()) newSeason();
+  askRestart = false; hush(); render();
+}
+window.addEventListener('storage', onStorage);
 function toast(text, ms=1300){ const el=$('toast'); el.textContent=text; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
+// Taps are ignored for a moment after every new screen: the second tap of a double tap must not press the button
+// that has just appeared under the finger
+const TAP_LOCK = 350;
+let tapLock = 0;
+const tapsLocked = () => performance.now() < tapLock;
 function btn(label, sub, onclick, cls='secondary', disabled=false){
   const b = document.createElement('button'); b.type='button'; b.className=cls; b.disabled=disabled;
-  b.innerHTML = sub ? `${label}<br>${sub}` : label; b.onclick = onclick; return b;
+  b.innerHTML = sub ? `${label}<br>${sub}` : label; b.onclick = e => { if (!tapsLocked()) onclick(e); }; return b;
 }
-let sceneKey = null;
 // the weather at the current hour: the morning's until 11:00, then maybe the next one
 function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOURS-1)] : S.D.weather; }
+
+// ---------- the scene picture ----------
+// Two pictures lie one on the other: a new frame fades in over the one shown, then it is the one shown.
+// A drawn frame (re-lit for the hour, or the izba) leaves the last picture on screen until it is ready.
+const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600;
 const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba pictures: is the curtain pulled aside
+const pic = {front: 0, url: null, seq: 0, fading: null};
+const layer = i => $(i ? 'bg2' : 'bg');
+function showPicture(url, alt, top){
+  if (url === pic.url) return;
+  pic.url = url; const seq = ++pic.seq;
+  if (pic.fading && pic.fading.started) endFade();   // a fade cut short by the next frame: it is shown in full at once
+  const shown = layer(pic.front), next = layer(1 - pic.front);
+  if (!shown.getAttribute('src') || !FADE){   // the first picture, or no motion wanted: at once
+    pic.fading = null; shown.src = url; shown.alt = alt; shown.classList.toggle('top', top); return;
+  }
+  next.style.transition = 'none'; next.style.opacity = '0'; next.style.zIndex = '2'; shown.style.zIndex = '1';
+  next.src = url; next.alt = alt; next.classList.toggle('top', top);
+  const f = pic.fading = {el: next, started: false, timer: 0};
+  const start = () => {
+    if (pic.seq !== seq) return;
+    f.started = true;
+    next.getBoundingClientRect();   // lay out the transparent picture first, so the change below fades
+    next.style.transition = `opacity ${FADE}ms ease`; next.style.opacity = '1';
+    f.timer = setTimeout(() => { if (pic.seq === seq) endFade(); }, FADE + 40);
+  };
+  (next.decode ? next.decode() : Promise.resolve()).then(start, start);
+}
+function endFade(){
+  const f = pic.fading; if (!f) return;
+  clearTimeout(f.timer); f.el.style.transition = 'none'; f.el.style.opacity = '1'; f.el.setAttribute('aria-hidden', 'false');
+  const old = layer(pic.front); old.alt = ''; old.setAttribute('aria-hidden', 'true');
+  pic.front = 1 - pic.front; pic.fading = null;
+}
+// a drawn scene at hour t, in the weather of that hour: its key, how to draw it, and the plain picture if drawing fails
+function frame(img, t){
+  const w = WEATHERS[S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
+  if (img in IZBA){   // the izba at this hour of this day, the evening at 16:00 with the lamp on
+    const open = IZBA[img];
+    return {key: `${img}/${w}/${h}/${S.day}`, draw: () => izbaScene(open, w, h, S.day), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
+  }
+  if (RELIT.has(img)) return {key: `${img}/${w}/${h}`, draw: () => litScene(img, w, h), plain: IMG[img][w]};
+  return null;
+}
+let sceneKey = null, sceneReady = Promise.resolve();
 function setScene(img){
-  const v = IMG[img], w = WEATHERS[S.D ? nowWeather() : 0];
-  $('bg').alt = NAME[img] || ''; $('bg').style.filter = 'none';
-  if (S.D && img in IZBA){   // the izba at this hour of this day, the evening at 16:00 with the lamp on
-    const open = IZBA[img], h = START + Math.min(S.t, HOURS), key = `${img}/${w}/${h}/${S.day}`;
-    sceneKey = key;
-    izbaScene(open, w, h, S.day).then(url => { if (sceneKey === key) $('bg').src = url; })
-      .catch(() => { if (sceneKey === key) $('bg').src = IMG[open ? 'izba' : 'izbaClosed'][w]; });
-    return;
-  }
-  if (S.D && DAYLIGHT[img] && DAYLIGHT[img].includes(w)){   // re-lit for the hour; keeps the last picture until ready
-    const h = START + Math.min(S.t, HOURS), key = `${img}/${w}/${h}`;
-    sceneKey = key;
-    litScene(img, w, h).then(url => { if (sceneKey === key) $('bg').src = url; }).catch(() => { if (sceneKey === key) $('bg').src = v[w]; });
-    return;
-  }
-  sceneKey = null; $('bg').src = typeof v === 'string' ? v : v[w];
+  const alt = NAME[img] || '', top = img in IZBA, f = S.D ? frame(img, S.t) : null;
+  if (!f){ const v = IMG[img]; sceneKey = null; sceneReady = Promise.resolve(); showPicture(typeof v === 'string' ? v : v[WEATHERS[S.D ? nowWeather() : 0]], alt, top); return; }
+  const key = sceneKey = f.key;
+  sceneReady = f.draw().then(url => { if (sceneKey === key) showPicture(url, alt, top); },
+                             () => { if (sceneKey === key) showPicture(f.plain, alt, top); });
+}
+// After a screen is shown, the frames the next taps will need are drawn in idle time, one at a time: the next hour
+// at the water or in the izba, and the places a tap away. When the hour passes, its picture is ready to fade in.
+let warmList = [], warmGen = 0;
+const whenIdle = fn => window.requestIdleCallback ? requestIdleCallback(fn, {timeout: 1500}) : setTimeout(fn, 120);
+function warmUp(){
+  const gen = ++warmGen, t = S.t, room = S.curtain ? 'izba' : 'izbaClosed', list = [];
+  const at = (img, tt) => list.push(frame(img, Math.min(tt, HOURS)));
+  const trips = dests => dests.filter(canGo).forEach(d => at(d, t + TRAVEL[d]));
+  if (S.phase === 'water'){ if (t < HOURS){ at(S.loc, t + 1); at(room, t); } else at('izbaEvening', HOURS); }
+  else if (S.phase === 'izba'){ at(S.curtain ? 'izbaClosed' : 'izba', t); at('home', t); at(t + 1 < HOURS ? room : 'izbaEvening', t + 1); }
+  else if (S.phase === 'yard'){ at(room, t); trips([...WATERS, 'shop']); }
+  else if (S.phase === 'shop'){ trips(WATERS); at(room, t); }
+  warmList = list;
+  const step = () => { if (gen !== warmGen) return; const f = warmList.shift();
+    if (f) f.draw().then(() => whenIdle(step), () => whenIdle(step)); };
+  sceneReady.then(() => whenIdle(step));
 }
 function hud(){
   const left = S.D ? Math.max(0, HOURS - S.t) : 0;   // hours of the day left
@@ -433,16 +595,23 @@ function moveButtons(){
   const opts = S.loc === 'shop' ? WATERS : [];
   g.style.gridTemplateColumns = `repeat(${opts.length + 1}, minmax(0,1fr))`;
   for (const w of opts){
-    const tt = TRAVEL[w]; const ok = S.t + tt < HOURS;
-    g.appendChild(btn(NAME[w], `${tt} ч`, ()=>go(w), 'secondary', !ok));
+    g.appendChild(btn(NAME[w], `${TRAVEL[w]} ч`, ()=>go(w), 'secondary', !canGo(w)));
   }
   g.appendChild(btn('Уйти домой', '', walkHome));
   return g;
 }
 
 // ---------- render ----------
+const FIT = new Set(['izba', 'yard', 'shop', 'water']);   // day screens fit the screen; the backstory and the evening scroll
+let shownPhase = null;
 function render(){
-  hud(); const P = $('panel'); P.innerHTML='';
+  const P = $('panel'), hadFocus = !!document.activeElement && P.contains(document.activeElement);
+  tapLock = performance.now() + TAP_LOCK;
+  hud(); P.innerHTML='';
+  $('wrap').classList.toggle('fit', FIT.has(S.phase));
+  $('wrap').classList.toggle('eve', S.phase === 'evening');
+  $('wrap').classList.toggle('ask', S.phase === 'evening' && askRestart);   // the restart question needs room (--ask)
+  if (S.phase !== shownPhase){ shownPhase = S.phase; if (window.scrollTo) scrollTo(0, 0); }   // a new screen starts at the top
   document.querySelector('.hud').style.visibility = S.phase === 'intro' ? 'hidden' : '';
   const add = html => { const d=document.createElement('div'); d.innerHTML=html; while(d.firstChild) P.appendChild(d.firstChild); };
   const actions = document.createElement('div'); actions.className='actions';
@@ -451,7 +620,7 @@ function render(){
     setScene('story');
     add(`<div class="lines story">
       <p>Река, поля, лес. Среди этой сибирской природы затерялась деревенька.</p>
-      <p>Сколько вы живете уже в ней? 10 лет? Или все 50? Никто уже не помнит, да и не важно.</p>
+      <p>Сколько вы живёте уже в ней? 10 лет? Или все 50? Никто уже не помнит, да и не важно.</p>
       <p>А что важно? В этом и суть игры. Понять, что важно, а что нет.</p></div>`);
     actions.appendChild(btn('Начать день', '', ()=>{ startDay(); save(); render(); }, 'primary'));
   }
@@ -473,7 +642,7 @@ function render(){
     setScene('home');
     add(journal());
     const g = document.createElement('div'); g.className='grid'; g.style.gridTemplateColumns='repeat(4, minmax(0,1fr))';
-    for (const d of [...WATERS,'shop']) g.appendChild(btn(NAME[d], `${TRAVEL[d]} ч`, ()=>go(d), 'secondary', S.t + TRAVEL[d] >= HOURS));
+    for (const d of [...WATERS,'shop']) g.appendChild(btn(NAME[d], `${TRAVEL[d]} ч`, ()=>go(d), 'secondary', !canGo(d)));
     actions.appendChild(g);
     actions.appendChild(btn('Домой', '', backInside));
   }
@@ -486,7 +655,7 @@ function render(){
 
   else if (S.phase==='water'){
     setScene(S.loc);
-    const quiet = S.hoursHere === 0 ? '' : S.dry === 0 ? 'только что клевало' : `тихо ${S.dry} ${plural(S.dry,'час','часа','часов')}`;
+    const quiet = S.hoursHere === 0 || S.dry == null ? '' : S.dry === 0 ? 'только что клевало' : `тихо ${S.dry} ${plural(S.dry,'час','часа','часов')}`;
     add(`<div class="meta"><span>${todayCatch()}</span><span>${quiet}</span></div>${journal()}`);
     if (S.t >= HOURS) actions.appendChild(btn('Вернуться домой', '', comeHome, 'primary'));   // the day is over here: only home
     else { actions.appendChild(btn('Остаться ещё на час', '', sit, 'primary')); actions.appendChild(moveButtons()); }
@@ -497,8 +666,9 @@ function render(){
     add(eveningHTML());
     actions.appendChild(btn('Лечь спать', '', nextDay, 'primary'));
     if (!askRestart) actions.appendChild(btn('Начать заново', '', ()=>{ askRestart = true; render(); }, 'link'));
-    else {   // the second tap: the whole game is wiped
-      add(`<div class="note">Начать всё заново? Дни и деньги не сохранятся.</div>`);
+    else {   // the second tap: the whole game is wiped; the question stays with the buttons, in sight
+      const q = document.createElement('div'); q.className = 'note'; q.textContent = 'Начать всё заново? Дни и деньги не сохранятся.';
+      actions.appendChild(q);
       const g = document.createElement('div'); g.className='grid'; g.style.gridTemplateColumns='repeat(2, minmax(0,1fr))';
       g.appendChild(btn('Начать заново', '', restart));
       g.appendChild(btn('Отмена', '', ()=>{ askRestart = false; render(); }));
@@ -508,11 +678,30 @@ function render(){
 
   P.appendChild(actions);
   scrollLog();
+  if (hadFocus){   // a keyboard or screen reader user stays on the buttons: the main one, or the first
+    const b = P.querySelector('button.primary:not(:disabled)') || P.querySelector('button:not(:disabled)');
+    if (b) b.focus({preventScroll: true});
+  }
+  announce();
+  if (S.D) warmUp();
 }
 function logAdd(t, text){ S.log.push({t: clock(t), text}); }
 function journal(){
-  // the time is written only on the first line of each hour
-  return `<div class="log" id="log">${S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('')}</div>`;
+  // the time is written only on the first line of each hour; a short screen squeezes the journal down to three lines
+  const n = Math.min(3, S.log.length), min = `calc(${(n*1.3).toFixed(1)}em + ${Math.max(0, n-1)*2 + 14}px)`;
+  return `<div class="log" id="log" style="min-height:${min}">${S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('')}</div>`;
+}
+// The journal is drawn anew on every screen, so a screen reader hears its new lines from a lasting region (#say);
+// a line the toast has just said is not said twice
+let saidLog = null, saidN = 0;
+function hush(){ saidLog = S.log || null; saidN = saidLog ? saidLog.length : 0; }   // a loaded game is not read out
+function announce(){
+  if (!S.log) return;
+  if (S.log !== saidLog){ saidLog = S.log; saidN = 0; }   // a new day
+  const said = $('toast').classList.contains('show') ? $('toast').textContent : null;
+  const fresh = S.log.slice(saidN).map(e => e.text.replace(/<[^>]*>/g, '')).filter(s => s.replace(/\.$/, '') !== said);
+  saidN = S.log.length;
+  if (fresh.length) $('say').textContent = fresh.join(' ');
 }
 function scrollLog(){ const el = $('log'); if (el) el.scrollTop = el.scrollHeight; }
 // what is seen on the water at the start of hour t
@@ -522,12 +711,14 @@ function lookAround(){
     if (nb.arrive === t && S.hoursHere > 0) logAdd(t, 'Пришёл Михалыч, сел рядом.');
     else if (S.hoursHere === 0) logAdd(t, nb.arrive === t ? 'Михалыч тоже пришёл сюда.' : 'Михалыч уже здесь.');
   }
-  let seen = false;
+  // the words follow the hour's weather: still water only in still weather (the chances do not change)
+  let seen = false; const wt = nowWeather(), calm = CALM.includes(wt);
   if (D.boil[w][t]){ logAdd(t, 'У камыша раз за разом плещет, мелочь выпрыгивает из воды.'); seen = true; }
   if (D.bubbles[w][t]){ logAdd(t, 'По воде медленно ползёт цепочка мелких пузырьков.'); seen = true; }
-  if (D.ripple[w][t]){ logAdd(t, choice(['По тихой воде тут и там расходятся круги.','У берега плеснуло, пошли круги.','У травы тихонько плеснуло.'])); seen = true; }
+  if (D.ripple[w][t]){ logAdd(t, choice([...(calm ? ['По тихой воде тут и там расходятся круги.'] : []),
+    'У берега плеснуло, пошли круги.', 'Под берегом тихонько плеснуло.'])); seen = true; }
   if (D.midge[w][t]){ logAdd(t, 'Над водой столбиками вьётся мошкара.'); seen = true; }
-  if (!seen) logAdd(t, 'Вода гладкая, ни всплеска.');
+  if (!seen) logAdd(t, calm ? 'Вода гладкая, ни всплеска.' : wt === 3 ? 'По воде бежит рябь, всплесков не видно.' : 'Дождь рябит воду, всплесков не видно.');
 }
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
 
@@ -553,7 +744,6 @@ function backInside(){ if (busy) return; S.phase = 'izba'; logAdd(S.t, 'Зашё
 // 16:00 caught him away from home: the only way is back to the izba for the evening
 function comeHome(){
   if (busy) return;
-  S.path.push(`${clock(HOURS)} — пора домой`);
   S.loc = 'home'; endDay();
 }
 // an hour at home: making tackle pays the wage, sitting pays nothing
@@ -572,59 +762,64 @@ function craftAll(){
   if (busy) return;
   const r = remaining(), pay = r*WAGE;
   S.money += pay; S.earnWork += pay;
-  S.path.push(`${clock(S.t)} → снасти до вечера`);
   advance(r); endDay();
 }
 // from a water or the village straight back to the izba; the day goes on there
 function walkHome(){
   if (busy) return;
   if (S.t >= HOURS) return comeHome();   // the day is already over
-  S.path.push(`${clock(S.t)} → домой`);
   logAdd(S.t, WATERS.includes(S.loc) ? 'Смотал удочки, пошёл домой.' : 'Пошёл домой.');
   S.loc = 'home'; S.phase = 'izba'; S.dry = 0; S.hoursHere = 0;
   save(); render();
 }
+// a trip must leave time to fish: a water is reached before 16:00, and the village only while a water can still be
+// reached after it (until 13:00)
+function canGo(dest){ return S.t + TRAVEL[dest] + (dest === 'shop' ? Math.min(...WATERS.map(w=>TRAVEL[w])) : 0) < HOURS; }
 function go(dest){
-  if (busy || WATERS.includes(S.loc)) return;
-  const tt = TRAVEL[dest];
-  if (S.t + tt >= HOURS) return;
-  S.path.push(`${clock(S.t)} → ${NAME[dest].toLowerCase()}`);
-  advance(tt); S.loc = dest; S.dry = 0; S.hoursHere = 0;
+  if (busy || WATERS.includes(S.loc) || !canGo(dest)) return;
+  advance(TRAVEL[dest]); S.loc = dest; S.dry = null; S.hoursHere = 0;
   if (dest === 'shop'){ logAdd(S.t, 'Деревня. Бабки на лавке у магазина.'); rumorLines().forEach(x=>logAdd(S.t, x)); S.phase='shop'; }
   else { logAdd(S.t, `${NAME[dest]}. Закинул удочку.`); S.phase='water'; lookAround(); }
   save(); render();
 }
 function rumorLines(){
   const {w, lv} = S.D.rumor[Math.min(S.t, HOURS-1)];
-  const a = lv===2 ? `Баба Нюра: «Колька только что ${WHERE[w]} во какую рыбину взял!»`
-          : lv===1 ? `Баба Нюра: «Говорят, ${WHERE[w]} клюёт помаленьку».`
-                   : `Баба Нюра: «${cap(WHERE[w])} пусто, Петрович весь день просидел зазря».`;
-  const b = choice(['Баба Валя: «Да брешет он».','Баба Валя: «Ну-ну».','Баба Валя: «Сходи да проверь».','Баба Валя молча кивает.']);
+  const a = lv===2 && w ? `Баба Нюра: «Колька только что ${WHERE[w]} во какую рыбину взял!»`
+          : lv===1 && w ? `Баба Нюра: «Говорят, ${WHERE[w]} клюёт помаленьку».`
+          : S.t < CHANGE_HOUR ? 'Баба Нюра: «Говорят, нигде не клюёт. Петрович с утра сидит зазря».'
+                              : 'Баба Нюра: «Говорят, нигде не клюёт, Петрович весь день просидел зазря».';
+  const b = choice(['Баба Валя: «Да брешут».','Баба Валя: «Ну-ну».','Баба Валя: «Сходи да проверь».','Баба Валя молча кивает.']);
   return [a, b];
 }
+// the neighbour caught something today (his bites stay 0 after he leaves)
+function nbCaught(){ return S.D.nb.bites.some(n => n > 0); }
 let busy = false;
 function sit(){
   if (busy || S.t >= HOURS) return; busy = true;
   const w = S.loc, h = S.t, n = S.D.catchT[w][h];
   S.presence[w].push(h);
-  $('waiting').classList.add('on');
-  document.querySelectorAll('button').forEach(b=>b.disabled=true);
+  $('panel').classList.add('busy');   // no taps while the hour passes; the screen stays as it is
+  frame(w, h + 1).draw().catch(() => {});   // the next hour's picture, if idle time has not drawn it yet
   setTimeout(()=>{
-    $('waiting').classList.remove('on');
     const D = S.D, nb = D.nb;
-    if (D.scare[w][h]) logAdd(h+1, 'У травы громко плеснуло, мелочь брызнула врассыпную.');
+    if (D.scare[w][h]) logAdd(h+1, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.');
+    // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
+    // a scare says nothing about the place (S.dry is null until the first hour that counts)
     if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n;
       const what = `${n > 1 ? fishWord(n) : 'Рыба'} +${sum} ₽`; toast(what); logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
-    else { toast('Тихо'); logAdd(h+1, 'Тихо.'); S.dry++; }
+    else if (D.lost[w][h]){ toast('Сорвалась'); S.dry = 0; }
+    else if (D.scare[w][h]) toast('Пусто');
+    else { toast('Тихо'); logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
     if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
     if (nb.w === w && nb.present[h]){
       logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
-      if (nb.leave === h) logAdd(h+1, nb.reason === 'empty' ? 'Михалыч сматывает удочки: «Пустое дело».' : 'Михалыч уходит с полным ведром.');
+      if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
+        : nbCaught() ? 'Михалыч сматывает удочки: «Всё, кончился клёв».' : 'Михалыч сматывает удочки: «Пустое дело».');
     }
     advance(1); S.hoursHere++;
     if (S.t < HOURS) lookAround();
     else logAdd(S.t, 'Вечереет, пора домой.');   // the day is over here: the screen offers only the way home
-    busy = false;
+    busy = false; $('panel').classList.remove('busy');
     save(); render();
   }, 750);
 }
@@ -633,23 +828,41 @@ function endDay(){
   S.history.push({day:S.day, earned});
   S.phase = 'evening'; save(); render();
 }
-function bestPlan(){   // tackle till some hour, one water, then home to tackle again
-  let best = {val: HOURS*WAGE, label:'весь день дома'};
-  for (const w of WATERS){ const tt=TRAVEL[w];
-    for (let dep=0; dep+tt<HOURS; dep++){ const arr = dep+tt;
-      for (let leave=arr+1; leave<=HOURS; leave++){
-        let v = dep*WAGE; for (let h=arr; h<leave; h++) v += S.D.catchT[w][h]*PRICE;
-        v += (HOURS-leave)*WAGE;
-        if (v > best.val) best = {val:v, label:`${NAME[w].toLowerCase()} с ${clock(arr)} до ${clock(leave)}`};
-      } } }
-  return best;
+// the best the day could give, knowing every hour: the moves the game has (an hour of tackle at home, a trip to a
+// water that earns nothing on the way, an hour of fishing, the free walk home), as many trips as pay.
+// V[t][p] is the most from hour t on, at home or at a water; ties keep the old man at home or on the same water.
+const BEST_NONE = 'весь день снасти';
+function bestPlan(){
+  const C = S.D.catchT, V = [], how = [];
+  for (let t = HOURS; t >= 0; t--){
+    V[t] = {}; how[t] = {};
+    if (t === HOURS){ V[t].home = 0; for (const w of WATERS) V[t][w] = 0; continue; }
+    V[t].home = WAGE + V[t+1].home; how[t].home = 'craft';
+    for (const w of WATERS) if (t + TRAVEL[w] < HOURS && V[t + TRAVEL[w]][w] > V[t].home){ V[t].home = V[t + TRAVEL[w]][w]; how[t].home = w; }
+    for (const w of WATERS){
+      const sit = C[w][t]*PRICE + V[t+1][w];
+      if (sit >= V[t].home){ V[t][w] = sit; how[t][w] = 'sit'; } else { V[t][w] = V[t].home; how[t][w] = 'home'; }
+    }
+  }
+  const runs = []; let t = 0, p = 'home';   // walk the best plan and gather its fishing hours
+  while (t < HOURS){
+    const m = how[t][p];
+    if (p === 'home'){ if (m === 'craft') t++; else { t += TRAVEL[m]; p = m; } }
+    else if (m === 'home') p = 'home';
+    else { const r = runs[runs.length-1];
+      if (r && r.w === p && r.to === t) r.to++; else runs.push({w: p, from: t, to: t+1}); t++; }
+  }
+  const label = runs.map(r => `${NAME[r.w].toLowerCase()} ${clock(r.from)}–${clock(r.to)}`).join(', ') || BEST_NONE;
+  return {val: V[0].home, label};
 }
 function eveningHTML(){
   const earned = S.earnFish + S.earnWork, best = bestPlan();
+  best.val = Math.max(best.val, earned);   // the plan above is the most the day could give; never show less than was earned
   let rows = `<div></div>${Array.from({length:HOURS},(_,h)=>`<div class="h">${START+h}</div>`).join('')}`;
   for (const w of WATERS){
     rows += `<div>${NAME[w]}</div>`;
     for (let h=0; h<HOURS; h++){
+      if (h < TRAVEL[w]){ rows += '<div class="cell na"></div>'; continue; }   // still on the way there: no one could fish it
       const n = S.D.catchT[w][h]; const you = S.presence[w].includes(h);
       rows += `<div class="cell ${n?(n>1?'big':'f'):''} ${you?'you':''}" title="${n ? fishWord(n) : 'пусто'}">${n || ''}</div>`;
     }
@@ -659,11 +872,12 @@ function eveningHTML(){
   const wLine = wl === S.D.weather ? `Погода: ${WEATHER_NAME[S.D.weather]}.` : `Погода: ${WEATHER_NAME[S.D.weather]}, с ${clock(CHANGE_HOUR)} ${WEATHER_NAME[wl]}.`;
   const nb = S.D.nb;
   const nbLine = !nb.w ? 'Михалыч сегодня не выходил.'
-    : `Михалыч сидел ${WHERE[nb.w]}${nb.reason === 'empty' ? ' и ушёл пустым' : nb.reason === 'full' ? ' и ушёл с полным ведром' : ''}.`;
+    : `Михалыч сидел ${WHERE[nb.w]}${nb.reason === 'empty' ? (nbCaught() ? ' и ушёл, когда перестало клевать' : ' и ушёл пустым')
+      : nb.reason === 'full' ? ' и ушёл с полным ведром' : ''}.`;
   return `<div class="title">Итог дня ${S.day}</div>
     <div class="sum"><span>Рыба</span><b>+${S.earnFish} ₽</b><span>Снасти</span><b>+${S.earnWork} ₽</b>
-    <span>Всего</span><b>+${earned} ₽</b><span>Если бы весь день дома</span><b>+${HOURS*WAGE} ₽</b>
-    <span>Лучший вариант: ${best.label}</span><b>+${best.val} ₽</b></div>
+    <span>Всего</span><b>+${earned} ₽</b><span>Если бы весь день снасти</span><b>+${HOURS*WAGE} ₽</b>
+    ${best.label === BEST_NONE ? '' : `<span>Лучший вариант: ${best.label}</span><b>+${best.val} ₽</b>`}</div>
     <div class="reveal">${rows}</div>
     <div class="note">Рамка — где ты сидел. Цифры — сколько рыбы попалось бы за час. ${wLine} ${nbLine} ${verdict}</div>
     <div class="note">Всего за ${S.day} ${plural(S.day,'день','дня','дней')}: ${S.money} ₽. Одни снасти дома дали бы ${S.day*HOURS*WAGE} ₽.</div>`;
@@ -678,10 +892,21 @@ function restart(){
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   newSeason(); save(); render(); showSplash();
 }
-if (!load() || S.phase === 'winter') newSeason();  // saves from the old 35-day season may end in winter
+if (!load()) newSeason();
+hush();
 // the title screen opens a new game, then the backstory and the first morning; later launches go straight to the saved game
-function showSplash(){ $('splashImg').src = IMG.splash; $('splash').hidden = false; }
-$('splashGo').onclick = () => { $('splash').hidden = true; render(); };
+function showSplash(){
+  const kb = !!document.activeElement && $('panel').contains(document.activeElement);
+  $('splashImg').src = IMG.splash; $('splashGo').disabled = false; $('splash').hidden = false;
+  tapLock = performance.now() + TAP_LOCK;
+  if (kb) $('splashGo').focus({preventScroll: true});
+}
+$('splashGo').onclick = () => {
+  if (tapsLocked()) return;
+  const kb = document.activeElement === $('splashGo');
+  $('splash').hidden = true; render();
+  if (kb){ const b = $('panel').querySelector('button.primary'); if (b) b.focus({preventScroll: true}); }
+};
 render(); if (S.phase === 'intro') showSplash();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>
