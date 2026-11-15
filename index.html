@@ -408,6 +408,14 @@ function render(){
     setScene('izbaEvening');   // nowWeather() is the last hour's weather: the evening comes with S.t = HOURS
     add(eveningHTML());
     actions.appendChild(btn('Лечь спать', '', nextDay, 'primary'));
+    if (!askRestart) actions.appendChild(btn('Начать заново', '', ()=>{ askRestart = true; render(); }, 'link'));
+    else {   // the second tap: the whole game is wiped
+      add(`<div class="note">Начать всё заново? Дни и деньги не сохранятся.</div>`);
+      const g = document.createElement('div'); g.className='grid'; g.style.gridTemplateColumns='repeat(2, minmax(0,1fr))';
+      g.appendChild(btn('Начать заново', '', restart));
+      g.appendChild(btn('Отмена', '', ()=>{ askRestart = false; render(); }));
+      actions.appendChild(g);
+    }
   }
 
   P.appendChild(actions);
@@ -553,10 +561,17 @@ function eveningHTML(){
     <span>Лучший вариант: ${best.label}</span><b>+${best.val} ₽</b></div>
     <div class="reveal">${rows}</div>
     <div class="note">Рамка — где ты сидел. Цифры — сколько рыбы попалось бы за час. ${wLine} ${nbLine} ${verdict}</div>
-    <div class="note">Всего за ${S.day} ${plural(S.day,'день','дня','дней')}: ${S.money} ₽. Одна работа дома дала бы ${S.day*HOURS*WAGE} ₽.</div>`;
+    <div class="note">Всего за ${S.day} ${plural(S.day,'день','дня','дней')}: ${S.money} ₽. Одни снасти дома дали бы ${S.day*HOURS*WAGE} ₽.</div>`;
 }
+let askRestart = false;   // the evening's 'start again' waits for a second tap
 function nextDay(){
-  S.day++; startDay(); save(); render();
+  askRestart = false; S.day++; startDay(); save(); render();
+}
+// a new game: the save is wiped, the title screen and the backstory come again
+function restart(){
+  askRestart = false;
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+  newSeason(); save(); render(); showSplash();
 }
 if (!load() || S.phase === 'winter') newSeason();  // saves from the old 35-day season may end in winter
 // the title screen opens a new game, then the backstory and the first morning; later launches go straight to the saved game
