@@ -173,7 +173,7 @@
 //
 // A classic script, no modules and no build step; it defines window.LiveScenes and nothing else. demo.html is its
 // page (build.py inlines this file there); a page with many scenes loads it with <script src>.
-//   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0}) -> scene
+//   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0, lit = true}) -> scene
 //     place one of LiveScenes.PLACES, weather one of LiveScenes.WEATHERS ('rain' is the drizzle), hour 6..18 (rounded
 //     and clamped, 12 when missing). src is the URL of the place's clean picture, 130x180, a data: URI or a
 //     same-origin URL: it is loaded with an Image, analysed once and cached by place and src. baked is the demo's
@@ -181,8 +181,9 @@
 //     scene that takes over from another (a new hour, a new place) starts at that one's `time`, so nothing in it
 //     jumps. The canvas is made 130x180 and only ever gets putImageData; until the picture is analysed it is left as
 //     it is (transparent), so an <img> under it shows. With autoplay the scene plays at 12 ticks a second, unless the
-//     system asks for reduced motion; otherwise it draws one still frame.
-//   scene.set({place, weather, hour, src, baked}): any of them; the clock goes on.
+//     system asks for reduced motion; otherwise it draws one still frame. lit: false is a day without power: at 18:00
+//     no window and no street lamp lights up (daytime.py's no_power); left out, or any other value, they light up.
+//   scene.set({place, weather, hour, src, baked, lit}): any of them; the clock goes on.
 //   scene.play(), scene.pause(), scene.playing.
 //   scene.time: the time of the scene's frame, in seconds.
 //   scene.ready() -> a promise of true once the scene has drawn its settings (at once if it has), or of false if it
@@ -396,7 +397,8 @@ const DAY_KEYS = {   // hour: sky tint, land tint, glow colour and strength low 
   17: {sky: [.84, .82, .72], land: [.78, .76, .68], glow: [218, 210, 160], g: .22},
   18: {sky: [.64, .62, .56], land: [.54, .52, .48], glow: [204, 194, 150], g: .28},
 };
-const DAY_FIRST = 6, DAY_LAST = 18, LIT_FROM = 18;   // windows and the shop's street lamp light up at 18:00
+const DAY_FIRST = 6, DAY_LAST = 18, LIT_FROM = 18;   // windows and the shop's street lamp light up at 18:00, unless the
+                                                     // village has no power that day (a scene's lit: false)
 const WINLIT = [201, 180, 110], LAMP_LIT = [246, 232, 164], LAMP_GLOW = [214, 200, 140];
 const LIT = {   // what lights up in the evening, per place; skip boxes [x, y, w, h] stay dark
   home: {c: keySet([C.win, [60, 58, 56]]), skip: [[60, 97, 5, 5]]},   // not the attic window
@@ -422,9 +424,10 @@ function sunColour(h) {
 const LAND = 0, SKY = 1, WATER = 2, LIT_PX = 3;
 // The light of an hour as a function of one pixel: light(c, p, k) lights colour c at pixel p as class k.
 // Lighting is affine in the colour, so a moving part mixed over the frame before the light looks as it would after.
-function lighter(P, w, hour) {
+// power false (a scene's lit: false): what would light up at 18:00 stays dark, lit as land; the lamp casts no pool.
+function lighter(P, w, hour, power) {
   if (hour == null) return c => c;   // ?baked=1: weather.py's picture, no hour
-  const L = dayLight(hour), wt = lerp3(L.land, L.sky, .6), gw = L.g * .35, haze = w === 'fog' ? .4 : 0, on = hour >= LIT_FROM;
+  const L = dayLight(hour), wt = lerp3(L.land, L.sky, .6), gw = L.g * .35, haze = w === 'fog' ? .4 : 0, on = power && hour >= LIT_FROM;
   const sk = new Float64Array(H);
   for (let y = 0; y < H; y++) sk[y] = Math.min(1, Math.max(0, (y - 40) / 52) * L.g);
   const [sr, sg, sb] = L.sky, [lr, lg, lb] = L.land, [wr, wg, wb] = wt, [gr, gg, gb] = L.glow, lamp = on ? P.lampK : null;
@@ -664,7 +667,7 @@ function stillWater(buf, P, S, w) {   // weather.py's whitecaps and rings where 
   for (const r of S.rings) { const p = r.y * W + r.x, m = mixPy(buf[p], ring, a); buf[p - 1] = m; buf[p + 1] = m; }
 }
 // hour null: weather.py's picture, unlit. baked (?baked=1): what moves is drawn where weather.py baked it.
-function buildLayer(P, w, hour, baked) {
+function buildLayer(P, w, hour, baked, power) {
   const S = sitesFor(P, w), src = w === 'overcast' ? P.baseClear : P.base, unlit = new Uint32Array(N), lit = new Uint32Array(N);
   for (let p = 0; p < N; p++) unlit[p] = stillPaint(P, w, src[p], p);
   if ((S.caps.length || S.rings.length) && (baked || P.float)) {   // weather.py's whitecaps and rings: all for the check,
@@ -673,7 +676,7 @@ function buildLayer(P, w, hour, baked) {
     stillWater(all, P, S, w);
     if (!baked) for (let p = 0; p < N; p++) if (P.quiet[p]) unlit[p] = all[p];
   }
-  const light = lighter(P, w, hour);
+  const light = lighter(P, w, hour, power);
   for (let p = 0; p < N; p++) lit[p] = light(unlit[p], p, P.cls[p]);
   let sun = null;
   if (w === 'sun') {
@@ -686,12 +689,12 @@ function buildLayer(P, w, hour, baked) {
   }
   return {P, w, hour, baked: !!baked, S, unlit, lit, light, sun, glints: w === 'sun' && hour != null ? glintSites(P, hour) : null};
 }
-const layers = new Map();   // the still layers by picture, weather, hour and ?baked, the most recent last (see trim)
-function layerFor(P, w, hour, bk) {
-  const key = `${P.id}/${w}/${hour}/${bk ? 'baked' : ''}`;
+const layers = new Map();   // the still layers by picture, weather, hour, ?baked and power, the most recent last (see trim)
+function layerFor(P, w, hour, bk, power) {
+  const key = `${P.id}/${w}/${hour}/${bk ? 'baked' : ''}/${power ? '' : 'dark'}`;
   let L = layers.get(key);
   if (L) layers.delete(key);
-  else L = buildLayer(P, w, hour, bk);
+  else L = buildLayer(P, w, hour, bk, power);
   layers.set(key, L);
   return L;
 }
@@ -986,7 +989,7 @@ function trimSoon() {   // when the code that makes or switches scenes now is do
 // with its ImageData), the settings it was asked for and the ones it draws, their picture and still layer, and its
 // clock. A scene that runs is `k` ticks ahead of the ticker; one that does not (paused, or its picture not analysed
 // yet) stands at `tick`.
-const KEYS = ['place', 'weather', 'hour', 'src', 'baked'];
+const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit'];
 const live = new Set();   // every scene not destroyed
 const warn = what => console.warn(`LiveScenes: ${what}`);
 const brief = v => { v = String(v); return v.length > 48 ? v.slice(0, 45) + '...' : v; };   // data: URIs are long
@@ -996,7 +999,7 @@ function settings(want) {   // what a scene is asked to draw, or why it cannot d
     : !WEATHERS.includes(want.weather) ? `unknown weather "${brief(want.weather)}"`
     : typeof want.src !== 'string' || !want.src ? `no src for ${want.place}` : '';
   return bad ? `${bad}; the scene draws nothing`
-    : {place: want.place, weather: want.weather, hour: hourOf(want.hour), src: want.src, baked: !!want.baked};
+    : {place: want.place, weather: want.weather, hour: hourOf(want.hour), src: want.src, baked: !!want.baked, lit: want.lit !== false};
 }
 function complain(s, what) { if (s.warned !== what) warn(s.warned = what); }   // a scene tells of one bad input once
 function settle(s, ok) { const w = s.waiters; s.waiters = []; w.forEach(r => r(ok)); }   // the scene's ready() promises
@@ -1022,7 +1025,7 @@ function change(s, o) {   // create() and set(): the picture and the still layer
 }
 function ready(s) {   // the picture is analysed: the still layer, the frame, and on with the clock if the scene plays
   const c = s.cfg;
-  s.layer = layerFor(s.pic.P, c.weather, c.baked ? null : c.hour, c.baked);
+  s.layer = layerFor(s.pic.P, c.weather, c.baked ? null : c.hour, c.baked, c.lit);
   trimSoon();
   if (show(s)) run(s);
 }
@@ -1296,6 +1299,11 @@ const ROOM_GAIN = {sun:[.18,.14,.04]}, CURTAIN_GAIN = {sun:.08};   // a sunny mi
 const GLASS = [41,37,89,105], RIVER = 78, RW = 6;                  // the window glass x0 y0 x1 y1, the river rows in it
 const BULB_LIT = [255,238,190], BULB_WARM = [1.10,.98,.80], SHADE_GLOW = [236,172,104];
 const LAMP_X = 77, LAMP_HW = 12;   // izba.py's lampshade: its cord and bulb at x 77, the fabric x 65..89 (between the chips)
+// a day without power: izba.py's kerosene lamp on the sill burns instead of the bulb (daytime.py's KERO_* numbers): a
+// flame of two pixels over the burner, the glass glowing round it, a small warm pool, the room beyond in the dusk
+const KERO_X = 45, KERO_FLAME = 97, KERO_CORE = [255,240,178], KERO_TIP = [246,164,72];
+const KERO_WARM = [1.18,.90,.56], KERO_GLOW = [255,188,104], KERO_POOL = .9, KERO_REACH = 15;
+const keroGlass = y => y >= 92 && y <= 98 ? [2,2,3,3,3,3,2][y-92] : y >= 85 && y <= 91 ? 1 : -1;   // its half width (no soot)
 const INK = [52,48,42], RED = [176,62,44];
 const HOUR_HAND = [[0,-3],[2,-3],[3,-2],[3,0],[3,2],[2,3],[0,3],[-2,3],[-3,2],[-3,0],[-3,-2],[-2,-3]];   // tip per hour
 const CHAIN = [140,128,100], CHAIN_D = [104,94,74], CONE = [124,104,68], CONE_D = [92,76,52];
@@ -1313,12 +1321,12 @@ const FONT3 = glyphs({'П':'XXX X.X X.X X.X X.X', 'Н':'X.X X.X XXX X.X X.X', '�
 // day 1 is Sunday the 15th, then the days go by a real calendar from 15 June; the month is not shown
 function dateOf(day){ const t = new Date(Date.UTC(2025, 5, 14 + day)); return [String(t.getUTCDate()), WEEKDAY[t.getUTCDay()], t.getUTCDay() === 0]; }
 let izCache = {}, izMask = null;
-function izbaScene(open, weather, h, day){
-  const key = `${open}/${weather}/${h}/${day}`;
+function izbaScene(open, weather, h, day, noPower = false){
+  const key = `${open}/${weather}/${h}/${day}/${noPower}`;
   if (izCache.day !== day) izCache = {day};   // a new day: yesterday's pictures are not needed
-  return izCache[key] || (izCache[key] = drawIzba(open, weather, h, day).catch(e => { delete izCache[key]; throw e; }));
+  return izCache[key] || (izCache[key] = drawIzba(open, weather, h, day, noPower).catch(e => { delete izCache[key]; throw e; }));
 }
-async function drawIzba(open, weather, h, day){
+async function drawIzba(open, weather, h, day, noPower = false){
   izMask = izMask || pixels(IMG.izbaMask);
   const m = (await izMask).d.data, out = await pixels(IMG[open ? 'izba' : 'izbaClosed'][weather]);
   const d = out.d.data, W = out.c.width, H = out.c.height, lt = IZ_LIGHT[weather];
@@ -1360,7 +1368,19 @@ async function drawIzba(open, weather, h, day){
     else c = tint3(c, x >= gx0 && x <= gx1 && y >= gy0 && y <= gy1 ? glass : room);
     d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2];
   }
-  if (h >= LIT_FROM){   // the bulb under the lampshade over the table is on and warms the room around it
+  if (h >= LIT_FROM && noPower){   // no power: the kerosene lamp burns; its glass glows over the view too, its pool lights the room
+    const ky = KERO_FLAME - .5;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
+      const p = y*W + x, i = p*4, dx = x - KERO_X, dy = y - ky, hw = keroGlass(y);
+      let c;
+      if (x === KERO_X && y === KERO_FLAME) c = KERO_CORE;
+      else if (x === KERO_X && y === KERO_FLAME - 1) c = KERO_TIP;
+      else if (hw >= 0 && Math.abs(dx) <= hw) c = mix3(tint3([src[i], src[i+1], src[i+2]], KERO_WARM), KERO_GLOW, .8*Math.exp(-(dx*dx + dy*dy)/18));
+      else if (!isView[p]) c = mix3([d[i], d[i+1], d[i+2]], tint3([src[i], src[i+1], src[i+2]], KERO_WARM), KERO_POOL*Math.exp(-(dx*dx + dy*dy)/(2*KERO_REACH**2)));
+      else continue;
+      d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2];
+    }
+  } else if (h >= LIT_FROM){   // the bulb under the lampshade over the table is on and warms the room around it
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
       const p = y*W + x, i = p*4; if (isView[p]) continue;
       const warm = tint3([src[i], src[i+1], src[i+2]], BULB_WARM);
