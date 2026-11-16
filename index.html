@@ -233,7 +233,8 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 // What the palette cannot find, from the pix.py calls that drew it (x, y in the 130x180 picture). Boxes are [x, y, w, h];
 // reeds is where «у камыша» is (the clump, or the lake's sedge at the water), for the sign of fry jumping by the reeds.
 // tufts is where grass tufts, the meadow's grass dots or the sedge lean in a gust; skyline: a near forest against the
-// sky, whose treetops a gust leans.
+// sky, whose treetops a gust leans; reflection: the bars of a reflection hanging from row y in colour c, whose feet
+// tremble on calm water.
 const ANCHORS = {
   home: {
     smoke: {x: 37, y: 90, n: 12},       // scene_home: px(38 + i % 3 - 1, 90 - 2 * i) above the chimney rect(37, 92, 3, 12)
@@ -254,6 +255,8 @@ const ANCHORS = {
     ferns: [[3, 165, 6, 4], [113, 165, 6, 4], [121, 165, 6, 4]],   // the ferns at x 6, 116, 124
     reeds: [87, 121, 26, 30],           // reeds(100, 150): the clump on the bank at the right, the pool above and left of it
     skyline: true,                      // the spruce wall round the pool
+    reflection: {c: [44, 54, 50], y: 86},   // the wall's reflection: rect(x, 86, 3, randint(6, 14), (44, 54, 50)) for x in
+                                            // range(10, 120, 6), hanging from the top of the pool
   },
   lake: {
     float: [60, 130],                   // rod(87, 152, 60, 120, 10)
@@ -328,7 +331,7 @@ const GUST_RAGGED = 10;                   // px the front wanders either way, ro
 const GUST_SLOTS = 4;                     // gusts on the scene at once, at most
 const LEAN_SKIP = .25;       // a crown or a fern leans once a cycle of its own, at a varied moment, and skips this share of cycles
 const PAW = {river: .9, omut: .6, lake: 1};   // how strong a gust's patch of ripple is on the water (the omut is sheltered)
-const CALM_NEAR = 12;                     // px from the float's quiet box over which a gust's ripple fades out
+const CALM_NEAR = 12;                     // px from the float's quiet box over which glints and a gust's ripple thin out
 const SHEEN = pack(176, 186, 136);        // the paler undersides of the grass a gust combs over on the meadow and the sedge
 const TOPS_TH = .4;                       // a gust this strong leans the treetops: one threshold, so they lean together
 const SMOKE_GUST = 4;                     // px a second a full gust adds to the smoke's drift
@@ -565,7 +568,35 @@ function makePlace(name, rgba) {
     // the box stay where it put them. The box runs from the top of the line (rod's float_dy 10) to the ripple under it.
     for (let yy = y - 12; yy <= y + 4; yy++) for (let xx = x - 4; xx <= x + 4; xx++) P.quiet[yy * W + xx] = 1;
   }
+  // The calm round the box: 0 in it, rising to 1 at CALM_NEAR px from it (1 everywhere without a float). Glints and a
+  // gust's ripple thin out towards the float by it, so they do not gather round it (weather.py's float_calm too).
+  P.calm = new Float64Array(N).fill(1);
+  if (P.float) for (let p = 0; p < N; p++) {
+    const x = p % W, y = (p / W) | 0, f = P.float;
+    P.calm[p] = Math.min(1, Math.max(f.x - 4 - x, x - f.x - 4, 0, f.y - 12 - y, y - f.y - 4) / CALM_NEAR);
+  }
   P.runs = P.runs.filter(r => { for (let x = r.x0 - 1; x <= r.x1 + 1; x++) if (P.quiet[r.y * W + x]) return false; return true; });
+  // A reflection's bars, side by side columns of its colour hanging from its row to the same foot: on calm water the
+  // foot of each grows or shrinks by a pixel now and then, at its own slow pace, as if the water breathed.
+  P.bars = [];
+  if (A.reflection) {
+    const k = keyOf(...A.reflection.c), y0 = A.reflection.y, foot = x => {
+      if (keys[y0 * W + x] !== k || P.cls[y0 * W + x] !== WATER) return -1;
+      let y = y0; while (y + 1 < H && keys[(y + 1) * W + x] === k) y++;
+      return y;
+    };
+    for (let x = 0; x < W; x++) {
+      const e = foot(x);
+      if (e < y0 + 2) continue;
+      let x1 = x; while (x1 + 1 < W && foot(x1 + 1) === e) x1++;
+      const ok = xx => { const q = (e + 1) * W + xx; return P.cls[q] === WATER && !P.quiet[q] && !P.reedNear[q] && P.calm[q] >= 1; };
+      let all = true; for (let xx = x; xx <= x1; xx++) all = all && ok(xx);
+      if (all) P.bars.push({x0: x, x1, e, c: P.clean[y0 * W + x],
+        per: 6 + 4 * noise(SCENE_SEED[name], P.bars.length, 8), ph: noise(SCENE_SEED[name], P.bars.length, 9)});
+      x = x1;
+    }
+    if (P.bars.length < 4) warn('the reflection');
+  }
   P.smoke = A.smoke || null;
   windSites(P, keys, A, warn);
   return P;
@@ -587,15 +618,9 @@ function windSites(P, keys, A, warn) {
     }
     if (n >= .66 * all) { P.field[p] = 1; P.fy0 = Math.min(P.fy0, y); P.fy1 = y; }
   }
-  // The water's rows, where a gust's patch of ripple runs, and how much of the patch shows: none in the float's quiet
-  // box and less and less towards it within CALM_NEAR px, so the ripple does not draw the eye to the float.
-  P.wy0 = H; P.wy1 = -1; P.calm = new Float64Array(N).fill(1);
+  // The water's rows, where a gust's patch of ripple runs (it fades out by the float, P.calm).
+  P.wy0 = H; P.wy1 = -1;
   for (let p = 0; p < N; p++) if (cls[p] === WATER) { const y = (p / W) | 0; P.wy0 = Math.min(P.wy0, y); P.wy1 = y; }
-  if (P.float) for (let p = 0; p < N; p++) {
-    const x = p % W, y = (p / W) | 0, f = P.float;
-    const d = Math.max(Math.max(f.x - 4 - x, x - f.x - 4, 0), Math.max(f.y - 12 - y, y - f.y - 4, 0));   // px from the quiet box
-    P.calm[p] = Math.min(1, d / CALM_NEAR);
-  }
   // The skyline of a near forest: each column's first forest pixel under the sky (or the far ridge). Where a column's
   // top differs from its upwind neighbour's, a gust copies the rows between them from upwind, so the treetops lean a
   // pixel downwind. Right to left, so each column copies its neighbour before that one moves.
@@ -695,7 +720,8 @@ function sitesFor(P, w) {
       }
       S.clouds.push({px, w: cw});
     }
-    for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (water(x, y) && rng.random() < .007 && open(x, y)) S.glintsBaked.push(y * W + x);
+    for (let x = 0; x < W; x++) for (let y = 0; y < H; y++)   // none by the float: weather.py's float_calm
+      if (water(x, y) && rng.random() < .007 * P.calm[y * W + x] && open(x, y)) S.glintsBaked.push(y * W + x);
   } else if (w === 'rain' || w === 'downpour') {
     const down = w === 'downpour';
     for (let i = 0; i < (down ? 9 : 6); i++) strip(down ? 2 : 1, down ? DOWN_CLOUD : RAIN_CLOUD);
@@ -726,10 +752,12 @@ function sitesFor(P, w) {
   S.ring = {s: Math.min(lo, -wide) - 1, r: Math.max(hi, W + wide) + 1 - (Math.min(lo, -wide) - 1)};
   return P.sites[w] = S;
 }
-function glintSites(P, hour) {   // the game's glints: a fixed number per water pixel against a chance that peaks under the sun
+function glintSites(P, hour) {   // the game's glints: a fixed number per water pixel against a chance that peaks under the sun,
+  // none in the float's quiet box and fewer towards it (P.calm), as in weather.py
   const sx = sunPath(hour)[0], s = [...P.name].reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7), g = {p: [], ph: [], per: [], n: 0};
   for (let y = 84; y < H; y++) for (let x = 0; x < W; x++) {
-    if (P.cls[y * W + x] !== WATER || P.reedNear[y * W + x] || noise(s, x, y) >= .002 + .03 * Math.exp(-(((x - sx) / 14) ** 2))) continue;
+    const p = y * W + x;
+    if (P.cls[p] !== WATER || P.reedNear[p] || noise(s, x, y) >= (.002 + .03 * Math.exp(-(((x - sx) / 14) ** 2))) * P.calm[p]) continue;
     g.p.push(y * W + x); g.ph.push(noise(s + 1, x, y)); g.per.push(2.4 + 2.2 * noise(s + 2, x, y)); g.n++;
   }
   return g;
@@ -1036,12 +1064,21 @@ function shimmer() {   // calm water: each lighter stroke drifts a pixel one way
     else if (s < -.6 && r.canL) { put(row + r.x1, wx(r.cr, row + r.x1, WATER)); put(row + r.x0 - 1, wx(r.s, row + r.x0 - 1, WATER)); }
   }
 }
+function reflection() {   // calm water: the foot of each bar of a reflection grows a pixel, then shrinks one, slowly
+  if (!CALM.has(F.w) || F.baked) return;
+  const B = F.P.bars;
+  for (let i = 0; i < B.length; i++) {
+    const b = B[i], s = Math.sin(2 * Math.PI * (F.t / b.per + b.ph));
+    if (s > .5) for (let x = b.x0, row = (b.e + 1) * W; x <= b.x1; x++) put(row + x, wx(b.c, row + x, WATER));
+    else if (s < -.5) for (let x = b.x0, row = b.e * W; x <= b.x1; x++) put(row + x, wx(F.P.clean[row + W + x], row + x, WATER));
+  }
+}
 function glints() {   // sun: the glints under the sun brighten and dim, each at its own pace
   if (F.w !== 'sun') return;
   if (F.baked) { F.S.glintsBaked.forEach(p => put(p, GLINT)); return; }
   const g = F.L.glints;
   for (let i = 0; i < g.n; i++) {
-    const s = F.P.quiet[g.p[i]] ? 1 : .5 + .5 * Math.sin(2 * Math.PI * (F.t / g.per[i] + g.ph[i]));
+    const s = .5 + .5 * Math.sin(2 * Math.PI * (F.t / g.per[i] + g.ph[i]));
     if (s >= .2) blend(g.p[i], GLINT, s < .45 ? .45 : s < .75 ? .75 : 1);
   }
 }
@@ -1165,6 +1202,7 @@ const EFFECTS = [
   {draw: fogBanks, names: () => F.w === 'fog' ? ['туман'] : []},
   {draw: clouds, names: () => F.S.clouds.length && CLOUD_V[F.w] ? ['облака'] : []},
   {draw: shimmer, names: () => CALM.has(F.w) && F.P.runs.length ? ['рябь'] : []},
+  {draw: reflection, names: () => CALM.has(F.w) && F.P.bars.length ? ['отражение'] : []},
   {draw: glints, names: () => F.L.glints && F.L.glints.n ? ['блики'] : []},
   {draw: whitecaps, names: () => F.S.caps.length ? ['барашки'] : []},
   {draw: rings, names: () => F.S.rings.length ? ['круги на воде'] : []},
