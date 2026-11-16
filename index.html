@@ -276,6 +276,10 @@ const FOREST_C = keySet([C.mid, C.hill, C.spruce, C.spruce2]);         // forest
 const MEADOW_C = keySet([C.meadow, C.meadow2, C.grass, C.grass2]);
 const SEDGE_C = keySet([[104, 108, 74], [140, 132, 86], [120, 120, 80], [96, 104, 70]]);   // the lake's shore and its sedge
 const CROWN_C = keySet([C.leaf, C.leaf2]), FERN_C = keySet([[98, 118, 70]]), GRASS_KEY = keyOf(...C.grass);
+// pix.py's REED and REED_DARK: glints, whitecaps and rain rings keep off the water within REED_NEAR px of a reed, as in
+// weather.py (near_reeds), so none lands between the stems or on a cattail head
+const REED_C = keySet([[150, 158, 76], [108, 120, 58], [104, 70, 46], [142, 98, 60], [122, 130, 64], [90, 100, 50], [90, 60, 42],
+  [120, 84, 54]]), REED_NEAR = 2;
 const CLOUD_KEY = keyOf(...C.cloud), CLOUD2_KEY = keyOf(...C.cloud2), SMOKE_KEY = keyOf(178, 180, 178);
 const SMOKE = pack(178, 180, 178), RED = pk(C.red), PAPER = pk(C.paper);
 const BAND = [pk(C.sky1), pk(C.sky2), pk(C.sky3)];
@@ -488,6 +492,12 @@ function makePlace(name, rgba) {
     }
     P.mat[p] = FOREST_C.has(k) ? 1 : MEADOW_C.has(k) ? 2 : name === 'lake' && y >= 140 && SEDGE_C.has(k) ? 3 : 0;
   }
+  P.reedNear = new Uint8Array(N);
+  for (let p = 0; p < N; p++) if (REED_C.has(keys[p])) {
+    const x = p % W, y = (p / W) | 0;
+    for (let yy = Math.max(0, y - REED_NEAR); yy <= Math.min(H - 1, y + REED_NEAR); yy++)
+      for (let xx = Math.max(0, x - REED_NEAR); xx <= Math.min(W - 1, x + REED_NEAR); xx++) P.reedNear[yy * W + xx] = 1;
+  }
   // The base: the clean scene without what an effect draws instead. The yard's smoke goes (its pixels take the colour
   // on their left); under the overcast clouds of pix.sky lies the plain band of the sky.
   P.base = P.clean.slice();
@@ -591,7 +601,7 @@ function sitesFor(P, w) {
   if (P.sites[w]) return P.sites[w];
   const seed = 100 * PLACES.indexOf(P.name) + WEATHERS.indexOf(w), rng = PyRandom(seed);
   const S = {seed, clouds: [], rings: [], streaks: [], caps: [], leaves: [], glintsBaked: []};
-  const water = (x, y) => P.cls[y * W + x] === WATER;
+  const water = (x, y) => P.cls[y * W + x] === WATER, open = (x, y) => !P.reedNear[y * W + x];   // open: not by the reeds
   const strip = (rows, colour) => {   // the cloud strips of drizzle and downpour
     const x0 = rng.randint(-20, 110), y0 = rng.randint(2, 60), sw = rng.randint(20, 50), px = [];
     for (let r = 0; r < rows; r++) for (let x = x0; x < x0 + sw; x++) px.push(x, y0 + r, colour);
@@ -607,11 +617,11 @@ function sitesFor(P, w) {
       }
       S.clouds.push({px, w: cw});
     }
-    for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (water(x, y) && rng.random() < .007) S.glintsBaked.push(y * W + x);
+    for (let x = 0; x < W; x++) for (let y = 0; y < H; y++) if (water(x, y) && rng.random() < .007 && open(x, y)) S.glintsBaked.push(y * W + x);
   } else if (w === 'rain' || w === 'downpour') {
     const down = w === 'downpour';
     for (let i = 0; i < (down ? 9 : 6); i++) strip(down ? 2 : 1, down ? DOWN_CLOUD : RAIN_CLOUD);
-    for (let x = 1; x < W - 1; x++) for (let y = 0; y < H; y++) if (water(x, y) && rng.random() < (down ? .02 : .025)) S.rings.push({x, y});
+    for (let x = 1; x < W - 1; x++) for (let y = 0; y < H; y++) if (water(x, y) && rng.random() < (down ? .02 : .025) && open(x, y)) S.rings.push({x, y});
     for (let i = 0; i < (down ? 320 : 150); i++) {
       const x = down ? rng.randint(0, W + 6) : rng.randint(0, W), y = down ? rng.randint(-4, H - 1) : rng.randint(-2, H - 1);
       S.streaks.push({x, y});
@@ -625,7 +635,7 @@ function sitesFor(P, w) {
     }
     const ex = EXPOSURE[P.name];
     for (let x = 0; x < W - 6; x++) for (let y = 0; y < H - 1; y++)
-      if (water(x, y) && rng.random() < ex * (.002 + .012 * (y - 84) / 96)) S.caps.push({x, y, n: rng.randint(3, 6)});
+      if (water(x, y) && rng.random() < ex * (.002 + .012 * (y - 84) / 96)) { const n = rng.randint(3, 6); if (open(x, y)) S.caps.push({x, y, n}); }
     for (let i = 0; i < 14; i++) S.leaves.push({x: rng.randint(0, W - 2), y: rng.randint(20, H - 10), c: rng.choice(LEAF_C)});
     S.caps.forEach((c, i) => { c.per = 3.2 + 2.4 * noise(seed, i, 4); c.ph = noise(seed, i, 5); });
   }
@@ -641,7 +651,7 @@ function sitesFor(P, w) {
 function glintSites(P, hour) {   // the game's glints: a fixed number per water pixel against a chance that peaks under the sun
   const sx = sunPath(hour)[0], s = [...P.name].reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7), g = {p: [], ph: [], per: [], n: 0};
   for (let y = 84; y < H; y++) for (let x = 0; x < W; x++) {
-    if (P.cls[y * W + x] !== WATER || noise(s, x, y) >= .002 + .03 * Math.exp(-(((x - sx) / 14) ** 2))) continue;
+    if (P.cls[y * W + x] !== WATER || P.reedNear[y * W + x] || noise(s, x, y) >= .002 + .03 * Math.exp(-(((x - sx) / 14) ** 2))) continue;
     g.p.push(y * W + x); g.ph.push(noise(s + 1, x, y)); g.per.push(2.4 + 2.2 * noise(s + 2, x, y)); g.n++;
   }
   return g;
@@ -660,11 +670,11 @@ function stillPaint(P, w, c, p) {   // weather.py's paint of one pixel, without 
   return c;
 }
 function stillWater(buf, P, S, w) {   // weather.py's whitecaps and rings where it put them, in its order
-  const cls = P.cls, down = w === 'downpour', ring = down ? DOWN_RING : RAIN_RING, a = down ? .6 : .45;
+  const cls = P.cls, near = P.reedNear, down = w === 'downpour', ring = down ? DOWN_RING : RAIN_RING, a = down ? .6 : .45;
   for (const c of S.caps) for (let i = 0; i < c.n; i++) {
     const p = c.y * W + c.x + i;
-    if (cls[p] === WATER) buf[p] = CAP;
-    if (cls[p + W] === WATER) buf[p + W] = mixPy(buf[p + W], TROUGH, .5);
+    if (cls[p] === WATER && !near[p]) buf[p] = CAP;
+    if (cls[p + W] === WATER && !near[p + W]) buf[p + W] = mixPy(buf[p + W], TROUGH, .5);
   }
   for (const r of S.rings) { const p = r.y * W + r.x, m = mixPy(buf[p], ring, a); buf[p - 1] = m; buf[p + 1] = m; }
 }
@@ -837,9 +847,13 @@ function whitecaps() {   // wind: a whitecap fades in, slides downwind a few pix
   }
 }
 function cap(x, y, n, a) {   // weather.py's whitecap: a white run over a darker trough, on the water only; none by the float
+  // or by the reeds
   if (y < 0 || y + 1 >= H) return;
-  const cls = F.P.cls, quiet = F.P.quiet;
-  for (let i = 0; i < n; i++) { const xx = x + i; if (xx >= 0 && xx < W && (quiet[y * W + xx] || quiet[(y + 1) * W + xx])) return; }
+  const cls = F.P.cls, quiet = F.P.quiet, near = F.P.reedNear;
+  for (let i = 0; i < n; i++) {
+    const xx = x + i, p = y * W + xx;
+    if (xx >= 0 && xx < W && (quiet[p] || quiet[p + W] || near[p] || near[p + W])) return;
+  }
   for (let i = 0; i < n; i++) {
     const xx = x + i; if (xx < 0 || xx >= W) continue;
     const p = y * W + xx;
@@ -857,7 +871,8 @@ function rings() {   // drizzle, downpour: a ring opens on the water, widens and
     const x = r.x + Math.floor(noise(F.S.seed + k, i, 3) * 7) - 3, y = r.y + Math.floor(noise(F.S.seed + k, i, 4) * 3) - 1;
     if (x - d < 0 || x + d >= W || y < 0 || y >= H) continue;
     const p = y * W + x;
-    if (cls[p] !== WATER || cls[p - d] !== WATER || cls[p + d] !== WATER || F.P.quiet[p - d] || F.P.quiet[p + d]) continue;
+    if (cls[p] !== WATER || cls[p - d] !== WATER || cls[p + d] !== WATER || F.P.quiet[p - d] || F.P.quiet[p + d] ||
+        F.P.reedNear[p - d] || F.P.reedNear[p + d]) continue;
     const m = mixPy(U[p], col, a); put(p - d, m); put(p + d, m);
   }
 }
