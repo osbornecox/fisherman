@@ -311,9 +311,11 @@ const GUST_V = 11, GUST_W = 14, GUST_PERIOD = 230, GUST_SKIP = .3, GUST_LATE = 6
 const GUST_MIN_EDGES = 40;   // a material with fewer texture edges than this is not worth a gust
 const LEAN_SKIP = .25;       // a crown or a fern leans once a cycle of its own, at a varied moment, and skips this share of cycles
 const CAP_DRIFT = 1.2, FOG_DRIFT = .7;               // px a second
-// Streaks that fall, and px per tick. The step stays shorter than the streak (2 px drizzle, 4 px downpour), so a pixel
-// of rain stays at least two ticks and the rain falls instead of blinking.
-const DRIZZLE_N = 60, DRIZZLE_STEP = 1, DOWNPOUR_N = 100, DOWNPOUR_STEP = 2;
+// Streaks that fall: how many move, and how fast. Drizzle and downpour are one rain on one slant, two pixels down for
+// one aside. The downpour's streaks (4 px) fall DOWNPOUR_STEP px a tick; the drizzle's are finer (3 px), fewer and
+// slower: a slant step (2 px down) once in DRIZZLE_EVERY ticks. Every position of a streak is held two ticks or more,
+// so the rain falls instead of blinking.
+const DRIZZLE_N = 60, DRIZZLE_EVERY = 2, DOWNPOUR_N = 100, DOWNPOUR_STEP = 2;
 
 // ---------- small helpers ----------
 const mod = (a, m) => ((a % m) + m) % m;
@@ -611,7 +613,7 @@ function sitesFor(P, w) {
     for (let i = 0; i < (down ? 9 : 6); i++) strip(down ? 2 : 1, down ? DOWN_CLOUD : RAIN_CLOUD);
     for (let x = 1; x < W - 1; x++) for (let y = 0; y < H; y++) if (water(x, y) && rng.random() < (down ? .02 : .025)) S.rings.push({x, y});
     for (let i = 0; i < (down ? 320 : 150); i++) {
-      const x = down ? rng.randint(0, W + 6) : rng.randint(0, W - 1), y = down ? rng.randint(-4, H - 1) : rng.randint(0, H - 1);
+      const x = down ? rng.randint(0, W + 6) : rng.randint(0, W), y = down ? rng.randint(-4, H - 1) : rng.randint(-2, H - 1);
       S.streaks.push({x, y});
     }
     S.rings.forEach((r, i) => { r.per = down ? 1.5 + noise(seed, i, 2) : 2.4 + 1.6 * noise(seed, i, 2); r.ph = noise(seed, i, 3); });
@@ -859,14 +861,18 @@ function rings() {   // drizzle, downpour: a ring opens on the water, widens and
     const m = mixPy(U[p], col, a); put(p - d, m); put(p + d, m);
   }
 }
-function rain() {   // drizzle: short vertical streaks; downpour: longer slanted ones, falling along their slant; a streak moves
-  // less than its length a tick, so every pixel of it stays for at least two ticks
+function rain() {   // drizzle and downpour: slanted streaks falling along their slant. A downpour streak (4 px) steps every
+  // tick by its own length; a drizzle streak (3 px) steps every DRIZZLE_EVERY ticks, the streaks taking turns so that
+  // some move on every tick, and its lowest pixel is where the next step puts its top one
   const R = F.S.streaks;
   if (F.w === 'rain') {
     for (let i = 0, n = F.baked ? R.length : Math.min(R.length, DRIZZLE_N); i < n; i++) {
       let x = R[i].x, y = R[i].y;
-      if (!F.baked) { const s = y + 2 + DRIZZLE_STEP * F.n, k = Math.floor(s / (H + 2)); y = s - k * (H + 2) - 2; x = mod(x + 47 * k, W); }
-      for (let j = 0; j < 2; j++) if (y + j >= 0 && y + j < H) blend((y + j) * W + x, RAIN_DROP, .5);
+      if (!F.baked) {
+        const m = Math.floor((F.n + i % DRIZZLE_EVERY) / DRIZZLE_EVERY), s = y + 2 + 2 * m, k = Math.floor(s / (H + 2));
+        y = s - k * (H + 2) - 2; x = mod(x - m + 47 * k, W + 2);
+      }
+      for (let j = 0; j < 3; j++) { const xx = x - (j >> 1), yy = y + j; if (xx >= 0 && xx < W && yy >= 0 && yy < H) blend(yy * W + xx, RAIN_DROP, .5); }
     }
   } else if (F.w === 'downpour') {
     for (let i = 0, n = F.baked ? R.length : Math.min(R.length, DOWNPOUR_N); i < n; i++) {
