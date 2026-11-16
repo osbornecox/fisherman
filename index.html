@@ -232,10 +232,14 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 
 // What the palette cannot find, from the pix.py calls that drew it (x, y in the 130x180 picture). Boxes are [x, y, w, h];
 // reeds is where «у камыша» is (the clump, or the lake's sedge at the water), for the sign of fry jumping by the reeds.
+// tufts is where grass tufts, the meadow's grass dots or the sedge lean in a gust; skyline: a near forest against the
+// sky, whose treetops a gust leans.
 const ANCHORS = {
   home: {
     smoke: {x: 37, y: 90, n: 12},       // scene_home: px(38 + i % 3 - 1, 90 - 2 * i) above the chimney rect(37, 92, 3, 12)
     crowns: [[109, 92, 19, 25]],        // birch(118, 150, 41, near=True): pix.BIRCH_NEAR's mask, x 109..127, y 92..116
+    tufts: [0, 86, 130, 94],            // the meadow's grass dots: px(randint(0, W - 1), randint(86, 179), grass)
+    skyline: true,                      // dome(92, 82, 70, 30, mid, ...): the wooded hill behind the izba
   },
   shop: {},
   river: {
@@ -243,16 +247,19 @@ const ANCHORS = {
     crowns: [[44, 65, 7, 8]],           // birch(47, 80, 9): pix.BIRCH_FAR's mask, x 44..50, y 65..72
     tufts: [0, 130, 32, 50],            // grass on the pebbles: rect(x, y - 3, 1, 3, grass) for x 0..30, y 136..179
     reeds: [1, 110, 26, 30],            // reeds(14, 139): the clump at the water's edge on the left, open water to its right
+    skyline: true,                      // dome(92, 84, 64, 42, hill, ...): the wooded hill across the river
   },
   omut: {
     float: [30, 128],                   // rod(53, 150, 30, 118, 10)
     ferns: [[3, 165, 6, 4], [113, 165, 6, 4], [121, 165, 6, 4]],   // the ferns at x 6, 116, 124
     reeds: [87, 121, 26, 30],           // reeds(100, 150): the clump on the bank at the right, the pool above and left of it
+    skyline: true,                      // the spruce wall round the pool
   },
   lake: {
     float: [60, 130],                   // rod(87, 152, 60, 120, 10)
     reeds: [106, 136, 24, 12],          // the sedge at the water on the right: scene_lake's tufts rect(x, y - randint(2, 6),
                                         // 1, 3) poking above its shore line (150 - x // 26 + 2 * (x // 9 % 2)), the water above
+    tufts: [0, 136, 130, 44],           // all the sedge's tufts on the shore
   },
 };
 
@@ -275,7 +282,7 @@ const STREAK_C = keySet([C.water2, [154, 166, 168], [78, 92, 96]]);   // the lig
 const FOREST_C = keySet([C.mid, C.hill, C.spruce, C.spruce2]);         // forest hills and walls
 const MEADOW_C = keySet([C.meadow, C.meadow2, C.grass, C.grass2]);
 const SEDGE_C = keySet([[104, 108, 74], [140, 132, 86], [120, 120, 80], [96, 104, 70]]);   // the lake's shore and its sedge
-const CROWN_C = keySet([C.leaf, C.leaf2]), FERN_C = keySet([[98, 118, 70]]), GRASS_KEY = keyOf(...C.grass);
+const CROWN_C = keySet([C.leaf, C.leaf2]), FERN_C = keySet([[98, 118, 70]]);
 // pix.py's REED and REED_DARK: glints, whitecaps and rain rings keep off the water within REED_NEAR px of a reed, as in
 // weather.py (near_reeds), so none lands between the stems or on a cattail head
 const REED_C = keySet([[150, 158, 76], [108, 120, 58], [104, 70, 46], [142, 98, 60], [122, 130, 64], [90, 100, 50], [90, 60, 42],
@@ -309,11 +316,22 @@ const SMOKE_PUFFS = {   // a puff leaves the chimney every `every` s, lives `lif
 // cause («По воде бежит рябь», «В ливень поплавок колотит каплями»). On still water it does not move: a float that
 // moves on «Вода гладкая, ни всплеска» would read as a bite.
 const FLOAT_PERIOD = {wind: 2.6, downpour: 3};
-// A gust: a band GUST_W px wide crossing at GUST_V px a second, one round every GUST_PERIOD px. So that it does not keep
-// time, a round has no gust at the chance GUST_SKIP, and its gust starts up to GUST_LATE px (5.8 s) late.
-const GUST_V = 11, GUST_W = 14, GUST_PERIOD = 230, GUST_SKIP = .3, GUST_LATE = 64;
-const GUST_MIN_EDGES = 40;   // a material with fewer texture edges than this is not worth a gust
+// The wind's gusts. A gust is a soft, wide wave of wind crossing the scene downwind (left to right): its front wanders
+// row by row and its strength is uneven down the scene, so no edge of it is straight. Nothing of it is drawn; what it
+// passes bends further and settles back (see the wind's effects). One chance of a gust every GUST_EVERY s, missed at
+// GUST_SKIP, at a varied moment, speed, width and strength, so the gusts do not keep time and now and then two come
+// close. The gusts are looked at every other tick, so whatever they bend holds two ticks or more.
+const GUST_EVERY = 7, GUST_SKIP = .35;
+const GUST_V = 11, GUST_DV = 5;           // px a second: the slowest, and how much faster one may be
+const GUST_HALF = 22, GUST_DHALF = 12;    // px from the middle of a gust to its ends: the narrowest, and how much wider
+const GUST_RAGGED = 10;                   // px the front wanders either way, row by row
+const GUST_SLOTS = 4;                     // gusts on the scene at once, at most
 const LEAN_SKIP = .25;       // a crown or a fern leans once a cycle of its own, at a varied moment, and skips this share of cycles
+const PAW = {river: .9, omut: .6, lake: 1};   // how strong a gust's patch of ripple is on the water (the omut is sheltered)
+const CALM_NEAR = 12;                     // px from the float's quiet box over which a gust's ripple fades out
+const SHEEN = pack(176, 186, 136);        // the paler undersides of the grass a gust combs over on the meadow and the sedge
+const TOPS_TH = .4;                       // a gust this strong leans the treetops: one threshold, so they lean together
+const SMOKE_GUST = 4;                     // px a second a full gust adds to the smoke's drift
 const CAP_DRIFT = 1.2, FOG_DRIFT = .7;               // px a second
 // Streaks that fall: how many move, and how fast. Drizzle and downpour are one rain on one slant, two pixels down for
 // one aside. The downpour's streaks (4 px) fall DOWNPOUR_STEP px a tick; the drizzle's are finer (3 px), fewer and
@@ -535,41 +553,7 @@ function makePlace(name, rgba) {
       per: 5 + 4 * noise(SCENE_SEED[name], P.runs.length, 6), ph: noise(SCENE_SEED[name], P.runs.length, 7)});
     x = e + 1;
   }
-  // The gust shifts a texture by a pixel where a pixel and its upwind neighbour are the same material. A material with
-  // hardly any texture (the village's few trees, the lake's far forest) is left out: the gust would change nothing there.
-  const same = p => p % W > 0 && P.mat[p] && P.mat[p] === P.mat[p - 1], edges = [0, 0, 0, 0];
-  for (let p = 0; p < N; p++) if (same(p) && keys[p] !== keys[p - 1]) edges[P.mat[p]]++;
-  const textured = m => edges[m] >= GUST_MIN_EDGES;
-  P.gustOK = new Uint8Array(N); P.gustY0 = H; P.gustY1 = 0;
-  for (let p = 0; p < N; p++) if (same(p) && textured(P.mat[p])) {
-    P.gustOK[p] = 1; const y = (p / W) | 0; P.gustY0 = Math.min(P.gustY0, y); P.gustY1 = Math.max(P.gustY1, y + 1);
-  }
-  P.gustNames = [textured(1) && 'лес', (textured(2) || textured(3)) && 'трава'].filter(Boolean);
-  // Sway: sprites (a birch crown, a fern) move a pixel downwind; a tuft swaps its tip with the pixel downwind of it.
-  // Each is a list of moves [to, from] applied to the still layer, and the column the gust is tested at.
-  P.sprites = []; P.quiet = new Uint8Array(N);
-  const sprite = (box, set, what) => {
-    const [bx, by, bw, bh] = box, moves = [], inside = (x, y) => x >= bx && x < bx + bw && set.has(keys[y * W + x]);
-    let n = 0;
-    for (let y = by; y < by + bh; y++) for (let x = bx + bw; x >= bx; x--) {
-      if (inside(x - 1, y)) moves.push(y * W + x, y * W + x - 1);             // the sprite's pixel moves right
-      else if (inside(x, y)) moves.push(y * W + x, y * W + bx - 1);           // the left edge shows what is behind it
-      n += inside(x, y);
-    }
-    if (n < 4) warn(what);
-    P.sprites.push({moves, x: bx + (bw >> 1), y: by, own: true});
-  };
-  (A.crowns || []).forEach(b => sprite(b, CROWN_C, 'a birch crown'));
-  (A.ferns || []).forEach(b => sprite(b, FERN_C, 'a fern'));
-  if (A.tufts) {
-    const [bx, by, bw, bh] = A.tufts;
-    for (let y = by + 1; y < by + bh - 1; y++) for (let x = bx; x < bx + bw; x++) {
-      const p = y * W + x;
-      if (keys[p] === GRASS_KEY && keys[p - W] !== GRASS_KEY && keys[p + W] === GRASS_KEY && keys[p + 1] !== GRASS_KEY)
-        P.sprites.push({moves: [p + 1, p, p, p + 1], x, y, own: false});
-    }
-  }
-  P.swayNames = [A.crowns && 'берёза', A.ferns && 'папоротник', A.tufts && 'трава'].filter(Boolean);
+  P.quiet = new Uint8Array(N);
   // The float: red, red, white from its top pixel down; what shows behind it when it lifts is the water on its left,
   // painted and lit as water.
   if (A.float) {
@@ -583,7 +567,101 @@ function makePlace(name, rgba) {
   }
   P.runs = P.runs.filter(r => { for (let x = r.x0 - 1; x <= r.x1 + 1; x++) if (P.quiet[r.y * W + x]) return false; return true; });
   P.smoke = A.smoke || null;
+  windSites(P, keys, A, warn);
   return P;
+}
+// What the wind's gusts move in a place (see the wind's effects).
+const TUFT_C = keySet([C.grass, [140, 132, 86], [120, 120, 80], [96, 104, 70]]);   // grass tufts and dots, the lake's sedge tufts
+const FAR_KEY = keyOf(122, 136, 128), MEADOW2_KEY = keyOf(...C.meadow2);            // pix.C's far ridge, the yard's meadow
+function windSites(P, keys, A, warn) {
+  const mat = P.mat, cls = P.cls;
+  // The meadow and the sedge where they make a field (not a lone tuft among the pebbles): a gust combs paler streaks
+  // into it.
+  P.field = new Uint8Array(N); P.fy0 = H; P.fy1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x;
+    if (mat[p] !== 2 && mat[p] !== 3) continue;
+    let n = 0, all = 0;
+    for (let yy = Math.max(0, y - 1); yy <= Math.min(H - 1, y + 1); yy++) for (let xx = Math.max(0, x - 1); xx <= Math.min(W - 1, x + 1); xx++) {
+      const m = mat[yy * W + xx]; all++; n += m === 2 || m === 3;
+    }
+    if (n >= .66 * all) { P.field[p] = 1; P.fy0 = Math.min(P.fy0, y); P.fy1 = y; }
+  }
+  // The water's rows, where a gust's patch of ripple runs, and how much of the patch shows: none in the float's quiet
+  // box and less and less towards it within CALM_NEAR px, so the ripple does not draw the eye to the float.
+  P.wy0 = H; P.wy1 = -1; P.calm = new Float64Array(N).fill(1);
+  for (let p = 0; p < N; p++) if (cls[p] === WATER) { const y = (p / W) | 0; P.wy0 = Math.min(P.wy0, y); P.wy1 = y; }
+  if (P.float) for (let p = 0; p < N; p++) {
+    const x = p % W, y = (p / W) | 0, f = P.float;
+    const d = Math.max(Math.max(f.x - 4 - x, x - f.x - 4, 0), Math.max(f.y - 12 - y, y - f.y - 4, 0));   // px from the quiet box
+    P.calm[p] = Math.min(1, d / CALM_NEAR);
+  }
+  // The skyline of a near forest: each column's first forest pixel under the sky (or the far ridge). Where a column's
+  // top differs from its upwind neighbour's, a gust copies the rows between them from upwind, so the treetops lean a
+  // pixel downwind. Right to left, so each column copies its neighbour before that one moves.
+  P.tops = [];
+  if (A.skyline) {
+    const top = new Int16Array(W).fill(-1);
+    for (let x = 0; x < W; x++) for (let y = 1; y < 92; y++) {
+      const p = y * W + x;
+      if (mat[p] === 1 && (cls[p - W] === SKY || keys[p - W] === FAR_KEY)) { top[x] = y; break; }
+    }
+    for (let x = W - 1; x >= 1; x--) if (top[x] >= 0 && top[x - 1] >= 0 && top[x] !== top[x - 1])
+      P.tops.push(x, Math.min(top[x], top[x - 1]), Math.max(top[x], top[x - 1]) - 1);
+  }
+  // Benders: a birch crown, a clump of reeds, a fern. A gust bends one by rows: at level 1 the rows above the share
+  // `lo` of its height move a pixel downwind; at level 2 the top rows move two and the middle ones one; its foot stays.
+  // Each level is a list of moves [to, from] in the frame, right to left along a row, so a pixel is copied before it
+  // moves; where the thing has gone the frame shows what is on the left of it on that row.
+  P.benders = [];
+  const bender = (box, set, levels, own, lo, what) => {
+    const [bx, by, bw, bh] = box, inside = (x, y) => x >= bx && x < bx + bw && y >= by && y < by + bh && set.has(keys[y * W + x]);
+    let yt = H, yb = -1, n = 0;
+    for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++) if (inside(x, y)) { yt = Math.min(yt, y); yb = y; n++; }
+    if (n < 4) { warn(what); return; }
+    const behind = (x, y) => { while (x > 0 && inside(x, y)) x--; return y * W + x; };
+    const lv = [];
+    for (let L = 1; L <= levels; L++) {
+      const moves = [];
+      for (let y = yt; y <= yb; y++) {
+        const s = (yb - y) / Math.max(1, yb - yt), off = L === 1 ? +(s >= lo) : s >= (1 + lo) / 2 ? 2 : s >= lo / 2 ? 1 : 0;
+        if (off) for (let x = Math.min(W - 1, bx + bw - 1 + off); x >= bx; x--) {
+          const to = y * W + x;
+          if (P.quiet[to]) continue;
+          if (inside(x - off, y)) moves.push(to, to - off);
+          else if (inside(x, y)) moves.push(to, behind(x, y));
+        }
+      }
+      lv.push(moves);
+    }
+    P.benders.push({x: bx + (bw >> 1), y: yt, lv, own, th: .28 + .2 * noise(19, P.benders.length, 1)});
+  };
+  (A.crowns || []).forEach(b => bender(b, CROWN_C, b[2] > 10 ? 2 : 1, true, .3, 'a birch crown'));
+  (A.ferns || []).forEach(b => bender(b, FERN_C, 1, true, .5, 'a fern'));
+  if (A.reeds) {   // the reed clumps (the lake's sedge has none: it leans as tufts)
+    const [bx, by, bw, bh] = A.reeds;
+    let n = 0;
+    for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++) n += REED_C.has(keys[y * W + x]);
+    if (n >= 20) bender(A.reeds, REED_C, 2, false, .45, 'the reeds');
+  }
+  // Tufts: the tip of a tuft (a run of one colour upwards, or a lone grass dot in the meadow) swaps places with the
+  // pixel downwind of it, so the tuft leans a pixel.
+  P.tufts = [];
+  if (A.tufts) {
+    const [bx, by, bw, bh] = A.tufts;
+    for (let y = Math.max(1, by); y < Math.min(H - 1, by + bh); y++) for (let x = Math.max(1, bx); x < Math.min(W - 1, bx + bw); x++) {
+      const p = y * W + x, k = keys[p];
+      if (!TUFT_C.has(k) || keys[p - W] === k || keys[p + 1] === k || P.quiet[p] || P.quiet[p + 1]) continue;
+      const tuft = keys[p + W] === k, dot = keys[p - 1] === MEADOW2_KEY && keys[p + 1] === MEADOW2_KEY && keys[p + W] === MEADOW2_KEY;
+      if (tuft || dot) P.tufts.push({p, x, y, th: .18 + .4 * noise(19, x, y)});
+    }
+  }
+  P.marks = new Uint8Array(N);   // 1: a pixel of a streak on the field, 2: of a dash on the water
+  P.streaks = strokesOn(P, 47, 9, [3, 5], 1, 2, p => P.field[p] === 1, () => 1, 1);
+  P.dashes = PAW[P.name] ? strokesOn(P, 43, 6, [2, 4], 0, 1, p => cls[p] === WATER && !P.reedNear[p] && !P.quiet[p], p => P.calm[p], 2)
+    : Array.from({length: H}, () => []);
+  P.windNames = [P.tops.length && 'верхушки леса', (P.fy1 >= 0 || P.tufts.length) && 'трава', A.crowns && 'берёза',
+    A.ferns && 'папоротник', P.benders.some(b => !b.own) && 'камыш', PAW[P.name] && P.wy1 >= 0 && 'рябь от порывов'].filter(Boolean);
 }
 function pixSkyClouds(seed) {   // pix.sky(): seven clouds, the first thing scene_<place> draws with its random.Random(seed)
   const rng = PyRandom(seed), out = [], c1 = pk(C.cloud), c2 = pk(C.cloud2);
@@ -699,7 +777,17 @@ function buildLayer(P, w, hour, baked, power) {
     }
     paintSun(lit, sun, false);
   }
-  return {P, w, hour, baked: !!baked, S, unlit, lit, light, sun, glints: w === 'sun' && hour != null ? glintSites(P, hour) : null};
+  return {P, w, hour, baked: !!baked, S, unlit, lit, light, sun, glints: w === 'sun' && hour != null ? glintSites(P, hour) : null,
+    gusty: w === 'wind' && !baked ? gustLayer(P, unlit, light) : null};
+}
+// What a gust draws, lit: on the meadow and the sedge its paler streaks, on the water its darker ripple dashes.
+function gustLayer(P, unlit, light) {
+  const g = new Uint32Array(N);
+  for (let p = 0; p < N; p++) {
+    if (P.marks[p] === 1) g[p] = light(mixPy(unlit[p], SHEEN, STREAK_A), p, P.cls[p]);
+    else if (P.marks[p] === 2) g[p] = light(mixPy(unlit[p], TROUGH, DASH_A), p, WATER);
+  }
+  return g;
 }
 const layers = new Map();   // the still layers by picture, weather, hour, ?baked and power, the most recent last (see trim)
 function layerFor(P, w, hour, bk, power) {
@@ -715,15 +803,16 @@ function layerFor(P, w, hour, bk, power) {
 // drawFrame(L, n, dst) draws tick n of the still layer L into dst (a Uint32Array of N pixels). Unlit effects draw
 // weather.py's colours into U; the pixels they touch are lit for the hour afterwards, and the sun is painted over them
 // again. Lit effects (objects: smoke, the float, leaves) draw over the lit frame, lit as land, so a faint puff over the
-// sky stays a puff. U, stamp, dirty and F are scratch for one call and nothing carries over to the next, so any number
+// sky stays a puff; the wind's gusts and what they bend draw there too, from lit colours. U, stamp, dirty and F are scratch for one call and nothing carries over to the next, so any number
 // of scenes can be drawn in one tick, each into its own buffer (the game's crossfade, a page of many scenes).
 const U = new Uint32Array(N), stamp = new Uint32Array(N), dirty = new Int32Array(N);
 let nd = 0, fid = 0, out = null;
-const F = {P: null, L: null, S: null, w: '', windy: false, t: 0, n: 0, baked: false, top: new Int16Array(3 * W), bot: new Int16Array(3 * W)};
+const F = {P: null, L: null, S: null, w: '', windy: false, t: 0, tg: 0, n: 0, baked: false, top: new Int16Array(3 * W), bot: new Int16Array(3 * W)};
 function drawFrame(L, n, dst) {
   out = dst; U.set(L.unlit); dst.set(L.lit);
   fid++; nd = 0;
   F.P = L.P; F.L = L; F.S = L.S; F.w = L.w; F.windy = WINDY.has(L.w); F.n = n; F.t = n / FPS; F.baked = L.baked;
+  F.tg = 2 * Math.floor(n / 2) / FPS; gustsNow();   // the gusts move every other tick
   for (let i = 0; i < EFFECTS.length; i++) if (!EFFECTS[i].lit) EFFECTS[i].draw();
   const cls = L.P.cls, light = L.light;
   for (let i = 0; i < nd; i++) { const p = dirty[i]; dst[p] = light(U[p], p, cls[p]); }
@@ -748,12 +837,105 @@ function wx(c, p, k) {   // a clean colour c drawn at p in this frame's weather 
   }
   return c;
 }
-function gustHead(t) {   // the x where the gust band starts at time t, or null in a round that has no gust
-  // (the band is off the picture at both ends of a round, so a skipped or late round never cuts a gust short)
-  const u = t * GUST_V, k = Math.floor(u / GUST_PERIOD);
-  return noise(16, k, 1) < GUST_SKIP ? null : Math.floor(u - k * GUST_PERIOD - GUST_LATE * noise(16, k, 2)) - GUST_W;
+// ---------- the wind's gusts (GUST_*) ----------
+// Gust k is the k-th chance of one, every GUST_EVERY s: missed, or it starts at t0 somewhere in its round with its own
+// speed v, half width hw and strength a. Its middle on row y is off[y] + v * (t - t0): the rows' offsets make the front
+// ragged and lean it a little (the lower rows lag), and str[y] makes it stronger in some rows than in others. At a
+// point its strength falls from the middle to its ends as a raised cosine. A gust's rows are worked out once.
+const gustCache = new Map();
+function wave(s, k, u) {   // smooth noise along u, gust k's own: in [0, 1)
+  const i = Math.floor(u), f = u - i, e = f * f * (3 - 2 * f), a = noise(s, k, i);
+  return a + (noise(s, k, i + 1) - a) * e;
 }
-const inGust = (x, y, t) => { const h = gustHead(t); if (h === null) return false; const head = h - (y >> 3); return x >= head && x < head + GUST_W; };
+function gustOf(k) {   // gust k, or null if its chance is missed
+  if (gustCache.has(k)) return gustCache.get(k);
+  let g = null;
+  if (noise(16, k, 1) >= GUST_SKIP) {
+    g = {t0: (k + .8 * noise(16, k, 2)) * GUST_EVERY, v: GUST_V + GUST_DV * noise(16, k, 3), hw: GUST_HALF + GUST_DHALF * noise(16, k, 4),
+         a: .45 + .55 * noise(16, k, 5), wy: noise(16, k, 6), wh: noise(16, k, 7), leaf: noise(16, k, 8) < .6, ly: noise(16, k, 9),
+         off: new Float64Array(H), str: new Float64Array(H)};
+    for (let y = 0; y < H; y++) {
+      g.off[y] = -g.hw - GUST_RAGGED - 24 + GUST_RAGGED * (2 * wave(17, k, y / 18) - 1) - .1 * (y - 120);
+      g.str[y] = g.a * (.35 + .65 * wave(18, k, y / 26));
+    }
+  }
+  if (gustCache.size > 24) gustCache.delete(gustCache.keys().next().value);
+  gustCache.set(k, g);
+  return g;
+}
+const gustGone = g => W + 2 * (g.hw + GUST_RAGGED) + 40;   // px a gust travels from coming in on the left to leaving on the right
+const GUST_LONGEST = (W + 2 * (GUST_HALF + GUST_DHALF + GUST_RAGGED) + 40) / GUST_V;   // s: the slowest, widest gust's crossing
+const BUMP = Float64Array.from({length: 65}, (_, i) => .5 + .5 * Math.cos(Math.PI * (i / 32 - 1)));
+const bump = u => u <= -1 || u >= 1 ? 0 : BUMP[(u + 1) * 32 | 0];   // 1 in the middle, 0 at the ends
+const bumpSum = u => u <= -1 ? 0 : u >= 1 ? 1 : (u + 1 + Math.sin(Math.PI * u) / Math.PI) / 2;   // its integral from -1
+// The gusts on the scene in this frame: G.g[i] and how far it has come, G.s[i]; its patch of ripple on the water is
+// centred on row G.yc[i], G.hh[i] rows either way. Looked at every other tick (F.tg).
+const G = {n: 0, g: [], s: new Float64Array(GUST_SLOTS), yc: new Float64Array(GUST_SLOTS), hh: new Float64Array(GUST_SLOTS)};
+function gustsNow() {
+  G.n = 0;
+  if (!F.windy || F.baked) return;
+  const t = F.tg, P = F.P;
+  for (let k = Math.floor((t - GUST_LONGEST) / GUST_EVERY); k <= Math.floor(t / GUST_EVERY) && G.n < GUST_SLOTS; k++) {
+    const g = gustOf(k);
+    if (!g || t < g.t0 || g.v * (t - g.t0) > gustGone(g)) continue;
+    G.g[G.n] = g; G.s[G.n] = g.v * (t - g.t0);
+    G.yc[G.n] = P.wy0 + (P.wy1 - P.wy0) * (.15 + .7 * g.wy); G.hh[G.n] = 6 + 8 * g.wh;
+    G.n++;
+  }
+}
+function gustAt(x, y) {   // how strong the gusts are at (x, y) in this frame: 0 (none) to 1
+  let v = 0;
+  for (let i = 0; i < G.n; i++) {
+    const g = G.g[i], u = (x - g.off[y] - G.s[i]) / g.hw;
+    if (u > -1 && u < 1) { const e = g.str[y] * BUMP[(u + 1) * 32 | 0]; if (e > v) v = e; }
+  }
+  return v;
+}
+function pawAt(x, y) {   // how strong a gust's patch of ripple is at (x, y) on the water: 0 to 1
+  let v = 0;
+  for (let i = 0; i < G.n; i++) {
+    const g = G.g[i], u = (x - g.off[y] - G.s[i]) / g.hw;
+    if (u > -1 && u < 1) { const e = g.str[y] * BUMP[(u + 1) * 32 | 0] * bump((y - G.yc[i]) / G.hh[i]); if (e > v) v = e; }
+  }
+  return v * (PAW[F.P.name] || 0);
+}
+function gustBlown(x, y, t0, t1) {   // the gusts' strength at (x, y) summed over the time from t0 to t1, in seconds
+  let v = 0;
+  for (let k = Math.floor((t0 - GUST_LONGEST) / GUST_EVERY); k <= Math.floor(t1 / GUST_EVERY); k++) {
+    const g = gustOf(k);
+    if (!g) continue;
+    const u = t => (x - g.off[y] - g.v * (t - g.t0)) / g.hw;   // falls as the gust comes on
+    v += g.str[y] * g.hw / g.v * (bumpSum(u(Math.max(t0, g.t0))) - bumpSum(u(Math.max(t1, g.t0))));
+  }
+  return v;
+}
+// The marks a gust leaves, fixed in the picture: short strokes along the rows (every `step`-th from `y0`), each 2 to 4
+// or 3 to 5 px long in a cell of `cell` px, staggered row by row. A stroke shows whole while the gust over its middle
+// (cx) is stronger than its own threshold, so a gust brings more of them the stronger it is and takes them away as it
+// goes: on the meadow and the sedge paler streaks, the grass combed over; on the water darker dashes, a patch of
+// rougher ripple. Per row, a flat list [x0, x1, cx, th, ...]: a stroke is cut to the pixels where `ok` holds, and its
+// threshold is divided by `k` at its middle (a stroke where k is 0 is left out). `mark` tells the pixels in P.marks.
+function strokesOn(P, seed, cell, len, y0, step, ok, k, mark) {
+  const rows = Array.from({length: H}, () => []);
+  for (let y = y0; y < H; y += step) {
+    const off = Math.floor(cell * noise(seed, y, 0));
+    for (let c = Math.floor(off / cell), c1 = Math.floor((W - 1 + off) / cell); c <= c1; c++) {
+      const n = len[0] + Math.floor((len[1] - len[0] + 1) * noise(seed + 1, c, y)), xs = c * cell - off;
+      const cx = Math.min(W - 1, Math.max(0, xs + (n >> 1))), f = k(y * W + cx);
+      if (f <= 0) continue;
+      const th = (.2 + .55 * noise(seed + 2, c, y)) / f;
+      for (let x = Math.max(0, xs), e = Math.min(W - 1, xs + n - 1); x <= e; x++) {
+        if (!ok(y * W + x)) continue;
+        let b = x; while (b + 1 <= e && ok(y * W + b + 1)) b++;
+        rows[y].push(x, b, cx, th);
+        for (let q = x; q <= b; q++) P.marks[y * W + q] = mark;
+        x = b;
+      }
+    }
+  }
+  return rows;
+}
+const STREAK_A = .28, DASH_A = .36;   // how far a streak goes to SHEEN and a dash to TROUGH
 
 // ---------- the effects ----------
 // Each draws one frame from F: F.t seconds and F.n ticks, F.P the place (masks, anchors), F.L the still layer of the
@@ -794,28 +976,55 @@ function clouds() {   // the weather's clouds drift on their ring, each stepping
     }
   }
 }
-function gust() {   // wind: now and then a band crossing the scene shifts the forest and grass texture a pixel downwind
-  if (!F.windy || F.baked) return;
-  const P = F.P, still = F.L.unlit, ok = P.gustOK, head = gustHead(F.t);
-  if (head === null) return;
-  for (let y = P.gustY0; y < P.gustY1; y++) {
-    const x0 = head - (y >> 3), row = y * W;   // lower rows lag: the gust leans with the wind
-    for (let x = Math.min(W - 1, x0 + GUST_W - 1); x >= Math.max(1, x0); x--) if (ok[row + x]) put(row + x, still[row + x - 1]);
+function gusts() {   // wind: as a gust passes, the treetops on a forest's skyline lean a pixel downwind, the meadow and the
+  // sedge show paler streaks, and on the water a patch of darker ripple runs across (none by the float or the reeds,
+  // and none under a whitecap). Drawn lit, from the wind layer's colours.
+  if (!G.n) return;
+  const P = F.P, o = out, T = P.tops, tab = F.L.gusty, paw = PAW[P.name] || 0;
+  for (let j = 0; j < T.length; j += 3) {
+    const x = T[j], y0 = T[j + 1], y1 = T[j + 2];
+    if (gustAt(x, y0) > TOPS_TH) for (let y = y0; y <= y1; y++) o[y * W + x] = o[y * W + x - 1];
+  }
+  const y0 = Math.min(P.fy0, P.wy0), y1 = Math.max(P.fy1, P.wy1);
+  for (let y = y0; y <= y1; y++) {
+    let x0 = W, x1 = -1, ripple = 0;   // where on the row the gusts are, and how strong their ripple is on it at most
+    for (let i = 0; i < G.n; i++) {
+      const g = G.g[i], c = g.off[y] + G.s[i];
+      x0 = Math.min(x0, c - g.hw); x1 = Math.max(x1, c + g.hw); ripple = Math.max(ripple, g.str[y] * bump((y - G.yc[i]) / G.hh[i]));
+    }
+    const row = y * W, fs = P.streaks[y], ds = P.dashes[y];
+    for (let j = 0; j < fs.length; j += 4) {
+      const cx = fs[j + 2];
+      if (cx > x0 && cx < x1 && gustAt(cx, y) > fs[j + 3]) for (let q = row + fs[j], e = row + fs[j + 1]; q <= e; q++) o[q] = tab[q];
+    }
+    if (ripple * paw > .2) for (let j = 0; j < ds.length; j += 4) {
+      const cx = ds[j + 2];
+      if (cx > x0 && cx < x1 && pawAt(cx, y) > ds[j + 3]) for (let q = row + ds[j], e = row + ds[j + 1]; q <= e; q++) if (stamp[q] !== fid) o[q] = tab[q];
+    }
   }
 }
-function sway() {   // wind: crowns, ferns and grass tips lean a pixel when the gust reaches them; a crown or a fern also on
-  // its own, for about a second once a cycle, at a varied moment and not every cycle, so it does not keep time; the
-  // grass together in a slow wave running downwind
+function bend() {   // wind: birch crowns, reeds and ferns bend as a gust passes, their tops further, and settle back; a
+  // crown or a fern also leans on its own, for about a second once a cycle, at a varied moment and not every cycle, so
+  // it does not keep time. Grass tufts, the meadow's dots and the sedge lean a pixel as the gust reaches them.
   if (!F.windy || F.baked) return;
-  const sp = F.P.sprites, still = F.L.unlit;
-  for (let i = 0; i < sp.length; i++) {
-    const s = sp[i];
-    let lean;
-    if (s.own) { const u = F.t / (3.1 + noise(7, i, 1)) + noise(7, i, 2), k = Math.floor(u), at = .05 + .5 * noise(9, i, k);
-      lean = u - k >= at && u - k < at + .24 && noise(39, i, k) >= LEAN_SKIP; }
-    else lean = Math.sin(2 * Math.PI * (F.t / 3.6 - s.x / 60)) >= .8;
-    if (!lean && !inGust(s.x, s.y, F.t)) continue;
-    for (let j = 0; j < s.moves.length; j += 2) put(s.moves[j], still[s.moves[j + 1]]);
+  const o = out, B = F.P.benders;
+  for (let i = 0; i < B.length; i++) {
+    const b = B[i], v = G.n ? gustAt(b.x, b.y) : 0;
+    let lv = v > b.th + .32 ? 2 : v > b.th ? 1 : 0;
+    if (!lv && b.own) {
+      const u = F.t / (3.1 + noise(7, i, 1)) + noise(7, i, 2), k = Math.floor(u), at = .05 + .5 * noise(9, i, k);
+      lv = u - k >= at && u - k < at + .24 && noise(39, i, k) >= LEAN_SKIP ? 1 : 0;
+    }
+    if (!lv) continue;
+    const m = b.lv[Math.min(lv, b.lv.length) - 1];
+    for (let j = 0; j < m.length; j += 2) o[m[j]] = o[m[j + 1]];
+  }
+  if (!G.n) return;
+  const T = F.P.tufts;
+  for (let i = 0; i < T.length; i++) {
+    const t = T[i];
+    if (gustAt(t.x, t.y) <= t.th) continue;
+    const c = o[t.p]; o[t.p] = o[t.p + 1]; o[t.p + 1] = c;
   }
 }
 function shimmer() {   // calm water: each lighter stroke drifts a pixel one way, then the other
@@ -876,9 +1085,9 @@ function rings() {   // drizzle, downpour: a ring opens on the water, widens and
     const m = mixPy(U[p], col, a); put(p - d, m); put(p + d, m);
   }
 }
-function rain() {   // drizzle and downpour: slanted streaks falling along their slant. A downpour streak (4 px) steps every
-  // tick by its own length; a drizzle streak (3 px) steps every DRIZZLE_EVERY ticks, the streaks taking turns so that
-  // some move on every tick, and its lowest pixel is where the next step puts its top one
+function rain() {   // drizzle and downpour: slanted streaks falling along their slant. A downpour streak (4 px) falls
+  // DOWNPOUR_STEP px every tick, half its length; a drizzle streak (3 px) steps every DRIZZLE_EVERY ticks, the streaks
+  // taking turns so that some move on every tick, and its lowest pixel is where the next step puts its top one
   const R = F.S.streaks;
   if (F.w === 'rain') {
     for (let i = 0, n = F.baked ? R.length : Math.min(R.length, DRIZZLE_N); i < n; i++) {
@@ -902,13 +1111,15 @@ function smokeBaked() {   // ?baked=1: the smoke column scene_home draws by day,
   if (!F.baked || !s) return;
   for (let i = 0; i < s.n; i++) { const p = (s.y - 2 * i) * W + s.x + i % 3; put(p, wx(SMOKE, p, LAND)); }
 }
-function smoke() {   // the chimney: faint one-pixel puffs rise and fade; the wind bends them along, the downpour beats them low
+function smoke() {   // the chimney: faint one-pixel puffs rise and fade; the wind bends them along, the downpour beats them low.
+  // A gust blows each puff further along by how much of it has passed the chimney in the puff's life.
   const s = F.P.smoke, m = SMOKE_PUFFS[F.w];
   if (!s || !m || F.baked) return;
   for (let k = Math.floor((F.t - m.life) / m.every) + 1, k1 = Math.floor(F.t / m.every); k <= k1; k++) {
     const age = F.t - k * m.every;
     if (age < 0 || age >= m.life) continue;
-    const x = Math.round(s.x + 1 + m.drift * age + .6 * Math.sin(1.9 * age + 6.28 * noise(3, k, 1)));
+    const blown = F.windy ? SMOKE_GUST * gustBlown(s.x + 1, s.y, F.t - age, F.t) : 0;
+    const x = Math.round(s.x + 1 + m.drift * age + blown + .6 * Math.sin(1.9 * age + 6.28 * noise(3, k, 1)));
     const y = Math.round(s.y - m.rise * (.85 + .3 * noise(3, k, 2)) * age);
     const a = Math.round(m.a * (1 - (age / m.life) ** 2) * 6) / 6;   // fades late, in a few steps, so a puff changes rarely
     if (a <= 0 || y < 0 || x < 0 || x >= W) continue;
@@ -925,7 +1136,8 @@ function float() {   // wind, downpour: the float lifts a pixel once a period, t
   over(p - W, wx(RED, p - W, LAND), 1, LAND); over(p, wx(RED, p, LAND), 1, LAND);
   over(p + W, wx(PAPER, p + W, LAND), 1, LAND); over(q, wx(f.under, q, f.underK), 1, f.underK);   // the water it uncovers
 }
-function leaves() {   // wind: now and then a leaf crosses the scene with the wind
+function leaves() {   // wind: now and then a leaf crosses the scene with the wind, and a gust now and then carries one along
+  // a little behind its middle (stepping with the gusts, every other tick); none crosses the float's quiet box
   if (F.baked && F.w === 'wind') { F.S.leaves.forEach(l => { const p = l.y * W + l.x; over(p, l.c, 1, F.P.cls[p]); over(p + 1, l.c, 1, F.P.cls[p + 1]); }); return; }
   if (!F.windy || F.baked) return;
   for (let i = 0; i < 2; i++) {   // two leaves, one every 17 s and one every 23 s: about one crossing in 10 s
@@ -933,7 +1145,14 @@ function leaves() {   // wind: now and then a leaf crosses the scene with the wi
     if (age > 8) continue;   // 8 s to cross, then a rest
     const x = Math.round(-2 + age * (W + 4) / 8), y = Math.round(30 + 100 * noise(5, i, k) + 1.2 * age + 3 * Math.sin(2.1 * age + i));
     const c = LEAF_C[Math.floor(3 * noise(6, i, k))];
-    for (let j = 0; j < 2; j++) if (x + j >= 0 && x + j < W && y >= 0 && y < H) over(y * W + x + j, c, 1, LAND);
+    for (let j = 0; j < 2; j++) if (x + j >= 0 && x + j < W && y >= 0 && y < H && !F.P.quiet[y * W + x + j]) over(y * W + x + j, c, 1, LAND);
+  }
+  for (let i = 0; i < G.n; i++) {
+    const g = G.g[i], age = F.tg - g.t0;
+    if (!g.leaf) continue;
+    const y0 = Math.round(40 + 90 * g.ly), x = Math.round(g.off[y0] + G.s[i] - .3 * g.hw);
+    const y = Math.round(y0 + .9 * age + 3 * Math.sin(2.1 * age + g.ly * 6)), c = LEAF_C[Math.floor(3 * g.wh)];
+    for (let j = 0; j < 2; j++) if (x + j >= 0 && x + j < W && y >= 0 && y < H && !F.P.quiet[y * W + x + j]) over(y * W + x + j, c, 1, LAND);
   }
 }
 // The registry, in drawing order. `names` tells the line under the picture what moves in this place and weather;
@@ -945,14 +1164,14 @@ function leaves() {   // wind: now and then a leaf crosses the scene with the wi
 const EFFECTS = [
   {draw: fogBanks, names: () => F.w === 'fog' ? ['туман'] : []},
   {draw: clouds, names: () => F.S.clouds.length && CLOUD_V[F.w] ? ['облака'] : []},
-  {draw: gust, names: () => F.windy ? F.P.gustNames : []},
-  {draw: sway, names: () => F.windy ? F.P.swayNames : []},
   {draw: shimmer, names: () => CALM.has(F.w) && F.P.runs.length ? ['рябь'] : []},
   {draw: glints, names: () => F.L.glints && F.L.glints.n ? ['блики'] : []},
   {draw: whitecaps, names: () => F.S.caps.length ? ['барашки'] : []},
   {draw: rings, names: () => F.S.rings.length ? ['круги на воде'] : []},
   {draw: smokeBaked, names: () => []},
   {draw: rain, names: () => F.S.streaks.length ? [F.w === 'rain' ? 'морось' : 'ливень'] : []},
+  {draw: gusts, lit: true, names: () => F.windy ? F.P.windNames : []},
+  {draw: bend, lit: true, names: () => []},
   {draw: smoke, lit: true, names: () => F.P.smoke && SMOKE_PUFFS[F.w] ? ['дым из трубы'] : []},
   {draw: float, lit: true, names: () => F.P.float && FLOAT_PERIOD[F.w] ? ['поплавок'] : []},
   {draw: leaves, lit: true, names: () => F.windy ? ['листья'] : []},
