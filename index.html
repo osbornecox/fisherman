@@ -1305,8 +1305,9 @@ const ROOM_GAIN = {sun:[.18,.14,.04]}, CURTAIN_GAIN = {sun:.08};   // a sunny mi
 const GLASS = [41,37,89,105], RIVER = 78, RW = 6;                  // the window glass x0 y0 x1 y1, the river rows in it
 const BULB_LIT = [255,238,190], BULB_WARM = [1.10,.98,.80], SHADE_GLOW = [236,172,104];
 const LAMP_X = 77, LAMP_HW = 12;   // izba.py's lampshade: its cord and bulb at x 77, the fabric x 65..89 (between the chips)
-// a day without power: izba.py's kerosene lamp on the sill burns instead of the bulb (daytime.py's KERO_* numbers): a
-// flame of two pixels over the burner, the glass glowing round it, a small warm pool, the room beyond in the dusk
+// a day without power: izba.py's kerosene lamp on the sill burns instead of the bulb: a flame of two pixels over the
+// burner, the glass glowing round it, a small warm pool, the room beyond in the dusk. KERO_X and keroGlass are
+// izba.py's KERO_X and KERO_GLASS, the other KERO_* numbers daytime.py's
 const KERO_X = 45, KERO_FLAME = 97, KERO_CORE = [255,240,178], KERO_TIP = [246,164,72];
 const KERO_WARM = [1.18,.90,.56], KERO_GLOW = [255,188,104], KERO_POOL = .9, KERO_REACH = 15;
 const keroGlass = y => y >= 92 && y <= 98 ? [2,2,3,3,3,3,2][y-92] : y >= 85 && y <= 91 ? 1 : -1;   // its half width (no soot)
@@ -1392,7 +1393,7 @@ async function drawIzba(open, weather, h, day, noPower = false){
       const warm = tint3([src[i], src[i+1], src[i+2]], BULB_WARM);
       let c;
       if (x >= LAMP_X-2 && x <= LAMP_X+2 && y >= 18 && y <= 19) c = BULB_LIT;
-      else if (x >= LAMP_X-LAMP_HW && x <= LAMP_X+LAMP_HW && y >= 4 && y <= 19 && src[i] - src[i+2] > 60) c = mix3(warm, SHADE_GLOW, .35);   // the fabric
+      else if (x >= LAMP_X-LAMP_HW && x <= LAMP_X+LAMP_HW && y >= 4 && y <= 19 && src[i] > 1.9*src[i+2]) c = mix3(warm, SHADE_GLOW, .35);   // the fabric: red over twice its blue, unlike the wall
       else { const dx = x - LAMP_X, dy = (y - 22)*.7; c = mix3([d[i], d[i+1], d[i+2]], warm, .85*Math.exp(-(dx*dx + dy*dy)/(2*55**2))); }
       d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2];
     }
