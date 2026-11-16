@@ -169,11 +169,14 @@
 // once: the weather painted by code the way art/tools/weather.py paints it (the same random numbers, so the still
 // parts match the baked pictures pixel for pixel), then lit for the hour the way the game lights it (daylight block).
 // Each tick copies that layer and lets a few small effects draw what moves; only the pixels they touch are lit again.
-// Everything that moves is a function of the time alone: no Math.random, nothing to do with the fish.
+// Everything that moves is a function of the time and the scene's seed alone: no Math.random. The engine decides
+// nothing about the fish: the signs on the water are the ones the game passes in (what its journal wrote for the hour),
+// drawn where the seed puts them.
 //
 // A classic script, no modules and no build step; it defines window.LiveScenes and nothing else. demo.html is its
 // page (build.py inlines this file there); a page with many scenes loads it with <script src>.
-//   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0, lit = true}) -> scene
+//   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0, lit = true, seed = 0,
+//     signs = []}) -> scene
 //     place one of LiveScenes.PLACES, weather one of LiveScenes.WEATHERS ('rain' is the drizzle), hour 6..18 (rounded
 //     and clamped, 12 when missing). src is the URL of the place's clean picture, 130x180, a data: URI or a
 //     same-origin URL: it is loaded with an Image, analysed once and cached by place and src. baked is the demo's
@@ -183,7 +186,14 @@
 //     it is (transparent), so an <img> under it shows. With autoplay the scene plays at 12 ticks a second, unless the
 //     system asks for reduced motion; otherwise it draws one still frame. lit: false is a day without power: at 18:00
 //     no window and no street lamp lights up (daytime.py's no_power); left out, or any other value, they light up.
-//   scene.set({place, weather, hour, src, baked, lit}): any of them; the clock goes on.
+//     signs are the signs on the water of the hour, as the journal wrote them: a list of {kind: 'splash', variant:
+//     'shore' | 'under' | 'calm'}, {kind: 'boil'}, {kind: 'bubbles'}, {kind: 'midge'} (LiveScenes.SIGNS lists them).
+//     Each shows at three sites on the water that the seed picks (an integer; the game's number for the day, the hour
+//     and the place), never by the float, at an uneven pace of its own: a splash every 5-9 s, a boil every 1-2 s, a
+//     chain of bubbles every 6-10 s, midges all the time. The first show comes within about 2 s of the signs being
+//     given (create, or a set() that changes the signs or the seed). Only on the waters (river, omut, lake); never
+//     with baked. With reduced motion and nothing playing each sign is drawn still, at its first site.
+//   scene.set({place, weather, hour, src, baked, lit, seed, signs}): any of them; the clock goes on.
 //   scene.play(), scene.pause(), scene.playing.
 //   scene.time: the time of the scene's frame, in seconds.
 //   scene.ready() -> a promise of true once the scene has drawn its settings (at once if it has), or of false if it
@@ -200,6 +210,7 @@
 //     until it gets the names changes its caption in the frame the picture changes.
 //   LiveScenes.dayLight(hour) -> {sky, land, glow, g}: the light of an hour (tints, glow colour and strength), and
 //     LiveScenes.DAY = {first, last, litFrom}: the game lights the izba with these, so the light is written once.
+//   LiveScenes.SIGNS: [{kind, variant?, name}], every sign a scene draws, name a short Russian label (the demo's).
 //   LiveScenes.PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version.
 // Bad input (an unknown place or weather, a picture that does not load) gets one console.warn and a scene that draws
 // nothing until set() gives it something it can draw.
@@ -828,18 +839,20 @@ function layerFor(P, w, hour, bk, power) {
 }
 
 // ---------- the frame ----------
-// drawFrame(L, n, dst) draws tick n of the still layer L into dst (a Uint32Array of N pixels). Unlit effects draw
-// weather.py's colours into U; the pixels they touch are lit for the hour afterwards, and the sun is painted over them
-// again. Lit effects (objects: smoke, the float, leaves) draw over the lit frame, lit as land, so a faint puff over the
+// drawFrame(L, n, dst, X) draws tick n of the still layer L into dst (a Uint32Array of N pixels), with the scene's signs
+// X ({plan, n0, still}, see signs()). Unlit effects draw weather.py's colours into U; the pixels they touch are lit for
+// the hour afterwards, and the sun is painted over them again. Lit effects (objects: smoke, the float, leaves) draw over the lit frame, lit as land, so a faint puff over the
 // sky stays a puff; the wind's gusts and what they bend draw there too, from lit colours. U, stamp, dirty and F are scratch for one call and nothing carries over to the next, so any number
 // of scenes can be drawn in one tick, each into its own buffer (the game's crossfade, a page of many scenes).
 const U = new Uint32Array(N), stamp = new Uint32Array(N), dirty = new Int32Array(N);
 let nd = 0, fid = 0, out = null;
-const F = {P: null, L: null, S: null, w: '', windy: false, t: 0, tg: 0, n: 0, baked: false, top: new Int16Array(3 * W), bot: new Int16Array(3 * W)};
-function drawFrame(L, n, dst) {
+const NO_X = {plan: null, n0: 0, still: false};   // a frame with no signs
+const F = {P: null, L: null, S: null, X: NO_X, w: '', windy: false, t: 0, tg: 0, n: 0, baked: false, top: new Int16Array(3 * W),
+           bot: new Int16Array(3 * W)};
+function drawFrame(L, n, dst, X) {
   out = dst; U.set(L.unlit); dst.set(L.lit);
   fid++; nd = 0;
-  F.P = L.P; F.L = L; F.S = L.S; F.w = L.w; F.windy = WINDY.has(L.w); F.n = n; F.t = n / FPS; F.baked = L.baked;
+  F.P = L.P; F.L = L; F.S = L.S; F.X = X || NO_X; F.w = L.w; F.windy = WINDY.has(L.w); F.n = n; F.t = n / FPS; F.baked = L.baked;
   F.tg = 2 * Math.floor(n / 2) / FPS; gustsNow();   // the gusts move every other tick
   for (let i = 0; i < EFFECTS.length; i++) if (!EFFECTS[i].lit) EFFECTS[i].draw();
   const cls = L.P.cls, light = L.light;
@@ -964,6 +977,184 @@ function strokesOn(P, seed, cell, len, y0, step, ok, k, mark) {
   return rows;
 }
 const STREAK_A = .28, DASH_A = .36;   // how far a streak goes to SHEEN and a dash to TROUGH
+
+// ---------- signs on the water ----------
+// A sign is drawn as shows: one splash and its rings, one fry's jump, one chain of bubbles. Show k of a sign starts at
+// step SIGN_LEAD + k * every + a jitter of up to `jit` steps (so two shows are every - jit to every + jit steps apart),
+// at one of its three sites, not the one before if it can help it. A step is SIGN_STEP ticks from the moment the signs
+// were given, and a show changes only from step to step, so every pixel of it holds two ticks or more. The midges are
+// one show that never ends, a column at each site. Sites are picked by the seed among the water pixels of the sign's
+// zone where its whole footprint (every pixel it may draw, found by drawing it) is on free water: water, not in or near
+// the float's quiet box, not by the reeds. A sign draws only on free water, in the weather's tone, lit as the water.
+const SIGN_STEP = 2;    // ticks a step
+const SIGN_LEAD = 4;    // steps before the first show at the earliest: the new hour's scene has faded in by then
+const SIGN_CALM = 8;    // px: no sign comes nearer the float's quiet box
+const SIGN_FOG = .5;    // a sign is on the water's face: the fog veils it half as much as the water it is on
+const RING_FOG = pack(92, 106, 112);   // on the fog's pale water a ring or a splash shows darker, the ripple's slopes
+const SIGN_APART = 18, SIGN_OTHERS = 10;   // px between the sites of a sign, and from another sign's (rows count double)
+const RING_C = pack(218, 226, 226), FRY_C = pack(208, 214, 212), MIDGE_C = pack(34, 36, 32);   // clean colours, toned by the weather
+const BEAD_C = pack(70, 82, 88);   // the shaded underside of a bubble
+const SIGNS = [
+  {kind: 'splash', variant: 'shore', name: 'у берега плеснуло'},   // «У берега плеснуло, пошли круги.»
+  {kind: 'splash', variant: 'under', name: 'под берегом плеснуло'},   // «Под берегом тихонько плеснуло.»
+  {kind: 'splash', variant: 'calm', name: 'тут и там круги'},   // «По тихой воде тут и там расходятся круги.»
+  {kind: 'boil', name: 'у камыша плещет'},   // «У камыша раз за разом плещет, мелочь выпрыгивает из воды.»
+  {kind: 'bubbles', name: 'пузырьки'},   // «По воде медленно ползёт цепочка мелких пузырьков.»
+  {kind: 'midge', name: 'мошкара'},   // «Над водой столбиками вьётся мошкара.»
+];
+const signId = s => s.variant ? `${s.kind}/${s.variant}` : s.kind;
+const SIGN_IDS = SIGNS.map(signId);
+const ringCache = new Map();
+function ringPts(rx, ry) {   // the outline of a ring on the water seen at a slant: [dx, dy, ...] round (0, 0)
+  const key = rx * 16 + ry;
+  if (!ringCache.has(key)) {
+    const q = [];
+    for (let dx = -rx; dx <= rx; dx++) { const dy = Math.round(ry * Math.sqrt(1 - (dx / rx) ** 2)); q.push(dx, -dy); if (dy) q.push(dx, dy); }
+    ringCache.set(key, q);
+  }
+  return ringCache.get(key);
+}
+function ring(dot, cx, cy, rx, ry, a) { const q = ringPts(rx, ry); for (let i = 0; i < q.length; i += 2) dot(cx + q[i], cy + q[i + 1], RING_C, a); }
+function jet(dot, x, y) { dot(x, y, RING_C, .95); dot(x, y - 1, RING_C, .6); }   // a small splash: a white drop over the water
+// The shows: draw(s, d, dot) draws step s (0 to dur - 1) of one show at (0, 0), d its way (1 or -1), through dot(dx, dy,
+// colour, alpha). every and jit are in steps; still is the step drawn with reduced motion. A splash's ring is far bigger
+// and slower than a raindrop's (a dot either side, ±1 then ±2, in under a second): it opens as an oval, 5 to 17 px wide,
+// over 2 s, a second ring inside it.
+const SHOWS = {
+  'splash/shore': {dur: 15, every: 42, jit: 12, still: 7, draw(s, d, dot) {   // a white splash, then the rings widen
+    if (s < 2) { jet(dot, 0, 0); dot(0, -2, RING_C, .5); dot(-1, 0, RING_C, .5); dot(1, 0, RING_C, .5); }
+    else if (s < 4) { dot(-2, -2, RING_C, .6); dot(2, -2, RING_C, .6); ring(dot, 0, 0, 2, 1, .8); }
+    else if (s < 7) ring(dot, 0, 0, 4, 1, .75);
+    else if (s < 11) { ring(dot, 0, 0, 6, 2, .6); ring(dot, 0, 0, 2, 1, .4); }
+    else { ring(dot, 0, 0, 8, 2, .38); ring(dot, 0, 0, 4, 1, .28); }
+  }},
+  'splash/under': {dur: 13, every: 42, jit: 12, still: 4, draw(s, d, dot) {   // no splash: a small ring, quietly
+    if (s < 4) ring(dot, 0, 0, 2, 1, .55);
+    else if (s < 9) ring(dot, 0, 0, 3, 1, .4);
+    else ring(dot, 0, 0, 4, 1, .22);
+  }},
+  'splash/calm': {dur: 15, every: 42, jit: 12, still: 7, twin: .4, draw(s, d, dot) {   // rings alone, now and then two at once
+    if (s < 3) ring(dot, 0, 0, 2, 1, .7);
+    else if (s < 7) ring(dot, 0, 0, 4, 1, .6);
+    else if (s < 11) { ring(dot, 0, 0, 6, 2, .5); ring(dot, 0, 0, 2, 1, .32); }
+    else { ring(dot, 0, 0, 8, 2, .3); ring(dot, 0, 0, 4, 1, .22); }
+  }},
+  boil: {dur: 11, every: 9, jit: 3, still: 2, dirs: true, draw(s, d, dot) {   // a fry jumps out in an arc and drops back
+    if (s === 0) jet(dot, 0, 0);
+    else if (s < 4) {
+      const f = [[1, -2, 2, -3], [3, -4, 4, -4], [5, -3, 6, -2]][s - 1];
+      dot(d * f[0], f[1], FRY_C, .95); dot(d * f[2], f[3], FRY_C, .95);
+      ring(dot, 0, 0, s < 3 ? 2 : 3, 1, s < 3 ? .45 : .3);
+    } else if (s === 4) jet(dot, 7 * d, 0);
+    else ring(dot, 7 * d, 0, s < 8 ? 2 : 3, 1, s < 8 ? .6 : .32);
+  }},
+  bubbles: {dur: 32, every: 48, jit: 12, still: 14, dirs: true, draw(s, d, dot) {   // six bubbles come up one by one along a slow
+    // path, each a little bead, light over its shaded underside, that shrinks to a dot and fades
+    for (let j = 0; j < 6; j++) {
+      const age = s - 4 * j, x = 3 * j * d, y = j < 3 ? 0 : -1;
+      if (age < 0 || age >= 12) continue;
+      dot(x, y, RING_C, age < 7 ? .9 : .45); dot(x, y + 1, BEAD_C, age < 7 ? .5 : .25);
+      if (age < 3) dot(x + d, y, RING_C, .7);
+    }
+  }},
+  midge: {always: true, draw(m, c, sd, dot, col) {   // a column of six midges, one over another, each dancing slowly up and
+    // down by its own height and now and then a pixel aside
+    for (let i = 0; i < 6; i++) {
+      const per = 2.8 + 1.6 * noise(sd, c, 10 + i), ph = noise(sd, c, 20 + i), hold = 3 + Math.floor(3 * noise(sd, c, 30 + i));
+      const y = -3 - Math.round(1.4 * i) + Math.round(1.5 * Math.sin(2 * Math.PI * (m * SIGN_STEP / FPS / per + ph)));
+      dot(Math.floor(3 * noise(sd + i, c, Math.floor(m / hold))) - 1, y, col, .75);
+    }
+  }},
+};
+SHOWS.midge.box = [-1, -12, 1, -2];   // the footprint of a column, x0, y0, x1, y1
+const MIDGE_LIGHT = pack(176, 178, 160), MIDGE_DARK = 100;   // over water darker than this (luma) the midges show light
+// Where on the water a sign may show, as a test of a site (x, y): the near bank is each column's lowest water.
+const ZONES = {
+  'splash/shore': (x, y, G) => y >= G.bot[x] - 8 && y <= G.bot[x] - 3,   // by the near bank
+  'splash/under': (x, y, G) => y >= G.bot[x] - 3 && y <= G.bot[x] - 2,   // right under it
+  'splash/calm': (x, y, G) => y <= G.bot[x] - 7 && y >= G.top[x] + 5 && G.open(x, y, 9, 3),   // open water
+  boil: (x, y, G) => G.reeds && x >= G.reeds[0] - 9 && x < G.reeds[0] + G.reeds[2] + 9 && y >= G.reeds[1] - 6 &&
+    y < G.reeds[1] + G.reeds[3] + 4 && G.byReeds(x, y),   // close by the reeds, beside them or just above
+  bubbles: (x, y, G) => y <= G.bot[x] - 5 && y >= G.top[x] + 4 && G.open(x, y, 4, 2),
+  midge: (x, y, G) => y >= G.bot[x] - 5 && y <= G.bot[x] - 1,   // low over the water by the near bank
+};
+// The ground the signs stand on, found once per picture: free water, each column's top and lowest water, and every
+// sign's candidate sites, [x, y, ways] with ways 1 (d = 1 fits), 2 (d = -1 fits) or 3.
+function signGround(P) {
+  if (P.sg) return P.sg;
+  const free = new Uint8Array(N), wet = new Int32Array((W + 1) * (H + 1)), top = new Int16Array(W).fill(H), bot = new Int16Array(W).fill(-1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const p = y * W + x, w = P.cls[p] === WATER;
+    if (w) { top[x] = Math.min(top[x], y); bot[x] = y; }
+    if (w && !P.quiet[p] && !P.reedNear[p] && P.calm[p] * CALM_NEAR >= SIGN_CALM) free[p] = 1;
+    wet[(y + 1) * (W + 1) + x + 1] = w + wet[y * (W + 1) + x + 1] + wet[(y + 1) * (W + 1) + x] - wet[y * (W + 1) + x];
+  }
+  const A = ANCHORS[P.name], reeds = A.reeds || null, isReed = new Uint8Array(N);
+  if (reeds) for (let p = 0; p < N; p++) {   // the reed pixels in the reeds' box: the clump's colours, or the lake's sedge
+    const x = p % W, y = (p / W) | 0;
+    if (x >= reeds[0] && x < reeds[0] + reeds[2] && y >= reeds[1] && y < reeds[1] + reeds[3] && P.cls[p] !== WATER) isReed[p] = 1;
+  }
+  const G = {free, top, bot, reeds, cand: {},
+    open(x, y, a, b) {   // is the box (x ± a, y ± b) all water
+      const x0 = x - a, y0 = y - b, x1 = x + a + 1, y1 = y + b + 1;
+      if (x0 < 0 || y0 < 0 || x1 > W || y1 > H) return false;
+      const S = (xx, yy) => wet[yy * (W + 1) + xx];
+      return S(x1, y1) - S(x0, y1) - S(x1, y0) + S(x0, y0) === (x1 - x0) * (y1 - y0);
+    },
+    byReeds(x, y) {   // a reed pixel within 6 px along the row, 3 rows up or 6 rows down
+      for (let yy = Math.max(0, y - 3); yy <= Math.min(H - 1, y + 6); yy++)
+        for (let xx = Math.max(0, x - 6); xx <= Math.min(W - 1, x + 6); xx++) if (isReed[yy * W + xx]) return true;
+      return false;
+    }};
+  const fits = (x, y, q) => {
+    for (let j = 0; j < q.length; j += 2) {
+      const xx = x + q[j], yy = y + q[j + 1];
+      if (xx < 0 || xx >= W || yy < 0 || yy >= H || !free[yy * W + xx]) return false;
+    }
+    return true;
+  };
+  for (const id of SIGN_IDS) {
+    const prints = footprints(id), c = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!free[y * W + x] || !ZONES[id](x, y, G)) continue;
+      let ways = 0;
+      prints.forEach((q, i) => { if (fits(x, y, q)) ways |= 1 << i; });
+      if (ways) c.push(x, y, ways);
+    }
+    G.cand[id] = c;
+  }
+  return P.sg = G;
+}
+function footprints(id) {   // every pixel a show may draw, [dx, dy, ...]: one list for d = 1 and one for d = -1 if it has a way
+  const sh = SHOWS[id];
+  if (sh.always) { const [x0, y0, x1, y1] = sh.box, q = []; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) q.push(x, y); return [q]; }
+  return (sh.dirs ? [1, -1] : [1]).map(d => {
+    const seen = new Set(), q = [];
+    for (let s = 0; s < sh.dur; s++) sh.draw(s, d, (dx, dy) => { const k = (dx + 64) * 256 + dy + 64; if (!seen.has(k)) { seen.add(k); q.push(dx, dy); } });
+    return q;
+  });
+}
+// The scene's signs: for each, its seed and three sites, spread out, picked in the seed's order among its candidates.
+function signPlan(P, seed, ids) {
+  const G = signGround(P), taken = [], plan = [];
+  for (const id of ids) {
+    const i = SIGN_IDS.indexOf(id), sd = (Math.imul(seed, 7919) + 104729 * (i + 1) + 1299709 * PLACES.indexOf(P.name)) | 0;
+    const c = G.cand[id], order = [];
+    for (let j = 0; j < c.length; j += 3) order.push(j);
+    const key = j => noise(sd, c[j], c[j + 1]);
+    order.sort((a, b) => key(a) - key(b));
+    const sites = [], far = (x, y, s, r) => s.every(q => (q.x - x) ** 2 + (2 * (q.y - y)) ** 2 >= r * r);
+    for (const k of [1, .6, .3]) for (const j of order) {   // closer together only if there is no room
+      if (sites.length >= 3) break;
+      const x = c[j], y = c[j + 1];
+      if (far(x, y, sites, SIGN_APART * k) && far(x, y, taken, SIGN_OTHERS * k)) sites.push({x, y, ways: c[j + 2]});
+    }
+    if (!sites.length) continue;
+    taken.push(...sites);
+    plan.push({id, sh: SHOWS[id], sd, sites});
+  }
+  return plan;
+}
 
 // ---------- the effects ----------
 // Each draws one frame from F: F.t seconds and F.n ticks, F.P the place (masks, anchors), F.L the still layer of the
@@ -1143,6 +1334,49 @@ function rain() {   // drizzle and downpour: slanted streaks falling along their
     }
   }
 }
+// The hour's signs (F.X.plan, given at tick F.X.n0), each show at its site; F.X.still: each sign still at its first site.
+function signs() {
+  const pl = F.X.plan;
+  if (!pl || F.baked) return;
+  const m = Math.floor((F.n - F.X.n0) / SIGN_STEP), still = F.X.still;
+  for (let i = 0; i < pl.length; i++) {
+    const g = pl[i], sh = g.sh, S = g.sites;
+    if (sh.always) {   // the midges: dark against light water, light against dark, by the still water at the column's foot
+      for (let c = 0; c < S.length; c++) {
+        const u = F.L.unlit[S[c].y * W + S[c].x], luma = .3 * (u & 255) + .59 * ((u >>> 8) & 255) + .11 * ((u >>> 16) & 255);
+        dotX = S[c].x; dotY = S[c].y; sh.draw(still ? 0 : m, c, g.sd, signDot, luma < MIDGE_DARK ? MIDGE_LIGHT : MIDGE_C);
+      }
+      continue;
+    }
+    if (still) { showAt(g, 0, sh.still, 0); continue; }
+    for (let k = Math.max(0, Math.floor((m - SIGN_LEAD - sh.jit - sh.dur - 6) / sh.every)); SIGN_LEAD + k * sh.every <= m; k++) {
+      const e = SIGN_LEAD + k * sh.every + Math.floor((sh.jit + 1) * noise(g.sd, k, 1)), at = siteOf(g, k);
+      if (m >= e && m - e < sh.dur) showAt(g, k, m - e, at);
+      if (sh.twin && S.length > 1 && noise(g.sd, k, 4) < sh.twin) {   // a second show 2 to 6 steps later at another site
+        const e2 = e + 2 + Math.floor(5 * noise(g.sd, k, 5));
+        if (m >= e2 && m - e2 < sh.dur) showAt(g, k, m - e2, (at + 1 + Math.floor((S.length - 1) * noise(g.sd, k, 6))) % S.length);
+      }
+    }
+  }
+}
+function siteOf(g, k) {   // the site of show k, picked by the seed: not the one show k - 1 picked if there is another
+  const n = g.sites.length, pick = j => Math.floor(n * noise(g.sd, j, 2)), i = pick(k);
+  return n > 1 && k > 0 && i === pick(k - 1) ? (i + 1) % n : i;
+}
+let dotX = 0, dotY = 0;   // the site a show draws at
+function showAt(g, k, s, at) {   // step s of show k of sign g at its site `at`, its way by the seed among those that fit
+  const q = g.sites[at];
+  dotX = q.x; dotY = q.y;
+  g.sh.draw(s, q.ways === 3 ? (noise(g.sd, k, 3) < .5 ? 1 : -1) : q.ways === 2 ? -1 : 1, signDot);
+}
+function signDot(dx, dy, c, a) {   // a pixel of a sign: on free water only, colour c toned by the weather, at alpha a
+  const x = dotX + dx, y = dotY + dy;
+  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  const p = y * W + x;
+  if (!F.P.sg.free[p]) return;
+  const col = F.w !== 'fog' ? wx(c, p, LAND) : mixPy(c === RING_C ? RING_FOG : c, FOG, SIGN_FOG * fogT(y, false, bankNow(x, y)));
+  put(p, a >= 1 ? col : mixPy(U[p], col, a));
+}
 function smokeBaked() {   // ?baked=1: the smoke column scene_home draws by day, part of every weather's picture
   const s = F.P.smoke;
   if (!F.baked || !s) return;
@@ -1206,6 +1440,7 @@ const EFFECTS = [
   {draw: glints, names: () => F.L.glints && F.L.glints.n ? ['блики'] : []},
   {draw: whitecaps, names: () => F.S.caps.length ? ['барашки'] : []},
   {draw: rings, names: () => F.S.rings.length ? ['круги на воде'] : []},
+  {draw: signs, names: () => []},
   {draw: smokeBaked, names: () => []},
   {draw: rain, names: () => F.S.streaks.length ? [F.w === 'rain' ? 'морось' : 'ливень'] : []},
   {draw: gusts, lit: true, names: () => F.windy ? F.P.windNames : []},
@@ -1267,24 +1502,37 @@ function trimSoon() {   // when the code that makes or switches scenes now is do
 // with its ImageData), the settings it was asked for and the ones it draws, their picture and still layer, and its
 // clock. A scene that runs is `k` ticks ahead of the ticker; one that does not (paused, or its picture not analysed
 // yet) stands at `tick`.
-const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit'];
+const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit', 'seed', 'signs'];
 const live = new Set();   // every scene not destroyed
 const warn = what => console.warn(`LiveScenes: ${what}`);
 const brief = v => { v = String(v); return v.length > 48 ? v.slice(0, 45) + '...' : v; };   // data: URIs are long
 const hourOf = h => h == null || h === '' || !isFinite(h) ? 12 : Math.min(DAY_LAST, Math.max(DAY_FIRST, Math.round(h)));
-function settings(want) {   // what a scene is asked to draw, or why it cannot draw it
+function settings(want, s) {   // what a scene is asked to draw, or why it cannot draw it
   const bad = !PLACES.includes(want.place) ? `unknown place "${brief(want.place)}"`
     : !WEATHERS.includes(want.weather) ? `unknown weather "${brief(want.weather)}"`
     : typeof want.src !== 'string' || !want.src ? `no src for ${want.place}` : '';
   return bad ? `${bad}; the scene draws nothing`
-    : {place: want.place, weather: want.weather, hour: hourOf(want.hour), src: want.src, baked: !!want.baked, lit: want.lit !== false};
+    : {place: want.place, weather: want.weather, hour: hourOf(want.hour), src: want.src, baked: !!want.baked, lit: want.lit !== false,
+       seed: isFinite(want.seed) ? Math.floor(+want.seed) | 0 : 0, signs: signsOf(want.signs, s)};
+}
+function signsOf(list, s) {   // the signs asked for, as their ids in the order of SIGNS joined by commas; a bad one is told of
+  // once a scene
+  const tell = what => { if (!s.told.has(what)) { s.told.add(what); warn(what); } };
+  if (list == null) return '';
+  if (!Array.isArray(list)) { tell('signs is not a list; the scene draws no signs'); return ''; }
+  const ids = new Set();
+  for (const g of list) {
+    const id = g && typeof g === 'object' ? signId(g) : String(g);
+    if (SIGN_IDS.includes(id)) ids.add(id); else tell(`unknown sign "${brief(id)}"; it is not drawn`);
+  }
+  return SIGN_IDS.filter(id => ids.has(id)).join(',');
 }
 function complain(s, what) { if (s.warned !== what) warn(s.warned = what); }   // a scene tells of one bad input once
 function settle(s, ok) { const w = s.waiters; s.waiters = []; w.forEach(r => r(ok)); }   // the scene's ready() promises
 function change(s, o) {   // create() and set(): the picture and the still layer of the settings, then the frame
   lookLater(0);           // a page that makes or switches scenes may have dropped others: a look once its task is done
   if (o && typeof o === 'object') for (const k of KEYS) if (k in o) s.want[k] = o[k];
-  const c = settings(s.want);
+  const c = settings(s.want, s);
   if (typeof c === 'string') {   // draws nothing
     complain(s, c); halt(s); s.cfg = s.pic = s.layer = null; s.bad = true; settle(s, false); return;
   }
@@ -1301,9 +1549,11 @@ function change(s, o) {   // create() and set(): the picture and the still layer
     } else ready(s);
   });
 }
-function ready(s) {   // the picture is analysed: the still layer, the frame, and on with the clock if the scene plays
-  const c = s.cfg;
-  s.layer = layerFor(s.pic.P, c.weather, c.baked ? null : c.hour, c.baked, c.lit);
+function ready(s) {   // the picture is analysed: the still layer, the signs' sites, the frame, and on with the clock if the
+  // scene plays. New signs, a new seed or a new place start the signs' steps from the scene's tick.
+  const c = s.cfg, P = s.pic.P, key = `${P.id}/${c.seed}/${c.signs}`;
+  s.layer = layerFor(P, c.weather, c.baked ? null : c.hour, c.baked, c.lit);
+  if (s.signKey !== key) { s.signKey = key; s.X.plan = P.float && c.signs ? signPlan(P, c.seed, c.signs.split(',')) : null; s.X.n0 = s.tick; }
   trimSoon();
   if (show(s)) run(s);
 }
@@ -1323,7 +1573,8 @@ function show(s) {   // the frame of the scene's tick, after the tick before it,
 }
 function render(s, n) {   // tick n into the frame not shown, then onto the canvas
   const t0 = performance.now(), back = 1 - s.shown, h = s.hist;
-  drawFrame(s.layer, n, s.out[back]);
+  s.X.still = !s.playing && !!s.X.plan && reducedMotion();   // with reduced motion a still frame shows each sign still
+  drawFrame(s.layer, n, s.out[back], s.X);
   s.ctx.putImageData(s.img[back], 0, 0);
   h.ms[h.i] = performance.now() - t0; h.i = (h.i + 1) % FPS; h.n++;
   s.shown = back; s.drawn = n;
@@ -1442,6 +1693,7 @@ document.addEventListener('visibilitychange', () => {
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 function create(canvas, opts) {
   const s = {cv: canvas, seen: false, want: {}, cfg: null, pic: null, layer: null, ctx: null, out: null, img: null,
+             X: {plan: null, n0: 0, still: false}, signKey: '', told: new Set(),
              shown: 1, hist: {ms: new Float64Array(FPS), i: 0, n: 0}, playing: false, running: false, tick: 0, k: 0,
              drawn: NaN, dead: false, warned: '', bad: false, fresh: false, waiters: []};
   const scene = Object.freeze({
@@ -1497,7 +1749,8 @@ function lightOf(h) {   // the light of an hour for the game's izba, a copy it m
 [PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME].forEach(Object.freeze);
 window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
   DAY: Object.freeze({first: DAY_FIRST, last: DAY_LAST, litFrom: LIT_FROM}),
-  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '2'});
+  SIGNS: Object.freeze(SIGNS.map(g => Object.freeze({...g}))),
+  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '3'});
 })();
 // ---------- end of scenes.js ----------
 </script>
