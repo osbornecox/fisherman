@@ -1,4 +1,4 @@
-const CACHE='should-i-stay-v32';
+const CACHE='should-i-stay-v33';
 const FILES=['./','index.html','manifest.webmanifest','icon-180.png','icon-192.png','icon-512.png'];
 // install fetches past the browser's HTTP cache, so a new version never caches the previous index.html
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting();});

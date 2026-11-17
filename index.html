@@ -176,7 +176,7 @@
 // A classic script, no modules and no build step; it defines window.LiveScenes and nothing else. demo.html is its
 // page (build.py inlines this file there); a page with many scenes loads it with <script src>.
 //   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0, lit = true, seed = 0,
-//     signs = [], life = null}) -> scene
+//     signs = [], life = null, lilies = false}) -> scene
 //     place one of LiveScenes.PLACES, weather one of LiveScenes.WEATHERS ('rain' is the drizzle), hour 6..18 (rounded
 //     and clamped, 12 when missing). src is the URL of the place's clean picture, 130x180, a data: URI or a
 //     same-origin URL: it is loaded with an Image, analysed once and cached by place and src. baked is the demo's
@@ -198,7 +198,10 @@
 //     the time since it was given (create, or a set() that changes the life, the seed or the place) and the seed, and
 //     comes again only after a long pause. Only on the waters; never with baked; with reduced motion and nothing playing
 //     it is drawn still, as it starts.
-//   scene.set({place, weather, hour, src, baked, lit, seed, signs, life}): any of them; the clock goes on.
+//     lilies: true opens the omut's water lilies for the hour (the summer hours between «Раскрылись кувшинки» and
+//     «Кувшинки закрылись», which are the lives 'lilies-open' and 'lilies-close'; with reduced motion those are drawn as
+//     they end).
+//   scene.set({place, weather, hour, src, baked, lit, seed, signs, life, lilies}): any of them; the clock goes on.
 //   scene.play(), scene.pause(), scene.playing.
 //   scene.time: the time of the scene's frame, in seconds.
 //   scene.ready() -> a promise of true once the scene has drawn its settings (at once if it has), or of false if it
@@ -224,8 +227,8 @@
 //   LiveScenes.dayLight(hour) -> {sky, land, glow, g}: the light of an hour (tints, glow colour and strength), and
 //     LiveScenes.DAY = {first, last, litFrom}: the game lights the izba with these, so the light is written once.
 //   LiveScenes.SIGNS: [{kind, variant?, name}], every sign a scene draws, name a short Russian label (the demo's).
-//   LiveScenes.LIFE: {river: [id, ...]}, the life each water draws, and LIFE_NAME: {id: a short Russian label} (the
-//     demo's). The journal line each id draws is by it in LIFE below.
+//   LiveScenes.LIFE: {river: [id, ...], omut: [...]}, the life each water draws, and LIFE_NAME: {id: a short Russian
+//     label} (the demo's). The journal line each id draws is by it in LIFE below.
 //   LiveScenes.EVENTS: {strike: {frames: [ms, ms, ms], ms}, scare: {ms}}, how long the one-shots take.
 //   LiveScenes.PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version.
 // Bad input (an unknown place or weather, a picture that does not load) gets one console.warn and a scene that draws
@@ -265,7 +268,8 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 // sky, whose treetops a gust leans; reflection: the bars of a reflection hanging from row y in colour c, whose feet
 // tremble on calm water.
 // Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; circle, [cx,
-// cy, rx, ry], where a bird of prey circles; sky, the rows a flock may fly at.
+// cy, rx, ry], where a bird of prey circles; sky, the rows a flock may fly at; bank, the row the far bank's beasts
+// stand on and the left edges they may take; lilies, the buds of the water lilies [x, y].
 const ANCHORS = {
   home: {
     smoke: {x: 37, y: 90, n: 12},       // scene_home: px(38 + i % 3 - 1, 90 - 2 * i) above the chimney rect(37, 92, 3, 12)
@@ -294,6 +298,13 @@ const ANCHORS = {
     skyline: true,                      // the spruce wall round the pool
     reflection: {c: [44, 54, 50], y: 86},   // the wall's reflection: rect(x, 86, 3, randint(6, 14), (44, 54, 50)) for x in
                                             // range(10, 120, 6), hanging from the top of the pool
+    bank: {y: 84, x: [40, 47, 56, 64, 72, 80]},   // the far bank: rect(0, 84, W, 96, (58, 66, 50)) under the spruce wall,
+                                            // with the pool's ellipse([-20, 84, 150, 150]) at row 85 for x 40..90, where a
+                                            // beast standing on row 84 drinks
+    circle: [66, 17, 12, 3],            // the gap of sky over the pool: rect(0, 0, W, 40, sky2) above the spruce wall, whose
+                                        // spires reach row 23 at the highest for x 52..80; the midday sun is above (row 12)
+    lilies: [[26, 123], [36, 129], [20, 133]],   // the buds: px(lx + 2, ly - 1, (232, 230, 220)) for the pads (lx, ly) in
+                                                 // [(24, 124), (34, 130), (18, 134)]; one is in the quiet box and stays a bud
   },
   lake: {
     float: [60, 130],                   // rod(87, 152, 60, 120, 10)
@@ -923,8 +934,8 @@ function layerFor(P, w, hour, bk, power) {
 // of scenes can be drawn in one tick, each into its own buffer (the game's crossfade, a page of many scenes).
 const U = new Uint32Array(N), stamp = new Uint32Array(N), dirty = new Int32Array(N);
 let nd = 0, fid = 0, out = null;
-// A frame with no signs, life or event.
-const NO_X = {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0};
+// A frame with no signs, life or event (open: the water lilies that stand open, see life()).
+const NO_X = {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0, open: null};
 const F = {P: null, L: null, S: null, X: NO_X, kx: null, w: '', windy: false, t: 0, tg: 0, n: 0, baked: false, top: new Int16Array(3 * W),
            bot: new Int16Array(3 * W)};
 function drawFrame(L, n, dst, X) {
@@ -1285,6 +1296,12 @@ const LIFE_C = {   // the clean colours of the sprites, by the letters they are 
   R: [86, 68, 52], r: [120, 98, 72], T: [96, 76, 58], g: [52, 76, 56], G: [70, 98, 70],   // a spruce: roots, trunk, needles
   n: [40, 40, 40], w: [226, 226, 220], y: [150, 152, 146],                        // a wagtail: black, its white face, grey
   h: [74, 60, 50], q: [50, 52, 54],                                               // the kite, geese
+  j: [62, 58, 54],                                                                // the hawk
+  e: [104, 78, 56], E: [74, 56, 42], l: [154, 138, 114], a: [190, 176, 144],      // an elk: its body, its head and hump,
+                                                                                  // its pale legs and antlers
+  f: [140, 104, 72], F: [114, 84, 60],                                            // the calf, its head
+  m: [96, 70, 50], M: [62, 46, 34],                                               // a bear, its snout and paws
+  W: [240, 238, 228], Y: [222, 196, 92],                                          // a water lily's petals and heart
 };
 // The sprites, rows split by '/', '.' for nothing. Beasts face left; their feet are on row `feet` of the sprite. A drift's
 // waterline is its row `wl`.
@@ -1296,7 +1313,23 @@ const LIFE_ART = {
   wagtail: ['..nw/nyy.'], wagtailBob: ['..nw/.yy./n...'],
   kite: ['.hh.hh./h..h..h'],
   goose: ['q.q/.q.'], goose2: ['.../qqq'],
+  hawk: ['j...j/.jjj.'],
+  // a moose, its long head hanging in front of the hump, on long pale legs; drinking, its muzzle dips below its feet
+  elkUp: ['.a.a......../.aaa.E....../.EEEEEEEEE../EEEEeeeeeeee/E..eeeeeeeee/...eeeeeeeee/...l.l...l.l/...l.l...l.l/...l.l...l.l', {feet: 8}],
+  elkDown: ['............/.....E....../...EEEEEEE../..EEeeeeeeee/.aEeeeeeeeee/aEEeeeeeeeee/.EEl.l...l.l/.E.l.l...l.l/.E.l.l...l.l/.E..........', {feet: 8}],
+  elkWalk: ['.a.a......../.aaa.E....../.EEEEEEEEE../EEEEeeeeeeee/E..eeeeeeeee/...eeeeeeeee/..l..l..l..l/..l..l..l..l/..l..l..l..l', {feet: 8}],
+  elkWalk2: ['.a.a......../.aaa.E....../.EEEEEEEEE../EEEEeeeeeeee/E..eeeeeeeee/...eeeeeeeee/...ll....ll./...ll....ll./...ll....ll.', {feet: 8}],
+  calfUp: ['.F...../FFfffff/F.fffff/...f..f/...f..f', {feet: 4}],
+  calfDown: ['......./..fffff/.Ffffff/FF.f..f/F..f..f', {feet: 4}],
+  calfWalk: ['.F...../FFfffff/F.fffff/..f..f./...f..f', {feet: 4}],
+  // a brown bear, its hump over the shoulders, its head low; sniffing the air, its nose up
+  bear: ['....mmm..../.m.mmmmmmm./mmmmmmmmmmm/Mmmmmmmmmmm/..mm....mm./..MM....MM.', {feet: 5}],
+  bearUp: ['.m..mmm..../Mmm.mmmmmm./.mmmmmmmmmm/..mmmmmmmmm/..mm....mm./..MM....MM.', {feet: 5}],
+  bearWalk: ['....mmm..../.m.mmmmmmm./mmmmmmmmmmm/Mmmmmmmmmmm/..m.m...m.m/..M.M...M.M', {feet: 5}],
+  lilyHalf: ['W.W'], lilyOpen: ['.W./WYW'],
 };
+// the elk cow: an elk without antlers
+for (const k of ['Up', 'Down', 'Walk', 'Walk2']) LIFE_ART['cow' + k] = [LIFE_ART['elk' + k][0].replace(/a/g, '.'), LIFE_ART['elk' + k][1]];
 for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, feet}
   const [art, o] = LIFE_ART[k], rows = art.split('/'), q = [];
   rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (r[x] !== '.') q.push(x, y, pk(LIFE_C[r[x]])); });
@@ -1310,6 +1343,11 @@ for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, 
 //     shifting a pixel now and then. After `stay` it drifts off sideways and away.
 //   flock: a flock (`form`, each bird's place flying left; it flies either way) crosses the sky at v, at a height in
 //     ANCHORS.sky, its wings beating slowly, in sight from the start.
+//   beast: on the far bank or shore (ANCHORS.bank), there from the start: an elk drinks and lifts its head now and then
+//     (`calf`: her calf beside her), a bear sniffs the air; after `stay` it walks off, fading into the forest, and later
+//     comes back out of it.
+//   lilies: the water lilies' buds (ANCHORS.lilies) open, or the open flowers close, one after another in the first 20 s,
+//     and stay so. Between the two the game passes lilies: true, and they stand open all the hour.
 const GEESE = [[0, 0], [4, -2], [8, -4], [12, -6], [4, 2], [8, 4], [12, 6], [16, 8]];   // a wedge, one arm longer
 const LIFE = {
   river: {
@@ -1321,18 +1359,27 @@ const LIFE = {
     kite: {is: 'circle', art: 'kite', lap: 22, stay: [150, 210], gap: [240, 300]},   // «Над деревней кружит коршун, тонко посвистывает»
     geese: {is: 'flock', art: 'goose', form: GEESE, v: 3.2, flap: 4, gap: [300, 420]},   // «Высоко над рекой тянется гусиный клин, его долго слышно»
   },
+  omut: {
+    elk: {is: 'beast', art: 'elk', stay: [75, 100], gap: [240, 300]},   // «На том берегу из ельника вышел лось. Долго пил и ушёл»
+    'elk-calf': {is: 'beast', art: 'cow', calf: true, stay: [75, 100], gap: [240, 300]},   // «К воде на том берегу спустились лосиха с лосёнком»
+    bear: {is: 'beast', art: 'bear', stay: [35, 55], gap: [300, 360]},   // «На том берегу показался медведь. Понюхал воздух и не спеша ушёл в ельник»
+    hawk: {is: 'circle', art: 'hawk', lap: 18, stay: [150, 210], gap: [240, 300]},   // «В просвете над омутом кружит ястреб»
+    'lilies-open': {is: 'lilies', open: true},    // «Раскрылись кувшинки»
+    'lilies-close': {is: 'lilies', open: false},  // «Кувшинки закрылись»
+  },
 };
 const LIFE_NAME = {   // a short Russian label of each (the demo's)
   log: 'бревно', 'log-fog': 'бревно из тумана', 'log-dark': 'тёмное бревно', spruce: 'ёлка с корнями', wagtail: 'бревно с трясогузкой',
-  kite: 'коршун', geese: 'гусиный клин',
+  kite: 'коршун', geese: 'гусиный клин', elk: 'лось', 'elk-calf': 'лосиха с лосёнком', bear: 'медведь', hawk: 'ястреб',
+  'lilies-open': 'кувшинки раскрылись', 'lilies-close': 'кувшинки закрылись',
 };
 // The life of a scene: its spec, its seed and where it goes. A drift takes a lane whose rows no sign's site comes within
 // SIGN_REACH rows of, or the one with the fewest such sites (ties by the seed), so it passes no sign if it can help it
-// (and a sign it passes still shows over it).
+// (and a sign it passes still shows over it); a beast takes one of the bank's places by the seed.
 const SIGN_REACH = 3;   // rows a sign's show reaches above and below its site: a splash's jet, its widest ring, a bead
 function lifePlan(P, seed, id, signs) {
   const L = LIFE[P.name][id], A = ANCHORS[P.name], sd = seedOf(seed, 50 + Object.keys(LIFE[P.name]).indexOf(id), P);
-  const g = {id, L, sd, lane: 0};
+  const g = {id, L, sd, lane: 0, x: 0, flowers: null};
   if (L.is === 'drift') {
     const S = LIFE_ART[L.art], near = y => {   // the sites near the rows the drift takes on lane y (a wagtail's too)
       const top = y - S.wl - (L.bird ? 2 : 0), bot = y - S.wl + S.h - 1;
@@ -1341,9 +1388,14 @@ function lifePlan(P, seed, id, signs) {
       return n;
     };
     g.lane = A.lanes.map(y => [near(y), noise(sd, y, 1), y]).sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2];
-  }
+  } else if (L.is === 'beast') {
+    const xs = A.bank.x;
+    g.x = xs[Math.floor(xs.length * noise(sd, 0, 2))];
+  } else if (L.is === 'lilies') g.flowers = lilyBuds(P);
   return g;
 }
+// The water lilies' buds that open: all but the one in the float's quiet box (null where there are none).
+const lilyBuds = P => ANCHORS[P.name].lilies ? ANCHORS[P.name].lilies.filter(([x, y]) => !P.quiet[y * W + x]) : null;
 const lk = new Uint32Array(N);   // lk[p] === fid: a pixel of life in this frame, lit as land and not under the sun's disc
 function lifeDot(x, y, c, a, veil) {   // a pixel of life: colour c toned by the weather, at alpha a; never in the quiet box.
   // veil: how much of the fog it takes, 1 as the land and the sky, SIGN_FOG on the water's face
@@ -1370,8 +1422,12 @@ function episode(m, len, gap, e0) {   // is step m in an episode (len steps, gap
 const span = (sd, i, r) => Math.round((r[0] + (r[1] - r[0]) * noise(sd, i, 99)) * LIFE_SPS);   // a time from range r, in steps
 function life() {
   const g = F.X.life;
-  if (!g || F.baked) return;
-  const m = F.X.still ? 0 : Math.max(0, Math.floor((F.n - F.X.l0) / LIFE_STEP));
+  if (F.baked) return;
+  if (F.X.open && !(g && g.L.is === 'lilies')) {   // the water lilies stand open (scene option lilies), all the hour
+    for (const [x, y] of F.X.open) sprite(LIFE_ART.lilyOpen, x - 1, y - 1, false, 1);
+  }
+  if (!g) return;
+  const m = F.X.still ? (g.L.is === 'lilies' ? 1e6 : 0) : Math.max(0, Math.floor((F.n - F.X.l0) / LIFE_STEP));
   LIVES[g.L.is](g, g.L, m);
 }
 const LIVES = {
@@ -1421,7 +1477,46 @@ const LIVES = {
       sprite(up ? S : S2, left ? x : W - x - S.w, y0 + fm[i][1], !left, 1);
     }
   },
+  beast(g, L, m) {
+    const sd = g.sd, A = ANCHORS[F.P.name], walkIn = 4 * LIFE_SPS, stay = span(sd, 1, L.stay), len = walkIn + stay + walkIn;
+    if (!episode(m, len, span(sd, 2, L.gap), walkIn + 3)) return;
+    const e = EP.e;   // which way it faces and walks: as the seed says each time
+    const dir = noise(sd, EP.k, 4) < .5 ? -1 : 1, flip = dir > 0;
+    let x = g.x, a = 1, pose = 'up';
+    if (e < walkIn || e >= walkIn + stay) {   // walks out of the forest, or back into it, fading
+      const w = e < walkIn ? e - walkIn : e - walkIn - stay;   // -walkIn..0 coming, 0..walkIn going
+      x += dir * Math.floor(w / 4);
+      a = Math.ceil(4 * (1 - Math.abs(w) / walkIn)) / 4;
+      pose = Math.floor(e / 3) & 1 ? 'walk' : 'walk2';
+    } else pose = L.art === 'bear' ? bearPose(sd, e - walkIn) : elkPose(sd, e - walkIn, 66);   // at the water
+    const ART = BEASTS[L.art], S = LIFE_ART[ART[pose] || ART.up], y = A.bank.y - S.feet;
+    sprite(S, x, y, flip, a);
+    if (L.calf) {   // the calf beside her, on the side she came from, its head up and down at its own pace
+      const C2 = LIFE_ART[pose === 'walk' || pose === 'walk2' ? 'calfWalk' : elkPose(sd + 1, e - walkIn, 42) === 'down' ? 'calfDown' : 'calfUp'];
+      sprite(C2, dir < 0 ? x + 13 : x - 8, A.bank.y - C2.feet, flip, a);   // a pixel's gap from her
+    }
+  },
+  lilies(g, L, m) {
+    for (let i = 0; i < g.flowers.length; i++) {
+      const [x, y] = g.flowers[i], at = Math.round((4 + 10 * i + 4 * noise(g.sd, i, 1)) * LIFE_SPS), half = 3 * LIFE_SPS;
+      const stage = m < at ? 0 : m < at + half ? 1 : 2, s = L.open ? stage : 2 - stage;   // 0 a bud, 1 opening, 2 open
+      if (s === 1) sprite(LIFE_ART.lilyHalf, x - 1, y, false, 1);
+      else if (s === 2) sprite(LIFE_ART.lilyOpen, x - 1, y - 1, false, 1);
+    }
+  },
 };
+const BEASTS = {elk: {up: 'elkUp', down: 'elkDown', walk: 'elkWalk', walk2: 'elkWalk2'}, cow: {up: 'cowUp', down: 'cowDown', walk: 'cowWalk', walk2: 'cowWalk2'},
+                bear: {up: 'bearUp', stand: 'bear', walk: 'bearWalk', walk2: 'bear'}};
+function elkPose(sd, s, block) {   // an elk at the water: it looks about for a few seconds, then drinks, lifting its head now
+  // and then for two or three seconds (a block of `block` steps, now and then skipped)
+  if (s < 3 * LIFE_SPS) return 'up';
+  const j = Math.floor(s / block), o = s - block * j, at = Math.floor(.25 * block + .5 * block * noise(sd, j, 8));
+  return noise(sd, j, 9) >= .25 && o >= at && o < at + 12 + Math.floor(10 * noise(sd, j, 10)) ? 'up' : 'down';
+}
+function bearPose(sd, s) {   // a bear on the bank sniffing the air: its head lifts twice in a while, otherwise it stands
+  const j = Math.floor(s / 36), o = s - 36 * j, at = 4 + Math.floor(18 * noise(sd, j, 8));
+  return (o >= at && o < at + 4) || (o >= at + 7 && o < at + 11) ? 'up' : 'stand';
+}
 const LIFE_IDS = Object.fromEntries(Object.entries(LIFE).map(([p, o]) => [p, Object.keys(o)]));
 
 // ---------- the effects ----------
@@ -1808,7 +1903,7 @@ function trimSoon() {   // when the code that makes or switches scenes now is do
 // with its ImageData), the settings it was asked for and the ones it draws, their picture and still layer, and its
 // clock. A scene that runs is `k` ticks ahead of the ticker; one that does not (paused, or its picture not analysed
 // yet) stands at `tick`.
-const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit', 'seed', 'signs', 'life'];
+const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit', 'seed', 'signs', 'life', 'lilies'];
 const live = new Set();   // every scene not destroyed
 const warn = what => console.warn(`LiveScenes: ${what}`);
 const brief = v => { v = String(v); return v.length > 48 ? v.slice(0, 45) + '...' : v; };   // data: URIs are long
@@ -1819,7 +1914,8 @@ function settings(want, s) {   // what a scene is asked to draw, or why it canno
     : typeof want.src !== 'string' || !want.src ? `no src for ${want.place}` : '';
   return bad ? `${bad}; the scene draws nothing`
     : {place: want.place, weather: want.weather, hour: hourOf(want.hour), src: want.src, baked: !!want.baked, lit: want.lit !== false,
-       seed: isFinite(want.seed) ? Math.floor(+want.seed) | 0 : 0, signs: signsOf(want.signs, s), life: lifeOf(want.life, want.place, s)};
+       seed: isFinite(want.seed) ? Math.floor(+want.seed) | 0 : 0, signs: signsOf(want.signs, s), life: lifeOf(want.life, want.place, s),
+       lilies: !!want.lilies};
 }
 function lifeOf(o, place, s) {   // the life asked for, as its id, if the place has it; a bad one is told of once a scene
   if (o == null || o === '') return '';
@@ -1878,6 +1974,7 @@ function ready(s) {   // the picture is analysed: the still layer, the signs' si
   const freshLife = s.lifeKey !== lkey;
   if (freshLife) { s.lifeKey = lkey; s.X.l0 = s.tick; }
   if (fresh || freshLife) s.X.life = c.life ? lifePlan(P, c.seed, c.life, s.X.plan) : null;
+  s.X.open = c.lilies ? lilyBuds(P) : null;
   trimSoon();
   if (show(s)) run(s);
 }
@@ -2065,7 +2162,7 @@ function wallTick(s) {
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 function create(canvas, opts) {
   const s = {cv: canvas, seen: false, want: {}, cfg: null, pic: null, layer: null, ctx: null, out: null, img: null,
-             X: {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0}, signKey: '', lifeKey: '', told: new Set(),
+             X: {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0, open: null}, signKey: '', lifeKey: '', told: new Set(),
              scare: null, ev: null,
              shown: 1, hist: {ms: new Float64Array(FPS), i: 0, n: 0}, playing: false, running: false, tick: 0, k: 0,
              drawn: NaN, dead: false, warned: '', bad: false, fresh: false, waiters: []};
