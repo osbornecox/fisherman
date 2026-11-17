@@ -300,11 +300,17 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 // tufts is where grass tufts, the meadow's grass dots or the sedge lean in a gust; skyline: a near forest against the
 // sky, whose treetops a gust leans; reflection: the bars of a reflection hanging from row y in colour c, whose feet
 // tremble on calm water.
-// Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; circle, [cx,
-// cy, rx, ry], where a bird of prey circles; sky, the rows a flock may fly at; bank, the row the far bank's beasts
-// stand on and the left edges they may take (or the two ends of the shore a beast walks along); lilies, the buds of the
-// water lilies [x, y]; hover, [x, y], where a bird of prey hangs on the wind; perch, the top of the dead trunk a raven
-// sits on.
+// Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; drift, the
+// columns its left end starts from; circle, [cx, cy, rx, ry], where a bird of prey circles; dodge, [x0, x1]: in the sun
+// the circle's centre goes to the end of these farther from the sun of the hour; sky, the rows a flock may fly at; bank,
+// the row the far bank's beasts stand on and the left edges they may take (or the two ends of the shore a beast's walk
+// starts between); lilies, the buds of the water lilies [x, y]; hover, [x, y], where a bird of prey hangs on the wind;
+// perch, the top of the dead trunk a raven sits on.
+// The game shows a scene whole across, standing on its bottom edge: a shorter phone loses the top rows (the 375x548
+// screen shows rows 76 and below, 320x568 rows 57, 375x667 rows 38, 390x664 rows 44), and the hud's two chips lie
+// over its top corners, about 18 rows deep, from the left edge to x 50 and from x 97 to the right edge (x 59 and 92
+// at 320 px). So what a life starts at, and what it is drawn still at with reduced motion, keeps in the columns
+// between the chips where it can; the sky that those phones do not show at all cannot hold it there.
 const ANCHORS = {
   home: {
     smoke: {x: 37, y: 90, n: 12},       // scene_home: px(38 + i % 3 - 1, 90 - 2 * i) above the chimney rect(37, 92, 3, 12)
@@ -322,6 +328,7 @@ const ANCHORS = {
     skyline: true,                      // dome(92, 84, 64, 42, hill, ...): the wooded hill across the river
     lanes: [93, 95, 97, 99],            // the far half of water(d, rng, 90, 140), over the hill's reflection rect(x, 90, 1,
                                         // randint(6, 12)) and 5 rows or more above the float's quiet box (rows 104..120)
+    drift: [50, 66],                    // between the hud's chips, which on the 375x548 screen cover the lanes' sides
     circle: [32, 34, 12, 3],            // over the village: izba(6, 66), izba(32, 75), izba(54, 83) under the sky of pix.sky
     sky: [12, 28],                      // high over the river, above the hill's top (dome(92, 84, 64, 42): row 42)
   },
@@ -333,13 +340,17 @@ const ANCHORS = {
     skyline: true,                      // the spruce wall round the pool
     reflection: {c: [44, 54, 50], y: 86},   // the wall's reflection: rect(x, 86, 3, randint(6, 14), (44, 54, 50)) for x in
                                             // range(10, 120, 6), hanging from the top of the pool
-    bank: {y: 84, x: [40, 47, 56, 64, 72, 80]},   // the far bank: rect(0, 84, W, 96, (58, 66, 50)) under the spruce wall,
+    bank: {y: 84, x: [60, 64, 68, 72, 76, 80]},   // the far bank: rect(0, 84, W, 96, (58, 66, 50)) under the spruce wall,
                                             // and the pool's ellipse([-20, 84, 150, 150]) over it from row 84 for x 51..79
                                             // (row 85 for x 40..90): a beast's feet on row 84 stand on the strip of bank
-                                            // or, in the middle, at the very edge of the water, where it drinks
-    circle: [28, 12, 12, 3],            // the gap of sky over the pool, rect(0, 0, W, 40, sky2), on its left, where the spires
-                                        // of the spruce wall stay below row 19 for x 14..42: the sun of the hawk's hours
-                                        // (11-15, sunPath) crosses the gap at x 55..94 and would put the bird on its disc
+                                            // or, in the middle, at the very edge of the water, where it drinks; a beast
+                                            // (12 wide, rows 76..84) from x 60 to 80 stays clear of the hud's chips
+                                            // on the shortest phones
+    circle: [71, 14, 8, 3],             // the gap of sky over the pool, rect(0, 0, W, 40, sky2), in its middle, where the
+                                        // spires of the spruce wall stay below row 22 for x 48..90, between the hud's chips
+                                        // (only the tall phones show this sky at all)
+    dodge: [60, 82],                    // the sun of the hawk's hours (11-15, sunPath) crosses the gap at x 55..94: the hawk
+                                        // circles at the end away from it, clear of its disc
     lilies: [[26, 123], [36, 129], [20, 133]],   // the buds: px(lx + 2, ly - 1, (232, 230, 220)) for the pads (lx, ly) in
                                                  // [(24, 124), (34, 130), (18, 134)]; one is in the quiet box and stays a bud
   },
@@ -349,12 +360,14 @@ const ANCHORS = {
     reeds: [106, 136, 24, 12],          // the sedge at the water on the right: scene_lake's tufts rect(x, y - randint(2, 6),
                                         // 1, 3) poking above its shore line (150 - x // 26 + 2 * (x // 9 % 2)), the water above
     tufts: [0, 136, 130, 44],           // all the sedge's tufts on the shore
-    circle: [100, 45, 10, 3],           // over the round hill: top = 52 + 14 * min(1, ((x - 90) / 40) ** 2), its top at x 90;
-                                        // under the 15:00 sun's halo (down to row 38), the lowest of the hawk's hours (11-15)
+    circle: [76, 47, 10, 3],            // over the round hill's left shoulder: top = 52 + 14 * min(1, ((x - 90) / 40) ** 2),
+                                        // its top at x 90; under the 15:00 sun's halo (down to row 38), the lowest of the
+                                        // hawk's hours (11-15), between the hud's chips and low enough for 375x667 and 390x664
     hover: [72, 47],                    // over the hill's slope (row 54 at x 72), into the wind
-    sky: [10, 30],                      // high over the lake
-    bank: {y: 85, x: [8, 122]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
-                                        // walks along row 85 between these x
+    sky: [38, 42],                      // over the lake, above the round hill (a wedge spans its row -6..+9): so low that
+                                        // 375x667 and 390x664 show it too
+    bank: {y: 85, x: [50, 84]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
+                                        // starts between these x, between the hud's chips, and walks along row 85
     perch: [112, 94],                   // the shorter dead trunk: rect(112, 112 - 18, 1, 18, (110, 104, 96)), its top pixel
   },
 };
@@ -1475,13 +1488,15 @@ for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, 
 }
 // The lives each water has, by id, with the journal's line each draws (05-zhizn-vokrug, where its months, hours, weather
 // and how often are; the game keeps to them). `is` is how it shows:
-//   drift: down the river from left to right at v, on one of the lanes, in sight from the start; `fog`: it comes out of
-//     the fog on the left and goes into it on the right; `bird`: a wagtail rides it, pumping its tail.
+//   drift: down the river from left to right at v, on one of the lanes, in sight from the start (at ANCHORS.drift);
+//     `fog`: later it comes out of the fog on the left, and it goes into it on the right; `bird`: a wagtail rides it,
+//     pumping its tail.
 //   circle: a bird of prey circles round ANCHORS.circle (a lap in about `lap`); in the wind, or with `hover` at
 //     ANCHORS.hover, it hangs on the spot, shifting a pixel now and then. After `stay` it drifts off sideways and away
-//     (to the `side` given, -1 left, or either way by the seed), and comes back from there.
+//     (to the `side` given, -1 left, or either way by the seed; with ANCHORS.dodge in the sun, away from the sun), and
+//     comes back from there.
 //   flock: a flock (`form`, each bird's place flying left; it flies either way) crosses the sky at v, at a height in
-//     ANCHORS.sky, its wings beating slowly, in sight from the start.
+//     ANCHORS.sky, its wings beating slowly, in sight from the start, nearly half way across.
 //   beast: on the far bank or shore (ANCHORS.bank), there from the start: an elk drinks and lifts its head now and then
 //     (`calf`: her calf beside her), a bear sniffs the air; after `stay` it walks off, fading into the forest, and later
 //     comes back out of it. `walk`: the dark spot plods along the shore all the while, fading in and out at the ends.
@@ -1506,7 +1521,7 @@ const LIFE = {
     'elk-calf': {is: 'beast', art: 'cow', calf: true, stay: [75, 100], gap: [240, 300]},   // «К воде на том берегу спустились лосиха с лосёнком»
     bear: {is: 'beast', art: 'bear', stay: [35, 55], gap: [300, 360]},   // «На том берегу показался медведь. Понюхал воздух и не спеша ушёл в ельник»
     hawk: {is: 'circle', art: 'hawk', lap: 18, stay: [150, 210], gap: [240, 300], side: -1},   // «В просвете над омутом кружит
-    // ястреб»; it leaves to the left, away from the sun of its hours
+    // ястреб»; it leaves to the left, or in the sun away from it (ANCHORS.omut.dodge)
     'lilies-open': {is: 'lilies', open: true},    // «Раскрылись кувшинки»
     'lilies-close': {is: 'lilies', open: false},  // «Кувшинки закрылись»
   },
@@ -1584,8 +1599,10 @@ function life() {
 }
 const LIVES = {
   drift(g, L, m) {
-    const S = LIFE_ART[L.art], v = L.v / LIFE_SPS, x0 = L.fog ? 2 + Math.floor(6 * noise(g.sd, 0, 1)) : 6 + Math.floor(22 * noise(g.sd, 0, 1));
-    // where it is when the clock starts: well in sight, or just coming out of the fog
+    const S = LIFE_ART[L.art], v = L.v / LIFE_SPS, [d0, d1] = ANCHORS[F.P.name].drift;
+    // where it is when the clock starts: in sight, between the hud's chips (in the fog too: it came out of the fog on the
+    // left, and later ones do)
+    const x0 = d0 + Math.floor((d1 - d0 + 1) * noise(g.sd, 0, 1));
     const len = Math.ceil((W + S.w + 2) / v), e0 = Math.floor((x0 + S.w + 1) / v);
     if (!episode(m, len, span(g.sd, 0, L.gap), e0)) return;
     const x = -S.w - 1 + Math.floor(v * EP.e), y = g.lane - S.wl;
@@ -1603,10 +1620,15 @@ const LIVES = {
   circle(g, L, m) {
     const S = LIFE_ART[L.art], A = ANCHORS[F.P.name], sd = g.sd, out = 15 * LIFE_SPS, len = span(sd, 1, L.stay);
     if (!episode(m, len, span(sd, 2, L.gap), out + Math.floor(.3 * len * noise(sd, 0, 3)))) return;
-    const e = EP.e, k = EP.k, side = L.side || (noise(sd, k, 5) < .5 ? -1 : 1);
+    const e = EP.e, k = EP.k;
     let f = 0;   // how far off it has drifted: it comes in at the start of an episode (not the first) and goes at its end
     if (k > 0 && e < out) f = 1 - e / out; else if (e >= len - out) f = (e - (len - out)) / out;
-    const hang = L.hover || F.windy, [cx, cy, rx, ry] = L.hover ? [...A.hover, 0, 0] : A.circle;
+    const hang = L.hover || F.windy;
+    let [cx, cy, rx, ry] = L.hover ? [...A.hover, 0, 0] : A.circle, side = L.side || (noise(sd, k, 5) < .5 ? -1 : 1);
+    if (!L.hover && A.dodge && F.L.sun) {   // in the sun: at the end of the gap away from it, and off away from it too
+      const sx = sunPath(F.L.hour)[0], [d0, d1] = A.dodge;
+      cx = Math.abs(sx - d0) > Math.abs(sx - d1) ? d0 : d1; side = cx < sx ? -1 : 1;
+    }
     let x = cx + side * 100 * f, y = cy - 8 * f;
     if (hang) {   // hangs on the wind, shifting a pixel now and then
       const j = Math.floor(e / 27);
@@ -1621,7 +1643,8 @@ const LIVES = {
     const S = LIFE_ART[L.art], S2 = LIFE_ART[L.art + '2'], sd = g.sd, A = ANCHORS[F.P.name], fm = L.form;
     let wide = 0; for (const [dx] of fm) wide = Math.max(wide, dx + S.w);
     const v = L.v * (.9 + .2 * noise(sd, 0, 1)) / LIFE_SPS, len = Math.ceil((W + wide + 4) / v);
-    if (!episode(m, len, span(sd, 2, L.gap), Math.floor(len * (.25 + .2 * noise(sd, 0, 3))))) return;
+    // it starts nearly half way across, between the hud's chips
+    if (!episode(m, len, span(sd, 2, L.gap), Math.floor(len * (.45 + .1 * noise(sd, 0, 3))))) return;
     const k = EP.k, e = EP.e, left = noise(sd, k, 4) < .5, gone = v * e, slope = .06 * (noise(sd, k, 6) - .5);
     const y0 = A.sky[0] + Math.floor((A.sky[1] - A.sky[0]) * noise(sd, k, 5)) + Math.round(gone * slope);
     for (let i = 0; i < fm.length; i++) {
