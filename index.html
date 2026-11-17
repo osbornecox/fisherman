@@ -303,8 +303,9 @@ const ANCHORS = {
     bank: {y: 84, x: [40, 47, 56, 64, 72, 80]},   // the far bank: rect(0, 84, W, 96, (58, 66, 50)) under the spruce wall,
                                             // with the pool's ellipse([-20, 84, 150, 150]) at row 85 for x 40..90, where a
                                             // beast standing on row 84 drinks
-    circle: [66, 17, 12, 3],            // the gap of sky over the pool: rect(0, 0, W, 40, sky2) above the spruce wall, whose
-                                        // spires reach row 23 at the highest for x 52..80; the midday sun is above (row 12)
+    circle: [28, 12, 12, 3],            // the gap of sky over the pool, rect(0, 0, W, 40, sky2), on its left, where the spires
+                                        // of the spruce wall stay below row 19 for x 14..42: the sun of the hawk's hours
+                                        // (11-15, sunPath) crosses the gap at x 55..94 and would put the bird on its disc
     lilies: [[26, 123], [36, 129], [20, 133]],   // the buds: px(lx + 2, ly - 1, (232, 230, 220)) for the pads (lx, ly) in
                                                  // [(24, 124), (34, 130), (18, 134)]; one is in the quiet box and stays a bud
   },
@@ -314,7 +315,8 @@ const ANCHORS = {
     reeds: [106, 136, 24, 12],          // the sedge at the water on the right: scene_lake's tufts rect(x, y - randint(2, 6),
                                         // 1, 3) poking above its shore line (150 - x // 26 + 2 * (x // 9 % 2)), the water above
     tufts: [0, 136, 130, 44],           // all the sedge's tufts on the shore
-    circle: [100, 40, 10, 3],           // over the round hill: top = 52 + 14 * min(1, ((x - 90) / 40) ** 2), its top at x 90
+    circle: [100, 45, 10, 3],           // over the round hill: top = 52 + 14 * min(1, ((x - 90) / 40) ** 2), its top at x 90;
+                                        // under the 15:00 sun's halo (down to row 38), the lowest of the hawk's hours (11-15)
     hover: [72, 47],                    // over the hill's slope (row 55 at x 72), into the wind
     sky: [10, 30],                      // high over the lake
     bank: {y: 85, x: [8, 122]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
@@ -548,7 +550,9 @@ function sunOf(P, sx, sy, core, halo, mix) {
 function paintSun(buf, s, touchedOnly) {   // touchedOnly: just the pixels an effect drew in this frame
   for (let i = 0; i < s.ps.length; i++) {
     const p = s.ps[i];
-    if (touchedOnly && (stamp[p] !== fid || lk[p] === fid)) continue;   // a bird of life stays in front of the sun
+    // a bird of life stays in front of the halo, and is lost in the glare of the core (a dark bird on the pale disc would
+    // give the sun a face)
+    if (touchedOnly && (stamp[p] !== fid || (lk[p] === fid && !s.inCore[i]))) continue;
     buf[p] = s.inCore[i] ? s.core : s.mix(buf[p], s.halo, .45);
   }
 }
@@ -1353,7 +1357,8 @@ for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, 
 //   drift: down the river from left to right at v, on one of the lanes, in sight from the start; `fog`: it comes out of
 //     the fog on the left and goes into it on the right; `bird`: a wagtail rides it, pumping its tail.
 //   circle: a bird of prey circles round ANCHORS.circle (a lap in about `lap`); in the wind, or with `hover` at
-//     ANCHORS.hover, it hangs on the spot, shifting a pixel now and then. After `stay` it drifts off sideways and away.
+//     ANCHORS.hover, it hangs on the spot, shifting a pixel now and then. After `stay` it drifts off sideways and away
+//     (to the `side` given, -1 left, or either way by the seed), and comes back from there.
 //   flock: a flock (`form`, each bird's place flying left; it flies either way) crosses the sky at v, at a height in
 //     ANCHORS.sky, its wings beating slowly, in sight from the start.
 //   beast: on the far bank or shore (ANCHORS.bank), there from the start: an elk drinks and lifts its head now and then
@@ -1379,7 +1384,8 @@ const LIFE = {
     elk: {is: 'beast', art: 'elk', stay: [75, 100], gap: [240, 300]},   // «На том берегу из ельника вышел лось. Долго пил и ушёл»
     'elk-calf': {is: 'beast', art: 'cow', calf: true, stay: [75, 100], gap: [240, 300]},   // «К воде на том берегу спустились лосиха с лосёнком»
     bear: {is: 'beast', art: 'bear', stay: [35, 55], gap: [300, 360]},   // «На том берегу показался медведь. Понюхал воздух и не спеша ушёл в ельник»
-    hawk: {is: 'circle', art: 'hawk', lap: 18, stay: [150, 210], gap: [240, 300]},   // «В просвете над омутом кружит ястреб»
+    hawk: {is: 'circle', art: 'hawk', lap: 18, stay: [150, 210], gap: [240, 300], side: -1},   // «В просвете над омутом кружит
+    // ястреб»; it leaves to the left, away from the sun of its hours
     'lilies-open': {is: 'lilies', open: true},    // «Раскрылись кувшинки»
     'lilies-close': {is: 'lilies', open: false},  // «Кувшинки закрылись»
   },
@@ -1476,7 +1482,7 @@ const LIVES = {
   circle(g, L, m) {
     const S = LIFE_ART[L.art], A = ANCHORS[F.P.name], sd = g.sd, out = 15 * LIFE_SPS, len = span(sd, 1, L.stay);
     if (!episode(m, len, span(sd, 2, L.gap), out + Math.floor(.3 * len * noise(sd, 0, 3)))) return;
-    const e = EP.e, k = EP.k, side = noise(sd, k, 5) < .5 ? -1 : 1;
+    const e = EP.e, k = EP.k, side = L.side || (noise(sd, k, 5) < .5 ? -1 : 1);
     let f = 0;   // how far off it has drifted: it comes in at the start of an episode (not the first) and goes at its end
     if (k > 0 && e < out) f = 1 - e / out; else if (e >= len - out) f = (e - (len - out)) / out;
     const hang = L.hover || F.windy, [cx, cy, rx, ry] = L.hover ? [...A.hover, 0, 0] : A.circle;
