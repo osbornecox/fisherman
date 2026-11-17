@@ -103,7 +103,10 @@
   .splash { position:fixed; inset:0; z-index:10; background:#55663f; display:flex; justify-content:center; }
   .splash[hidden] { display:none; }
   .splash .frame { position:relative; width:100%; max-width:430px; height:100%; overflow:hidden; }
-  .splash img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center bottom; image-rendering:pixelated; }
+  /* a screen shorter than the picture loses four fifths of what it cannot show at the top (the sky) and a fifth at
+     the bottom (the meadow): on the shortest phones the forested hill stays under the title, not the river, and the
+     izba stays clear of the button */
+  .splash img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 80%; image-rendering:pixelated; }
   /* the title is light like the tag, with a dark pixel outline: it lies on the forest on a short screen and on the
      sky on a tall one (or half on each), and reads on both */
   .splash .name { position:absolute; top:calc(env(safe-area-inset-top) + 7.5%); left:16px; right:16px; text-align:center; font-size:38px; font-weight:600; line-height:1.1;
