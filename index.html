@@ -2679,7 +2679,14 @@ function onStorage(e){
   askRestart = false; hush(); render();
 }
 window.addEventListener('storage', onStorage);
-function toast(text, ms=1300){ const el=$('toast'); el.textContent=text; el.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
+// The toast tells how an hour went, over the screen drawn right after it, and belongs to that screen alone: the next
+// screen (render) or the next hour (sit) takes it away at once, so a quick tap never carries it over to the evening
+function toast(text, ms=1300){ const el=$('toast'); el.textContent=text; el.classList.add('show'); toast.fresh = true; clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
+function hideToast(){
+  const el = $('toast'); clearTimeout(toast._t); toast.fresh = false;
+  if (!el.classList.contains('show')) return;
+  el.style.transition = 'none'; el.classList.remove('show'); void el.offsetWidth; el.style.transition = '';   // no fade-out
+}
 // Taps are ignored for a moment after every new screen: the second tap of a double tap must not press the button
 // that has just appeared under the finger
 const TAP_LOCK = 350;
@@ -2806,6 +2813,7 @@ let shownPhase = null;
 function render(){
   const P = $('panel'), hadFocus = !!document.activeElement && P.contains(document.activeElement);
   tapLock = performance.now() + TAP_LOCK;
+  if (toast.fresh) toast.fresh = false; else hideToast();   // a toast is shown on the screen drawn right after it only
   hud(); P.innerHTML='';
   $('wrap').classList.toggle('fit', FIT.has(S.phase));
   $('wrap').classList.toggle('intro', S.phase === 'intro');
@@ -3019,6 +3027,7 @@ function nbCaught(){ return S.D.nb.bites.some(n => n > 0); }
 let busy = false;
 function sit(){
   if (busy || S.t >= HOURS) return; busy = true;
+  hideToast();   // the last hour's toast goes as the next hour starts
   const w = S.loc, h = S.t, n = S.D.catchT[w][h];
   S.presence[w].push(h);
   $('panel').classList.add('busy');   // no taps while the hour passes; the screen stays as it is
