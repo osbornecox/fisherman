@@ -220,7 +220,8 @@
 //   scene.stats() -> {ms, px}: the mean ms a drawn frame took over about the last second and the pixels the last frame
 //     changed (counted only when asked); null before the first frame.
 //   LiveScenes.preload(place, src) -> a promise of true once the picture is analysed (false if it cannot be): a scene
-//     of a preloaded place draws its first frame inside create() or set().
+//     of a preloaded place draws its first frame inside create() or set(). Once a water's picture is analysed, the
+//     engine finds where its signs may show bit by bit in idle time, so a scene with signs need not.
 //   LiveScenes.names(place, weather) -> the Russian names of what really moves there (the demo's caption), by the
 //     picture of the place analysed last; null until a picture of the place has been analysed. A scene draws its
 //     first frame of a place in the task that analyses the picture, so a page that asks again at every display frame
@@ -1206,16 +1207,19 @@ const ZONES = {
   midge: (x, y, G) => y >= G.bot[x] - 5 && y <= G.bot[x] - 1,   // low over the water by the near bank
   scare: (x, y, G) => y >= G.bot[x] - 7 && y <= G.bot[x] - 3,   // under the water by the near bank
 };
-// The ground the signs stand on, found once per picture: free water, each column's top and lowest water, and every
-// sign's candidate sites, [x, y, ways] with ways 1 (d = 1 fits), 2 (d = -1 fits) or 3.
+// The ground the signs stand on, found once per picture when a scene first has signs or a scare: free water, each
+// column's top and lowest water, and each sign's candidate sites, [x, y, ways] with ways 1 (d = 1 fits), 2 (d = -1 fits)
+// or 3, found the first time that sign is asked for (G.cands(id)).
 function signGround(P) {
   if (P.sg) return P.sg;
   const free = new Uint8Array(N), wet = new Int32Array((W + 1) * (H + 1)), top = new Int16Array(W).fill(H), bot = new Int16Array(W).fill(-1);
+  const busy = new Int32Array((W + 1) * (H + 1));   // sums of the pixels that are not free water, for a box at a glance
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const p = y * W + x, w = P.cls[p] === WATER;
+    const p = y * W + x, w = P.cls[p] === WATER, i = (y + 1) * (W + 1) + x + 1;
     if (w) { top[x] = Math.min(top[x], y); bot[x] = y; }
     if (w && !P.quiet[p] && !P.reedNear[p] && P.calm[p] * CALM_NEAR >= SIGN_CALM) free[p] = 1;
-    wet[(y + 1) * (W + 1) + x + 1] = w + wet[y * (W + 1) + x + 1] + wet[(y + 1) * (W + 1) + x] - wet[y * (W + 1) + x];
+    wet[i] = w + wet[i - W - 1] + wet[i - 1] - wet[i - W - 2];
+    busy[i] = 1 - free[p] + busy[i - W - 1] + busy[i - 1] - busy[i - W - 2];
   }
   const A = ANCHORS[P.name], reeds = A.reeds || null, isReed = new Uint8Array(N);
   if (reeds) for (let p = 0; p < N; p++) {   // the reed pixels in the reeds' box: the clump's colours, or the lake's sedge
@@ -1223,6 +1227,17 @@ function signGround(P) {
     if (x >= reeds[0] && x < reeds[0] + reeds[2] && y >= reeds[1] && y < reeds[1] + reeds[3] && P.cls[p] !== WATER) isReed[p] = 1;
   }
   const G = {free, top, bot, reeds, cand: {},
+    cands(id) {   // the sign's candidate sites, found once
+      if (this.cand[id]) return this.cand[id];
+      const prints = footprints(id), c = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        if (!free[y * W + x] || !ZONES[id](x, y, G)) continue;
+        let ways = 0;
+        prints.forEach((q, i) => { if (fits(x, y, q)) ways |= 1 << i; });
+        if (ways) c.push(x, y, ways);
+      }
+      return this.cand[id] = c;
+    },
     open(x, y, a, b) {   // is the box (x ± a, y ± b) all water
       const x0 = x - a, y0 = y - b, x1 = x + a + 1, y1 = y + b + 1;
       if (x0 < 0 || y0 < 0 || x1 > W || y1 > H) return false;
@@ -1234,35 +1249,37 @@ function signGround(P) {
         for (let xx = Math.max(0, x - 6); xx <= Math.min(W - 1, x + 6); xx++) if (isReed[yy * W + xx]) return true;
       return false;
     }};
-  const fits = (x, y, q) => {
+  const fits = (x, y, q) => {   // is every pixel of footprint q at (x, y) free water: its whole box at a glance if it can
+    const [bx0, by0, bx1, by1] = q.box, x0 = x + bx0, y0 = y + by0, x1 = x + bx1 + 1, y1 = y + by1 + 1;
+    if (x0 >= 0 && y0 >= 0 && x1 <= W && y1 <= H &&
+        busy[y1 * (W + 1) + x1] - busy[y0 * (W + 1) + x1] - busy[y1 * (W + 1) + x0] + busy[y0 * (W + 1) + x0] === 0) return true;
     for (let j = 0; j < q.length; j += 2) {
       const xx = x + q[j], yy = y + q[j + 1];
       if (xx < 0 || xx >= W || yy < 0 || yy >= H || !free[yy * W + xx]) return false;
     }
     return true;
   };
-  for (const id of [...SIGN_IDS, 'scare']) {
-    const prints = footprints(id), c = [];
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      if (!free[y * W + x] || !ZONES[id](x, y, G)) continue;
-      let ways = 0;
-      prints.forEach((q, i) => { if (fits(x, y, q)) ways |= 1 << i; });
-      if (ways) c.push(x, y, ways);
-    }
-    G.cand[id] = c;
-  }
   return P.sg = G;
 }
-function footprints(id) {   // every pixel a show may draw, [dx, dy, ...]: one list for d = 1 and one for d = -1 if it has a way
-  const sh = SHOWS[id];
-  if (sh.always) { const [x0, y0, x1, y1] = sh.box, q = []; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) q.push(x, y); return [q]; }
-  return (sh.dirs ? [1, -1] : [1]).map(d => {
+const printCache = {};
+function footprints(id) {   // every pixel a show may draw, [dx, dy, ...]: one list for d = 1 and one for d = -1 if it has a
+  // way, each with its box [x0, y0, x1, y1]; found once
+  if (printCache[id]) return printCache[id];
+  const sh = SHOWS[id], boxed = q => {
+    q.box = [Infinity, Infinity, -Infinity, -Infinity];
+    for (let j = 0; j < q.length; j += 2) {
+      q.box[0] = Math.min(q.box[0], q[j]); q.box[1] = Math.min(q.box[1], q[j + 1]); q.box[2] = Math.max(q.box[2], q[j]); q.box[3] = Math.max(q.box[3], q[j + 1]);
+    }
+    return q;
+  };
+  if (sh.always) { const [x0, y0, x1, y1] = sh.box, q = []; for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) q.push(x, y); return printCache[id] = [boxed(q)]; }
+  return printCache[id] = (sh.dirs ? [1, -1] : [1]).map(d => {
     const seen = new Set(), q = [];
     for (let s = 0; s < sh.dur; s++) sh.draw(s, d, (dx, dy, c, a, soft) => {
       const k = (dx + 64) * 256 + dy + 64;
       if (!soft && !seen.has(k)) { seen.add(k); q.push(dx, dy); }
     });
-    return q;
+    return boxed(q);
   });
 }
 // The scene's signs: for each, its seed and three sites, spread out, picked in the seed's order among its candidates
@@ -1271,7 +1288,7 @@ const seedOf = (seed, i, P) => (Math.imul(seed, 7919) + 104729 * (i + 1) + 12997
 function signPlan(P, seed, ids, glints) {
   const G = signGround(P), taken = [], plan = [];
   for (const id of ids) {
-    const c = glints && GLARE_SHY.has(id) ? clearOfGlints(G.cand[id], footprints(id), glints) : G.cand[id];
+    const c = glints && GLARE_SHY.has(id) ? clearOfGlints(G.cands(id), footprints(id), glints) : G.cands(id);
     const sd = seedOf(seed, SIGN_IDS.indexOf(id), P), sites = pickSites(c, sd, taken);
     if (!sites.length) continue;
     taken.push(...sites);
@@ -1302,10 +1319,9 @@ function clearOfGlints(c, prints, g) {   // the candidates c whose ways keep GLA
   return out.length >= 9 ? out : c;
 }
 function pickSites(c, sd, taken) {   // three of the candidates c in the seed's order, apart from each other and from taken
-  const order = [];
-  for (let j = 0; j < c.length; j += 3) order.push(j);
-  const key = j => noise(sd, c[j], c[j + 1]);
-  order.sort((a, b) => key(a) - key(b));
+  const order = [], key = new Float64Array(c.length);
+  for (let j = 0; j < c.length; j += 3) { order.push(j); key[j] = noise(sd, c[j], c[j + 1]); }
+  order.sort((a, b) => key[a] - key[b]);
   const sites = [], far = (x, y, s, r) => s.every(q => (q.x - x) ** 2 + (2 * (q.y - y)) ** 2 >= r * r);
   for (const k of [1, .6, .3]) for (const j of order) {   // closer together only if there is no room
     if (sites.length >= 3) break;
@@ -1314,8 +1330,16 @@ function pickSites(c, sd, taken) {   // three of the candidates c in the seed's 
   }
   return sites;
 }
-// Where the scene's scare may go: three sites by the near bank, by the seed; an event takes one by its start.
-function scarePlan(P, seed) { const sd = seedOf(seed, SIGN_IDS.length, P); return {sd, sites: pickSites(signGround(P).cand.scare, sd, [])}; }
+// The signs' ground and every sign's candidates of a water's picture, found bit by bit in idle time once the picture is
+// analysed (a sign a slice), so that the first scene with signs need not find them as it fades in.
+const idly = f => typeof requestIdleCallback === 'function' ? requestIdleCallback(f, {timeout: 2000}) : setTimeout(f, 100);
+function warmSigns(P) {
+  const ids = [...SIGN_IDS, 'scare'], next = () => { if (ids.length) { signGround(P).cands(ids.shift()); idly(next); } };
+  idly(next);
+}
+// Where the scene's scare may go: three sites by the near bank, by the seed; an event takes one by its start. Found at
+// the scene's first scare.
+function scarePlan(P, seed) { const sd = seedOf(seed, SIGN_IDS.length, P); return {sd, sites: pickSites(signGround(P).cands('scare'), sd, [])}; }
 
 // ---------- life around the water ----------
 // One drawn thing of the hour's life (docs/05-zhizn-vokrug: the game picks it and writes its line in the journal), such
@@ -1957,7 +1981,7 @@ function pictureFor(place, src) {   // the clean picture, analysed once; `wait` 
   if (e) pictures.delete(key);
   else {
     e = {P: null, failed: '', wait: null};
-    e.wait = decode(src).then(rgba => { e.P = latest[place] = makePlace(place, rgba); })
+    e.wait = decode(src).then(rgba => { e.P = latest[place] = makePlace(place, rgba); if (e.P.float) warmSigns(e.P); })
       .catch(err => { e.failed = (err && err.message) || 'did not load'; if (pictures.get(key) === e) pictures.delete(key); });
   }
   pictures.set(key, e);
@@ -2050,7 +2074,7 @@ function ready(s) {   // the picture is analysed: the still layer, the signs' si
   if (fresh) {
     s.signKey = key; s.X.n0 = s.tick;
     s.X.plan = P.float && ids.length ? signPlan(P, c.seed, ids, glints) : null;
-    s.scare = P.float ? scarePlan(P, c.seed) : null;
+    s.scare = null;   // found at the first scare (startEvent)
   }
   const freshLife = s.lifeKey !== lkey;
   if (freshLife) { s.lifeKey = lkey; s.X.l0 = s.tick; }
@@ -2208,7 +2232,9 @@ function startEvent(s, kind, done) {
     done(false); return;
   }
   endEvent(s, false);
-  const P = s.layer && s.layer.P, sc = s.scare;
+  const P = s.layer && s.layer.P;
+  if (P && P.float && !s.cfg.baked && kind === 'scare' && !s.scare) s.scare = scarePlan(P, s.cfg.seed);   // the first scare
+  const sc = s.scare;
   if (!P || s.cfg.baked || (kind === 'strike' ? !P.rod : !sc || !sc.sites.length)) { done(false); return; }   // not here
   const ev = s.ev = {kind, dur: EVENT_TICKS[kind], done, mode: s.running ? 'run' : 'wall', n0: s.running ? ticks() + s.k + 1 : s.tick,
                      e: 0, w0: 0, timer: 0, x: 0, y: 0, d: 1};
