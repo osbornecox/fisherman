@@ -1385,7 +1385,8 @@ const LIFE_C = {   // the clean colours of the sprites, by the letters they are 
   e: [104, 78, 56], E: [74, 56, 42], l: [154, 138, 114], a: [190, 176, 144],      // an elk: its body, its head and hump,
                                                                                   // its pale legs and antlers
   f: [140, 104, 72], F: [114, 84, 60],                                            // the calf, its head
-  m: [96, 70, 50], M: [62, 46, 34],                                               // a bear, its snout and paws
+  m: [104, 76, 54], M: [62, 46, 34], o: [156, 120, 82], L: [176, 146, 108],      // a bear: its fur, jaw and paws, the
+                                                                                  // light on its hump and back, its snout
   W: [240, 238, 228], Y: [222, 196, 92],                                          // a water lily's petals and heart
   u: [80, 82, 84], s: [36, 32, 30], v: [30, 30, 34],                              // cranes, the dark spot, a raven
 };
@@ -1408,10 +1409,11 @@ const LIFE_ART = {
   calfUp: ['.F...../FFfffff/F.fffff/...f..f/...f..f', {feet: 4}],
   calfDown: ['......./..fffff/.Ffffff/FF.f..f/F..f..f', {feet: 4}],
   calfWalk: ['.F...../FFfffff/F.fffff/..f..f./...f..f', {feet: 4}],
-  // a brown bear, its hump over the shoulders, its head low; sniffing the air, its nose up
-  bear: ['....mmm..../.m.mmmmmmm./mmmmmmmmmmm/Mmmmmmmmmmm/..mm....mm./..MM....MM.', {feet: 5}],
-  bearUp: ['.m..mmm..../Mmm.mmmmmm./.mmmmmmmmmm/..mmmmmmmmm/..mm....mm./..MM....MM.', {feet: 5}],
-  bearWalk: ['....mmm..../.m.mmmmmmm./mmmmmmmmmmm/Mmmmmmmmmmm/..m.m...m.m/..M.M...M.M', {feet: 5}],
+  // a brown bear, its big head low in front of the hump over its shoulders, an ear up, the light on its back so that it
+  // shows against the dark spruces; sniffing the air, its nose up
+  bear: ['...ooo....../.o.ommooooo./oo.mmmmmmmmo/Lmmmmmmmmmmm/.MMmmmmmmmmm/...mmmmmmmm./...mm....mm./...MM....MM.', {feet: 7}],
+  bearUp: ['.o.ooo....../Loo.mmooooo./.mm.mmmmmmmo/..mmmmmmmmmm/..mmmmmmmmmm/...mmmmmmmm./...mm....mm./...MM....MM.', {feet: 7}],
+  bearWalk: ['...ooo....../.o.ommooooo./oo.mmmmmmmmo/Lmmmmmmmmmmm/.MMmmmmmmmmm/...mmmmmmmm./..mm......mm/..MM......MM', {feet: 7}],
   lilyHalf: ['W.W'], lilyOpen: ['.W./WYW'],
   crane: ['.u.../uuuuu/.....'], crane2: ['...../uuuuu/.u...'],
   spot: ['.sss./sssss/s.s.s', {feet: 2}], spot2: ['.sss./sssss/.s.s.', {feet: 2}],
