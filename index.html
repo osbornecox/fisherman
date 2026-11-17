@@ -3562,7 +3562,7 @@ let busy = false;
 // An hour at the water takes HOUR_MS on screen, then its toast and the next hour. A bite, a fish or a lost fish alike,
 // lifts the rod out of the water in the scene (LiveScenes.EVENTS.strike), so that it goes up about when the toast of
 // a quiet hour comes, and its toast comes with the raised rod. A scare is told in the journal, under the hour the hud
-// shows, as it passes in that hour; then its shadow passes, then comes the toast. The next hour is drawn only once the
+// shows, as it passes in that hour; then its shadow passes, with the toast. The next hour is drawn only once the
 // one-shot is over, so its scene never cuts it off; a scene that cannot show it, or fails to, lets the hour go on at
 // once. The taps stay off until the next hour is drawn, and come back whatever happens on the way.
 const HOUR_MS = 750, TOAST_MS = 1300;
@@ -3602,10 +3602,13 @@ async function sit(){
       if (!shown) await wait(t0 + HOUR_MS - performance.now());
     }
     else if (D.scare[w][h]){
+      // the shadow and its toast come together, and the toast stays its time after the shadow has passed; a scene that
+      // cannot show the shadow leaves the toast its usual time
       await wait(HOUR_MS);
       writeLife(w, h);   // the hour's life comes before what it gave
       logAdd(h, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
-      await oneShot('scare');
+      told = true; toast(what, LiveScenes.EVENTS.scare.ms + TOAST_MS, h + 1 >= HOURS);
+      if (!await oneShot('scare')) toast(what, TOAST_MS, h + 1 >= HOURS);
     }
     else await wait(HOUR_MS);
     writeLife(w, h);   // the hour is sat out: its life, under its time, before its result (written once)
