@@ -3284,7 +3284,8 @@ function lookAround(){
 // kite circles over the village, an elk comes down to drink on the far bank. When an hour on a water opens, it may get
 // one line of it (S.life, by `${water}/${hour}`: the line's key, or '' for none), and the scene of that hour draws it
 // from the start if it is one the engine draws (LiveScenes.LIFE). The line goes into the journal under that hour's
-// time once the hour is sat out, before what the hour gave; never into the evening's page or its counts. On the omut
+// time once the hour is sat out, before what the hour gave, and a drawn one also when the old man leaves the water in
+// that hour, before he goes: the scene has shown it; never into the evening's page or its counts. On the omut
 // the water lilies open on a summer morning and stand open till 16:00, when they close (the scene's `lilies`).
 // Each line: its water ('all': any), its words, the hours it may come at (the start of the hour, 6..17), the weathers
 // it fits (WEATHERS indices; a line that names none takes any but the downpour, and in fog only what is heard or is
@@ -3469,7 +3470,7 @@ function chooseLife(w, t){
   return (pool.find(L => (r -= rate(L)) < 0) || pool[pool.length - 1]).key;
 }
 const lifeOf = (w, t) => LIFE_KEY[S.life && S.life[`${w}/${t}`]] || null;
-// the hour sat out: its line into the journal, under the hour's time (once)
+// the hour sat out (or a drawn life's hour left): its line into the journal, under the hour's time (once)
 function writeLife(w, t){
   const L = lifeOf(w, t);
   if (!L || S.lifeLast[L.key] === S.day) return;
@@ -3524,10 +3525,12 @@ function craftAll(){
   S.trail.push({k: 'craft', t: S.t, n: r}); logAdd(S.t, `Мастерил снасти до вечера, +${pay} ₽.`);   // today's page in the book
   advance(r); endDay();
 }
-// from a water or the village straight back to the izba; the day goes on there
+// from a water or the village straight back to the izba; the day goes on there. A life the scene has drawn in this
+// hour has been seen: its line goes into the journal before he goes (one that is not drawn was not, and is not written)
 function walkHome(){
   if (busy) return;
   if (S.t >= HOURS) return comeHome();   // the day is already over
+  if (WATERS.includes(S.loc)){ const L = lifeOf(S.loc, S.t); if (L && L.draw) writeLife(S.loc, S.t); }
   logAdd(S.t, WATERS.includes(S.loc) ? 'Смотал удочки, пошёл домой.' : 'Пошёл домой.');
   S.loc = 'home'; S.phase = 'izba'; S.dry = 0; S.hoursHere = 0;
   save(); render();
