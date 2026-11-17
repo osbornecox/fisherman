@@ -2675,7 +2675,7 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
-  S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals() };
+  S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {} };
   newHouse();
 }
 function genDay(){
@@ -2732,6 +2732,7 @@ function startDay(){
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
   S.signs = {};   // the signs lookAround() wrote, by water and hour
+  S.life = {};    // the life around the water lookAround() chose, by water and hour
   S.trail = [];   // where the day went, for the evening's page
   S.phase = 'izba'; S.purchases = [];   // nothing bought yet today
   logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
@@ -2875,6 +2876,9 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   }
   if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
   S.noPower = S.noPower === true;   // saved before the days without power: the power is on
+  // saved before the life around the water: none this hour, and none written before
+  if (!S.life || typeof S.life !== 'object') S.life = {};
+  if (!S.lifeLast || typeof S.lifeLast !== 'object') S.lifeLast = {};
   // saved before the scenes showed the signs: the hour at a water gets its signs back from its journal lines
   if (!S.signs || typeof S.signs !== 'object'){
     S.signs = {};
@@ -3015,9 +3019,12 @@ function frame(img, t){
     const open = IZBA[img], keep = img === 'izbaEvening' && np ? KERO_KEEP : 0;
     return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
   }
-  if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed
-    const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [];
-    return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}`, live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np, seed, signs}};
+  if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed,
+    // and the hour's life if the scene draws it; on the omut the lilies stand open in the summer hours after they opened
+    const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [], water = WATERS.includes(img) && !!S.life;
+    const L = water ? lifeOf(img, t) : null, kind = L && L.draw || '', lilies = water && img === 'omut' && liliesOpen(t);
+    return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}/${kind}/${lilies}`,
+      live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np, seed, signs, life: kind ? {kind} : null, lilies}};
   }
   return null;
 }
@@ -3237,6 +3244,203 @@ function lookAround(){
   if (D.midge[w][t]) sign('midge');
   if (!signs.length) logAdd(t, calm ? 'Вода гладкая, ни всплеска.' : wt === 3 ? 'По воде бежит рябь, всплесков не видно.' : 'Дождь рябит воду, всплесков не видно.');
   if (signs.length) S.signs[`${w}/${t}`] = signs; else delete S.signs[`${w}/${t}`];
+  S.life[`${w}/${t}`] = chooseLife(w, t);   // and what goes on around the water this hour, if anything
+}
+
+// ---------- life around the water ----------
+// While the old man sits, life goes on around the water, and none of it has to do with the fish: a log drifts by, a
+// kite circles over the village, an elk comes down to drink on the far bank. When an hour on a water opens, it may get
+// one line of it (S.life, by `${water}/${hour}`: the line's key, or '' for none), and the scene of that hour draws it
+// from the start if it is one the engine draws (LiveScenes.LIFE). The line goes into the journal under that hour's
+// time once the hour is sat out, before what the hour gave; never into the evening's page or its counts. On the omut
+// the water lilies open on a summer morning and stand open till 16:00, when they close (the scene's `lilies`).
+// Each line: its water ('all': any), its words, the hours it may come at (the start of the hour, 6..17), the weathers
+// it fits (WEATHERS indices; a line that names none takes any but the downpour, and in fog only what is heard or is
+// close by), its months by the izba's calendar (dateOf), how often, and what the scene draws. How often: 'often',
+// 'some', 'rare' and 'season' come by chance in an hour they fit (LIFE_RARE, LIFE_FOUL, LIFE_RATE; a rare or season
+// line keeps away LIFE_GAP days after it was written); 'clock' is nature's clock, and the old man's tea and lunch: it
+// comes at one hour of its window a day (clockHour()), whenever the old man is there then and the weather fits. A line
+// comes at most once a day, and an hour has one at most. Its draws come from hashOf(), never from rnd(): the fishing
+// days stay as they were, and a reload gives the same life. S.lifeLast keeps the day each line was last written.
+const LIFE_LINES = [
+  // the river: on the water
+  {at: 'river', id: 'log', f: 'some', w: '0123', draw: 'log', s: 'Мимо медленно проплыло бревно.'},
+  {at: 'river', id: 'log-fog', f: 'rare', w: '4', h: '6-10', draw: 'log-fog', s: 'Из тумана выплыло бревно и ушло в туман.'},
+  {at: 'river', id: 'log-dark', f: 'rare', w: '0123', draw: 'log-dark', s: 'Проплыло старое тёмное бревно — ещё со сплава, наверно.'},
+  {at: 'river', id: 'spruce', f: 'rare', w: '25', draw: 'spruce', s: 'Проплыла ёлка с корнями — где-то выше подмыло берег.'},
+  {at: 'river', id: 'board', f: 'rare', w: '0123', s: 'Проплыла серая доска с ржавым гвоздём.'},
+  {at: 'river', id: 'leaves', f: 'often', w: '0123', m: '9', s: 'По воде плывут жёлтые листья.'},
+  {at: 'river', id: 'wagtail-log', f: 'season', w: '0123', m: '5-8', draw: 'wagtail', s: 'Проплыло бревно, на нём сидит трясогузка.'},
+  {at: 'river', id: 'foam', f: 'some', w: '25', s: 'Вдоль берега тянется полоса пены.'},
+  // the river: the shingle and the boats
+  {at: 'river', id: 'wagtail', f: 'often', w: '013', m: '5-8', s: 'По гальке у воды бегает трясогузка, качает хвостом.'},
+  {at: 'river', id: 'sandpiper', f: 'some', w: '01234', h: '6-10', m: '5-7', s: 'У самой воды бегает маленький кулик и всё время кивает.'},
+  {at: 'river', id: 'crow', f: 'some', w: '01234', s: 'На борт лодки села ворона, посидела и улетела.'},
+  {at: 'river', id: 'lizard', f: 'some', w: '1', h: '11-15', m: '5-8', s: 'На тёплый камень выползла ящерица.'},
+  {at: 'river', id: 'boats-rain', f: 'often', w: '25', s: 'Дождь стучит по днищам лодок.'},
+  {at: 'river', id: 'shingle-wet', f: 'some', w: '2', s: 'Галька потемнела от дождя.'},
+  {at: 'river', id: 'capercaillie', f: 'season', w: '0123', h: '6-8', m: '9-10', s: 'Ниже по берегу на галечник вышел глухарь и клюёт камешки.'},
+  // the river: the far bank
+  {at: 'river', id: 'cow', f: 'some', w: '0123', h: '8-16', s: 'На том берегу к воде спустилась корова, попила и ушла.'},
+  {at: 'river', id: 'roe', f: 'rare', w: '0123', h: '6-8,16-17', s: 'На лугу на том берегу пасётся косуля.'},
+  {at: 'river', id: 'roe-bark', f: 'rare', w: '01234', h: '6-9,16-17', s: 'За лугом кто-то хрипло гавкнул. Не собака — косуля.'},
+  {at: 'river', id: 'cow-fog', f: 'some', w: '4', h: '6-10', s: 'В тумане на том берегу мычит корова, самой не видно.'},
+  {at: 'river', id: 'birch', f: 'some', w: '3', m: '9', s: 'С берёзы на том берегу летят жёлтые листья.'},
+  // the river: the sky
+  {at: 'river', id: 'kite', f: 'often', w: '01', h: '10-16', m: '5-8', draw: 'kite', s: 'Над деревней кружит коршун, тонко посвистывает.'},
+  {at: 'river', id: 'geese', f: 'rare', w: '0123', m: '9-10', draw: 'geese', s: 'Высоко над рекой тянется гусиный клин, его долго слышно.'},
+  {at: 'river', id: 'ducks', f: 'some', w: '0123', s: 'Над рекой пролетела пара уток.'},
+  {at: 'river', id: 'crows', f: 'some', w: '0123', h: '16-17', m: '9-11', s: 'Через реку к лесу тянутся вороны.'},
+  {at: 'river', id: 'haze', f: 'some', w: '1', h: '12-15', s: 'Над лугом на том берегу дрожит тёплый воздух.'},
+  // the river: the village across, only its beasts
+  {at: 'river', id: 'rooster', f: 'clock', w: '01234', h: '6-8', s: 'В деревне прокричал петух.'},
+  {at: 'river', id: 'dog', f: 'some', w: '01234', s: 'За рекой залаяла собака и умолкла.'},
+  // the omut: the beasts on the far bank
+  {at: 'omut', id: 'elk', f: 'rare', w: '0123', h: '6-9,16-17', draw: 'elk', s: 'На том берегу из ельника вышел лось. Долго пил и ушёл.'},
+  {at: 'omut', id: 'elk-calf', f: 'season', w: '0123', h: '6-9', m: '6-7', draw: 'elk-calf', s: 'К воде на том берегу спустились лосиха с лосёнком.'},
+  {at: 'omut', id: 'elk-moan', f: 'some', w: '01234', h: '6-8,16-17', m: '9', s: 'Где-то в лесу низко, протяжно стонет лось.'},
+  {at: 'omut', id: 'crack-fog', f: 'rare', w: '4', h: '6-10', s: 'В тумане на том берегу трещат ветки — ходит кто-то большой.'},
+  {at: 'omut', id: 'bear', f: 'season', w: '0123', h: '6-9,16-17', draw: 'bear', s: 'На том берегу показался медведь. Понюхал воздух и не спеша ушёл в ельник.'},
+  {at: 'omut', id: 'bear-track', f: 'rare', w: '01234', h: '6-8', s: 'На глине у воды свежий медвежий след.'},
+  {at: 'omut', id: 'lynx', f: 'season', q: .5, w: '01234', s: 'На поваленной ели сидит рысь. Миг — и её нет.'},
+  {at: 'omut', id: 'hare', f: 'rare', w: '01234', h: '6-9', s: 'Из-за кочки выглянул заяц и ускакал.'},
+  // the omut: the small neighbours
+  {at: 'omut', id: 'squirrel', f: 'often', w: '01234', s: 'По поваленной ели пробежала белка.'},
+  {at: 'omut', id: 'husks', f: 'some', w: '013', s: 'Сверху сыплется шелуха: белка шелушит шишку.'},
+  {at: 'omut', id: 'squirrel-chatter', f: 'some', w: '01234', s: 'Белка сердито цокает с ветки.'},
+  {at: 'omut', id: 'chipmunk', f: 'some', w: '01234', m: '5-8', s: 'На ствол у воды выскочил бурундук, посидел столбиком и пропал.'},
+  // the omut: the birds
+  {at: 'omut', id: 'hazel-grouse', f: 'often', w: '01234', h: '6-11', s: 'В ельнике тонко свистит рябчик.'},
+  {at: 'omut', id: 'woodpecker', f: 'often', w: '01234', s: 'Где-то стучит дятел.'},
+  {at: 'omut', id: 'tits', f: 'often', w: '01234', s: 'По ельнику прошла стайка синиц, перекликаясь.'},
+  {at: 'omut', id: 'jay', f: 'rare', w: '01234', s: 'Рядом на ветку села рыжехвостая лесная птица и смотрит, не боится.'},
+  {at: 'omut', id: 'capercaillie', f: 'rare', w: '01234', h: '6-9', s: 'Из ельника с шумом сорвался глухарь.'},
+  {at: 'omut', id: 'hush', f: 'rare', w: '01', s: 'В ельнике разом умолкли птицы. Потом запели снова.'},
+  {at: 'omut', id: 'owl', f: 'season', w: '01234', h: '10-15', s: 'Среди бела дня в ельнике ухнула сова.'},
+  {at: 'omut', id: 'hawk', f: 'some', w: '01', h: '11-15', draw: 'hawk', s: 'В просвете над омутом кружит ястреб.'},
+  {at: 'omut', id: 'cuckoo', f: 'often', w: '01234', m: '5-7', s: 'Где-то кукует кукушка.'},
+  {at: 'omut', id: 'cuckoo-count', f: 'rare', w: '01234', m: '5-7',   // how many times, by the day
+    s: () => `Кукушка прокуковала ${CUCKOO[Math.floor(lifeHash(4)*CUCKOO.length)]} и умолкла.`},
+  {at: 'omut', id: 'geese', f: 'rare', w: '01234', m: '9-10', s: 'Высоко пролетели гуси, только голоса над лесом.'},
+  // the omut: the forest
+  {at: 'omut', id: 'bough', f: 'some', w: '01234', s: 'В лесу с треском сломался сук.'},
+  {at: 'omut', id: 'cone', f: 'some', w: '01234', m: '8-10', s: 'Рядом в мох упала шишка.'},
+  {at: 'omut', id: 'wind-top', f: 'often', w: '3', s: 'Наверху шумят ели, а у воды ни ветерка.'},
+  {at: 'omut', id: 'creak', f: 'some', w: '3', s: 'Где-то скрипит сухое дерево.'},
+  {at: 'omut', id: 'tree-fall', f: 'rare', w: '3', s: 'Далеко в лесу упало дерево: долгий треск и глухой удар.'},
+  {at: 'omut', id: 'drip', f: 'often', w: '2', s: 'С еловых лап капает.'},
+  {at: 'omut', id: 'downpour', f: 'often', w: '5', s: 'Дождь шумит по лесу так, что больше ничего не слышно.'},
+  {at: 'omut', id: 'fog', f: 'often', w: '4', h: '6-10', s: 'Того берега не видно, из тумана торчат верхушки елей.'},
+  {at: 'omut', id: 'sunbeam', f: 'some', w: '1', h: '9-13', s: 'Сквозь ели на воду упал луч солнца.'},
+  {at: 'omut', id: 'sun-off', f: 'clock', w: '1', h: '15', s: 'Солнце ушло за ельник, на омуте сразу сумрачно.'},
+  {at: 'omut', id: 'resin', f: 'some', w: '1', s: 'Пахнет смолой и прелой хвоей.'},
+  {at: 'omut', id: 'mushroom-smell', f: 'some', w: '2', m: '8-9', s: 'Тянет грибным духом.'},
+  // the omut: underfoot
+  {at: 'omut', id: 'boletus', f: 'some', w: '01234', m: '8-9', s: 'У пня краснеет подосиновик.'},
+  {at: 'omut', id: 'cowberry', f: 'some', w: '01234', m: '8-9', s: 'Брусника у воды совсем покраснела.'},
+  {at: 'omut', id: 'fern', f: 'some', w: '01234', m: '9', s: 'Папоротник у ног порыжел.'},
+  {at: 'omut', id: 'ant', f: 'some', w: '01', m: '5-8', s: 'По сапогу ползёт муравей с хвоинкой.'},
+  {at: 'omut', id: 'lilies-open', f: 'clock', w: '01234', h: '7-8', m: '6-8', draw: 'lilies-open', s: 'Раскрылись кувшинки.'},
+  {at: 'omut', id: 'lilies-close', f: 'clock', w: '0123', h: '16', m: '6-8', draw: 'lilies-close', s: 'Кувшинки закрылись.', need: () => liliesOpened()},
+  {at: 'omut', id: 'mosquito', f: 'often', w: '04', m: '6-8', s: 'Над ухом звенит комар.'},
+  // the lake: the sky
+  {at: 'lake', id: 'geese', f: 'some', w: '0123', m: '9-10', draw: 'geese', s: 'Высоко над озером идёт гусиный клин. Его слышно ещё долго после того, как он скрылся.'},
+  {at: 'lake', id: 'cranes-far', f: 'some', w: '01234', h: '6-10', m: '8-9', s: 'Где-то за озером, на болотах, кричат журавли.'},
+  {at: 'lake', id: 'cranes', f: 'rare', w: '0123', m: '9', draw: 'cranes', s: 'Высоко пролетели журавли, перекликаясь.'},
+  {at: 'lake', id: 'goldeneyes', f: 'some', w: '01234', s: 'Над головой со свистом крыльев пронеслась стайка уток.'},
+  {at: 'lake', id: 'ducks', f: 'some', w: '0123', s: 'Пара уток пролетела над водой и села у того берега.'},
+  {at: 'lake', id: 'swans', f: 'season', w: '0123', m: '10', s: 'Высоко пролетели лебеди — белые, кричат, как трубы.'},
+  {at: 'lake', id: 'hawk', f: 'often', w: '01', h: '11-15', draw: 'hawk', s: 'Над сопкой кружит ястреб.'},
+  {at: 'lake', id: 'hawk-hover', f: 'rare', w: '3', draw: 'hawk-hover', s: 'Ястреб висит на ветру над склоном, не двигаясь.'},
+  // the lake: the dead trunks, the bench, the grass
+  {at: 'lake', id: 'raven', f: 'some', w: '0123', draw: 'raven', s: 'На сухой ствол в воде сел ворон. Посидел и улетел.'},
+  {at: 'lake', id: 'woodpecker', f: 'some', w: '013', s: 'Дятел стучит по сухому стволу, по воде далеко слышно.'},
+  {at: 'lake', id: 'wagtail', f: 'some', w: '01234', m: '5-8', s: 'На лавку у воды села трясогузка.'},
+  {at: 'lake', id: 'grass-wind', f: 'often', w: '3', s: 'Ветер гонит по сухой траве волны.'},
+  {at: 'lake', id: 'grasshoppers', f: 'often', w: '1', h: '11-15', m: '5-8', s: 'В сухой траве стрекочут кузнечики.'},
+  {at: 'lake', id: 'small-bird', f: 'some', w: '01234', s: 'Из травы вспорхнула маленькая птичка и пропала.'},
+  {at: 'lake', id: 'grass-rain', f: 'often', w: '2', s: 'Дождь шуршит по сухой траве.'},
+  {at: 'lake', id: 'bog-smell', f: 'some', w: '2', s: 'Пахнет болотом и багульником.'},
+  {at: 'lake', id: 'gossamer', f: 'some', w: '1', h: '11-17', m: '9', s: 'В воздухе плывёт паутинка, блестит на солнце.'},
+  // the lake: the far shore and the hill
+  {at: 'lake', id: 'dark-spot', f: 'season', w: '0123', h: '6-9,16-17', draw: 'dark-spot', s: 'По тому берегу бредёт что-то большое и тёмное. Медведь, наверно.'},
+  {at: 'lake', id: 'elk', f: 'rare', w: '0123', h: '6-9,16-17', s: 'К воде на том берегу вышел лось.'},
+  {at: 'lake', id: 'elk-swim', f: 'season', w: '0123', m: '9', s: 'Через озеро плывёт лось — над водой одна голова с рогами.'},
+  {at: 'lake', id: 'reindeer', f: 'season', w: '0123', m: '9-11', s: 'На том берегу к воде вышли олени, три, с большими рогами.'},
+  {at: 'lake', id: 'crash', f: 'rare', w: '01234', s: 'На том берегу кто-то ломится через сухостой, по воде далеко слышно.'},
+  {at: 'lake', id: 'cloud-shadow', f: 'some', w: '01', s: 'По сопке бежит тень от облака.'},
+  {at: 'lake', id: 'fog-hill', f: 'often', w: '4', h: '6-9', s: 'Сопку до половины затянуло туманом.'},
+  {at: 'lake', id: 'fog-thins', f: 'clock', w: '4', h: '10', s: 'Туман на сопке редеет.'},
+  {at: 'lake', id: 'tin', f: 'some', w: '1', s: 'У того берега вода блестит, как жесть.'},
+  {at: 'lake', id: 'downpour', f: 'often', w: '5', s: 'Ливень закрыл тот берег, будто его и нет.'},
+  {at: 'lake', id: 'loon', f: 'rare', w: '01234', h: '6-9,16-17', s: 'Над озером протяжно, тоскливо кричит какая-то птица.'},
+  // every water
+  {at: 'all', id: 'dragonfly', f: 'some', w: '01', m: '5-8', s: 'На кончик удочки села стрекоза.'},
+  {at: 'all', id: 'butterfly', f: 'some', w: '1', m: '5-8', s: 'На ведро села бабочка.'},
+  {at: 'all', id: 'ladybird', f: 'some', w: '1', m: '9', s: 'По рукаву ползёт божья коровка.'},
+  {at: 'all', id: 'gossamer', f: 'some', w: '1', h: '11-17', m: '9', s: 'На леске блестит паутинка.'},
+  {at: 'all', id: 'raven', f: 'some', w: '01234', s: 'Над головой пролетел ворон, гулко крикнул.'},
+  // the old man himself: tea in the morning and a bite at noon
+  {at: 'all', id: 'tea', f: 'clock', w: '01234', h: '7-9', s: 'Налил чаю из термоса.'},
+  {at: 'all', id: 'lunch', f: 'clock', w: '01234', h: '12-13', s: 'Перекусил: хлеб, варёное яйцо, луковица.'},
+];
+const CUCKOO = ['два раза', 'три раза', 'четыре раза', 'пять раз', 'шесть раз', 'семь раз'];
+const LIFE_RARE = {season: .008, rare: .02};    // a rarer line's own chance in an hour it fits (times its q)
+const LIFE_FOUL = {often: .2, some: .06};       // and a line of foul weather only (rain, wind, fog, downpour)'s
+const LIFE_RATE = {often: .12, some: .04};      // the rest: their weights, and their sum the chance of one of them,
+const LIFE_CAP = .28;                           // up to this
+const LIFE_GAP = 7;   // days a rare or season line keeps away after it was written
+const LIFE_TAG = 0x4c494645, LILIES_TILL = 15;   // the lilies stand open till the hour of 15:00, and close at 16:00
+const spans = (s, lo, hi) => s ? s.split(',').map(r => { const [a, b = a] = r.split('-').map(Number); return [a, b]; }) : [[lo, hi]];
+const inSpans = (x, sp) => sp.some(([a, b]) => x >= a && x <= b);
+const LIFE_KEY = {};
+LIFE_LINES.forEach((L, i) => { L.key = `${L.at}/${L.id}`; L.n = i; L.hrs = spans(L.h, START, START + HOURS - 1); L.mos = spans(L.m, 1, 12);
+  L.ws = [...L.w].map(Number); L.foul = L.ws.every(x => x >= 2); LIFE_KEY[L.key] = L; });
+const lifeHash = (...v) => hashOf(LIFE_TAG, S.day, ...v);
+const lifeMonth = () => dayDate(S.day).getUTCMonth() + 1;   // the izba's calendar
+const lifeWeather = t => S.D.weathers ? S.D.weathers[Math.min(t, HOURS - 1)] : S.D.weather;
+// the day's hour of a clock line at water w: one of its window, by the day; a line of every water keeps off the hours
+// of the water's own clock lines (the old man's tea is not lost to the rooster)
+function clockHour(L, w){
+  const [a, b] = L.hrs[0], own = L.at === 'all' ? LIFE_LINES.filter(M => M.f === 'clock' && M.at === w).map(M => clockHour(M, w)) : [];
+  let h = a + Math.floor(lifeHash(1, L.n)*(b - a + 1));
+  for (let k = a; k <= b && own.includes(h); k++) h = h === b ? a : h + 1;
+  return h;
+}
+// the omut's lilies open on a summer morning with no downpour at their hour, and stand open after it till LILIES_TILL
+const LILIES = LIFE_KEY['omut/lilies-open'];
+function liliesOpened(){ return inSpans(lifeMonth(), LILIES.mos) && LILIES.ws.includes(lifeWeather(clockHour(LILIES, 'omut') - START)); }
+function liliesOpen(t){ const hr = START + t; return liliesOpened() && hr > clockHour(LILIES, 'omut') && hr <= LILIES_TILL; }
+function lifeFits(L, w, t){
+  const last = S.lifeLast[L.key];
+  return (L.at === w || L.at === 'all') && inSpans(START + t, L.hrs) && L.ws.includes(lifeWeather(t)) && inSpans(lifeMonth(), L.mos)
+    && last !== S.day && !(L.f in LIFE_RARE && Number.isFinite(last) && S.day - last < LIFE_GAP) && (!L.need || L.need());
+}
+// the line of the hour t at water w, as the hour opens: the clock's, else maybe one by chance, unless the hour before
+// had a line written here: then this one takes a breath
+function chooseLife(w, t){
+  const hr = START + t, wi = WATERS.indexOf(w), can = LIFE_LINES.filter(L => lifeFits(L, w, t));
+  const clock = can.find(L => L.f === 'clock' && hr === clockHour(L, w)), prev = lifeOf(w, t - 1);
+  if (clock) return clock.key;
+  if (prev && S.lifeLast[prev.key] === S.day) return '';
+  // the rarer lines first, each by its own chance, then those of a foul weather, so a place with much else to say does
+  // not crowd them out
+  const own = (L, p) => lifeHash(5, t, wi, L.n) < p;
+  for (const due of [can.filter(L => L.f === 'season' && own(L, LIFE_RARE.season*(L.q || 1))), can.filter(L => L.f === 'rare' && own(L, LIFE_RARE.rare)),
+                     can.filter(L => L.foul && L.f in LIFE_FOUL && own(L, LIFE_FOUL[L.f]))])
+    if (due.length) return due[Math.floor(lifeHash(6, t, wi)*due.length)].key;
+  const pool = can.filter(L => !L.foul && L.f in LIFE_RATE), rate = L => LIFE_RATE[L.f];
+  const sum = pool.reduce((s, L) => s + rate(L), 0);
+  if (!pool.length || lifeHash(2, t, wi) >= Math.min(LIFE_CAP, sum)) return '';
+  let r = lifeHash(3, t, wi)*sum;
+  return (pool.find(L => (r -= rate(L)) < 0) || pool[pool.length - 1]).key;
+}
+const lifeOf = (w, t) => LIFE_KEY[S.life && S.life[`${w}/${t}`]] || null;
+// the hour sat out: its line into the journal, under the hour's time (once)
+function writeLife(w, t){
+  const L = lifeOf(w, t);
+  if (!L || S.lifeLast[L.key] === S.day) return;
+  logAdd(t, typeof L.s === 'function' ? L.s() : L.s); S.lifeLast[L.key] = S.day;
 }
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
 
@@ -3363,10 +3567,12 @@ async function sit(){
     }
     else if (D.scare[w][h]){
       await wait(HOUR_MS);
+      writeLife(w, h);   // the hour's life comes before what it gave
       logAdd(h, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
       await oneShot('scare');
     }
     else await wait(HOUR_MS);
+    writeLife(w, h);   // the hour is sat out: its life, under its time, before its result (written once)
     if (!told) toast(what, TOAST_MS, h + 1 >= HOURS);
     // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
     // a scare says nothing about the place (S.dry is null until the first hour that counts)
