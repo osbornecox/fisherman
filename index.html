@@ -921,6 +921,7 @@ function buildLayer(P, w, hour, baked, power) {
     paintSun(lit, sun, false);
   }
   return {P, w, hour, baked: !!baked, S, unlit, lit, light, sun, glints: w === 'sun' && hour != null ? glintSites(P, hour) : null,
+    gain: signGain(w, hour),
     gusty: w === 'wind' && !baked ? gustLayer(P, unlit, light) : null};
 }
 // What a gust draws, lit: on the meadow and the sedge its paler streaks, on the water its darker ripple dashes.
@@ -1112,6 +1113,16 @@ const SIGN_STEP = 2;    // ticks a step
 const SIGN_LEAD = 4;    // steps before the first show at the earliest: the new hour's scene has faded in by then
 const SIGN_CALM = 8;    // px: no sign comes nearer the float's quiet box
 const SIGN_FOG = .5;    // a sign is on the water's face: the fog veils it half as much as the water it is on
+// On dim water a sign is drawn stronger (each pixel's alpha times a gain, up to 1), so the quieter rings still show: in
+// fog by SIGN_FOG_GAIN, and in the low light of early morning and evening by as much as the hour dims the land, up to
+// SIGN_DIM_GAIN. At 18:00 or in fog at 8:00 a ring was about half as plain as at noon, the quiet one under the bank next
+// to nothing on a phone.
+const SIGN_FOG_GAIN = 1.6, SIGN_DIM_GAIN = 1.4;
+function signGain(w, hour) {
+  if (hour == null) return 1;
+  const L = dayLight(hour), land = (L.land[0] + L.land[1] + L.land[2]) / 3;
+  return (w === 'fog' ? SIGN_FOG_GAIN : 1) * Math.max(1, Math.min(SIGN_DIM_GAIN, 1 / land));
+}
 const RING_FOG = pack(92, 106, 112), FOG_PALE = 150;   // on the fog's pale water (luma over FOG_PALE) a ring or a splash
 // shows darker, the ripple's slopes; on the dark omut it stays light
 const SIGN_APART = 18, SIGN_OTHERS = 10;   // px between the sites of a sign, and from another sign's (rows count double)
@@ -1860,11 +1871,13 @@ function showAt(g, k, s, at) {   // step s of show k of sign g at its site `at`,
   dotX = q.x; dotY = q.y;
   g.sh.draw(s, q.ways === 3 ? (noise(g.sd, k, 3) < .5 ? 1 : -1) : q.ways === 2 ? -1 : 1, signDot);
 }
-function signDot(dx, dy, c, a) {   // a pixel of a sign: on free water only, colour c toned by the weather, at alpha a
+function signDot(dx, dy, c, a) {   // a pixel of a sign: on free water only, colour c toned by the weather, at alpha a (times
+  // the layer's gain on dim water)
   const x = dotX + dx, y = dotY + dy;
   if (x < 0 || x >= W || y < 0 || y >= H) return;
   const p = y * W + x;
   if (!F.P.sg.free[p]) return;
+  a = Math.min(1, a * F.L.gain);
   const u = U[p], pale = c === RING_C && F.w === 'fog' && .3 * (u & 255) + .59 * ((u >>> 8) & 255) + .11 * ((u >>> 16) & 255) > FOG_PALE;
   const col = F.w !== 'fog' ? wx(c, p, LAND) : mixPy(pale ? RING_FOG : c, FOG, SIGN_FOG * fogT(y, false, bankNow(x, y)));
   put(p, a >= 1 ? col : mixPy(U[p], col, a));
