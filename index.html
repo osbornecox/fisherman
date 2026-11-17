@@ -1385,8 +1385,8 @@ function scarePlan(P, seed) { const sd = seedOf(seed, SIGN_IDS.length, P); retur
 // to 7 minutes). It moves in steps of LIFE_STEP ticks, so every pixel of it holds two ticks or more. It is drawn in the
 // weather's tone and lit as land, so the hour's light dims it at 6:00 and 18:00 and the fog veils it as it veils the
 // land and the sky (what floats, as a sign on the water's face: half as much); the rain falls over it, the signs show
-// over it (and a drift takes a lane clear of their sites if there is one) and the sun's disc does not hide a bird in
-// front of it. Nothing of it ever draws in the float's quiet box, and nothing of it splashes. ?baked=1 draws none. Times
+// over it (and a drift takes a lane clear of their sites if there is one); a bird stays in front of the sun's halo
+// but is lost in the glare of its core. Nothing of it ever draws in the float's quiet box, and nothing of it splashes. ?baked=1 draws none. Times
 // are in seconds, speeds in px a second.
 const LIFE_STEP = 2;                       // ticks a step
 const LIFE_SPS = FPS / LIFE_STEP;          // steps a second
@@ -1467,7 +1467,7 @@ const LIFE = {
     'log-dark': {is: 'drift', art: 'logDark', v: .9, gap: [300, 420]},         // «Проплыло старое тёмное бревно — ещё со сплава, наверно»
     spruce: {is: 'drift', art: 'spruce', v: 1, gap: [300, 420]},               // «Проплыла ёлка с корнями — где-то выше подмыло берег»
     wagtail: {is: 'drift', art: 'log', v: 1.1, gap: [300, 420], bird: true},   // «Проплыло бревно, на нём сидит трясогузка»
-    kite: {is: 'circle', art: 'kite', lap: 22, stay: [150, 210], gap: [240, 300]},   // «Над деревней кружит коршун, тонко посвистывает»
+    kite: {is: 'circle', art: 'kite', lap: 22, stay: [150, 210], gap: [240, 300], side: -1},   // «Над деревней кружит коршун, тонко посвистывает»
     geese: {is: 'flock', art: 'goose', form: GEESE, v: 3.2, flap: 4, gap: [300, 420]},   // «Высоко над рекой тянется гусиный клин, его долго слышно»
   },
   omut: {
@@ -1517,7 +1517,7 @@ function lifePlan(P, seed, id, signs) {
 }
 // The water lilies' buds that open: all but the one in the float's quiet box (null where there are none).
 const lilyBuds = P => ANCHORS[P.name].lilies ? ANCHORS[P.name].lilies.filter(([x, y]) => !P.quiet[y * W + x]) : null;
-const lk = new Uint32Array(N);   // lk[p] === fid: a pixel of life in this frame, lit as land and not under the sun's disc
+const lk = new Uint32Array(N);   // lk[p] === fid: a pixel of life in this frame, lit as land; the sun's core paints over it, the halo does not
 function lifeDot(x, y, c, a, veil) {   // a pixel of life: colour c toned by the weather, at alpha a; never in the quiet box.
   // veil: how much of the fog it takes, 1 as the land and the sky, SIGN_FOG on the water's face
   if (x < 0 || x >= W || y < 0 || y >= H || a <= 0) return;
