@@ -392,6 +392,8 @@ const GUST_RAGGED = 10;                   // px the front wanders either way, ro
 const GUST_SLOTS = 4;                     // gusts on the scene at once, at most
 const LEAN_SKIP = .25;       // a crown or a fern leans once a cycle of its own, at a varied moment, and skips this share of cycles
 const PAW = {river: .9, omut: .6, lake: 1};   // how strong a gust's patch of ripple is on the water (the omut is sheltered)
+const COMB_HALF = 18, COMB_DHALF = 14;    // rows from the middle of the patch a gust combs on the meadow or the sedge to its
+                                          // top and bottom: the lowest, and how much taller one may be
 const CALM_NEAR = 12;                     // px from the float's quiet box over which glints and a gust's ripple thin out
 const SHEEN = pack(176, 186, 136);        // the paler undersides of the grass a gust combs over on the meadow and the sedge
 const TOPS_TH = .4;                       // a gust this strong leans the treetops: one threshold, so they lean together
@@ -1003,7 +1005,7 @@ function gustOf(k) {   // gust k, or null if its chance is missed
   if (noise(16, k, 1) >= GUST_SKIP) {
     g = {t0: (k + .8 * noise(16, k, 2)) * GUST_EVERY, v: GUST_V + GUST_DV * noise(16, k, 3), hw: GUST_HALF + GUST_DHALF * noise(16, k, 4),
          a: .45 + .55 * noise(16, k, 5), wy: noise(16, k, 6), wh: noise(16, k, 7), leaf: noise(16, k, 8) < .6, ly: noise(16, k, 9),
-         off: new Float64Array(H), str: new Float64Array(H)};
+         fy: noise(16, k, 10), fh: noise(16, k, 11), off: new Float64Array(H), str: new Float64Array(H)};
     for (let y = 0; y < H; y++) {
       g.off[y] = -g.hw - GUST_RAGGED - 24 + GUST_RAGGED * (2 * wave(17, k, y / 18) - 1) - .1 * (y - 120);
       g.str[y] = g.a * (.35 + .65 * wave(18, k, y / 26));
@@ -1019,8 +1021,10 @@ const BUMP = Float64Array.from({length: 65}, (_, i) => .5 + .5 * Math.cos(Math.P
 const bump = u => u <= -1 || u >= 1 ? 0 : BUMP[(u + 1) * 32 | 0];   // 1 in the middle, 0 at the ends
 const bumpSum = u => u <= -1 ? 0 : u >= 1 ? 1 : (u + 1 + Math.sin(Math.PI * u) / Math.PI) / 2;   // its integral from -1
 // The gusts on the scene in this frame: G.g[i] and how far it has come, G.s[i]; its patch of ripple on the water is
-// centred on row G.yc[i], G.hh[i] rows either way. Looked at every other tick (F.t).
-const G = {n: 0, g: [], s: new Float64Array(GUST_SLOTS), yc: new Float64Array(GUST_SLOTS), hh: new Float64Array(GUST_SLOTS)};
+// centred on row G.yc[i], G.hh[i] rows either way, and the patch it combs on the meadow and the sedge on row G.fc[i],
+// G.fh[i] rows either way. Looked at every other tick (F.t).
+const G = {n: 0, g: [], s: new Float64Array(GUST_SLOTS), yc: new Float64Array(GUST_SLOTS), hh: new Float64Array(GUST_SLOTS),
+           fc: new Float64Array(GUST_SLOTS), fh: new Float64Array(GUST_SLOTS)};
 function gustsNow() {
   G.n = 0;
   if (!F.windy || F.baked) return;
@@ -1030,6 +1034,7 @@ function gustsNow() {
     if (!g || t < g.t0 || g.v * (t - g.t0) > gustGone(g)) continue;
     G.g[G.n] = g; G.s[G.n] = g.v * (t - g.t0);
     G.yc[G.n] = P.wy0 + (P.wy1 - P.wy0) * (.15 + .7 * g.wy); G.hh[G.n] = 6 + 8 * g.wh;
+    G.fc[G.n] = P.fy0 + (P.fy1 - P.fy0) * (.15 + .7 * g.fy); G.fh[G.n] = COMB_HALF + COMB_DHALF * g.fh;
     G.n++;
   }
 }
@@ -1038,6 +1043,14 @@ function gustAt(x, y) {   // how strong the gusts are at (x, y) in this frame: 0
   for (let i = 0; i < G.n; i++) {
     const g = G.g[i], u = (x - g.off[y] - G.s[i]) / g.hw;
     if (u > -1 && u < 1) { const e = g.str[y] * BUMP[(u + 1) * 32 | 0]; if (e > v) v = e; }
+  }
+  return v;
+}
+function combAt(x, y) {   // how strong a gust's combing is at (x, y) on the meadow or the sedge: 0 to 1
+  let v = 0;
+  for (let i = 0; i < G.n; i++) {
+    const g = G.g[i], u = (x - g.off[y] - G.s[i]) / g.hw;
+    if (u > -1 && u < 1) { const e = g.str[y] * BUMP[(u + 1) * 32 | 0] * bump((y - G.fc[i]) / G.fh[i]); if (e > v) v = e; }
   }
   return v;
 }
@@ -1669,9 +1682,9 @@ function clouds() {   // the weather's clouds drift on their ring, each stepping
     }
   }
 }
-function gusts() {   // wind: as a gust passes, the treetops on a forest's skyline lean a pixel downwind, the meadow and the
-  // sedge show paler streaks, and on the water a patch of darker ripple runs across (none by the float or the reeds,
-  // and none under a whitecap). Drawn lit, from the wind layer's colours.
+function gusts() {   // wind: as a gust passes, the treetops on a forest's skyline lean a pixel downwind, a patch of paler
+  // streaks runs across the meadow and the sedge, and on the water a patch of darker ripple (none by the float or the
+  // reeds, and none under a whitecap). Drawn lit, from the wind layer's colours.
   if (!G.n) return;
   const P = F.P, o = out, T = P.tops, tab = F.L.gusty, paw = PAW[P.name] || 0;
   for (let j = 0; j < T.length; j += 3) {
@@ -1680,15 +1693,17 @@ function gusts() {   // wind: as a gust passes, the treetops on a forest's skyli
   }
   const y0 = Math.min(P.fy0, P.wy0), y1 = Math.max(P.fy1, P.wy1);
   for (let y = y0; y <= y1; y++) {
-    let x0 = W, x1 = -1, ripple = 0;   // where on the row the gusts are, and how strong their ripple is on it at most
+    let x0 = W, x1 = -1, ripple = 0, comb = 0;   // where on the row the gusts are, and how strong their ripple and their
+    // combing are on it at most
     for (let i = 0; i < G.n; i++) {
       const g = G.g[i], c = g.off[y] + G.s[i];
       x0 = Math.min(x0, c - g.hw); x1 = Math.max(x1, c + g.hw); ripple = Math.max(ripple, g.str[y] * bump((y - G.yc[i]) / G.hh[i]));
+      comb = Math.max(comb, g.str[y] * bump((y - G.fc[i]) / G.fh[i]));
     }
     const row = y * W, fs = P.streaks[y], ds = P.dashes[y];
-    for (let j = 0; j < fs.length; j += 4) {
+    if (comb > .2) for (let j = 0; j < fs.length; j += 4) {
       const cx = fs[j + 2];
-      if (cx > x0 && cx < x1 && gustAt(cx, y) > fs[j + 3]) for (let q = row + fs[j], e = row + fs[j + 1]; q <= e; q++) o[q] = tab[q];
+      if (cx > x0 && cx < x1 && combAt(cx, y) > fs[j + 3]) for (let q = row + fs[j], e = row + fs[j + 1]; q <= e; q++) o[q] = tab[q];
     }
     if (ripple * paw > .2) for (let j = 0; j < ds.length; j += 4) {
       const cx = ds[j + 2];
