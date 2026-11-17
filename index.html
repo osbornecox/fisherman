@@ -87,10 +87,17 @@
      screen a run may break after the water's name, or the plan would take a line for every run) */
   .sum .run, .sum .hrs { white-space:nowrap; }
   @media (max-width: 359px) { .sum .run { white-space:normal; } }
-  /* the journal shows up to about five lines; on a short screen it gives way down to three (journal() sets min-height) */
-  .log { flex: 0 1 auto; max-height: 6.7em; overflow-y: auto; display:flex; flex-direction:column; gap:2px; font-size:15px; line-height:1.3;
-         padding: 6px 0; border-top: 1px solid #b9b1a0; border-bottom: 1px solid #b9b1a0; -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
-  .log > div { display:flex; gap:8px; }
+  /* the journal: a frame (.log) round the lines that scroll (#log). It shows whole lines only: fitLog() gives it the
+     room down to the buttons (on a short screen at least its last three lines), its top edge on the top of a line,
+     scrolled to the newest line; while older lines lie above, its top edge fades (.more). Five lines until it is fitted.
+     Its lines are a whole number of pixels high: browsers round a scroll range to whole pixels, and a half-pixel line
+     would leave the top edge half a pixel off the top of a line (19px, not 20: the three lines a short phone's izba
+     keeps take no more room than they did at 19.5) */
+  .log { flex: none; font-size:15px; line-height:19px; padding: 6px 0; border-top: 1px solid #b9b1a0; border-bottom: 1px solid #b9b1a0; }
+  .log .rows { max-height: calc(5 * 19px + 8px); overflow-y: auto; display:flex; flex-direction:column; gap:2px;
+               -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
+  .log .rows.more { -webkit-mask-image: linear-gradient(rgba(0,0,0,.2), #000 1.4em); mask-image: linear-gradient(rgba(0,0,0,.2), #000 1.4em); }
+  .log .rows > div { display:flex; gap:8px; }
   .log .tm { flex: 0 0 2.9em; color: var(--sub); }
   .note { font-size:14px; color:var(--sub); line-height:1.35; }
   .splash { position:fixed; inset:0; z-index:10; background:#55663f; display:flex; justify-content:center; }
@@ -2862,7 +2869,7 @@ function render(){
   }
 
   P.appendChild(actions);
-  scrollLog();
+  fitLog();
   if (hadFocus){   // a keyboard or screen reader user stays on the buttons: the main one, or the first
     const b = P.querySelector('button.primary:not(:disabled)') || P.querySelector('button:not(:disabled)');
     if (b) b.focus({preventScroll: true});
@@ -2871,10 +2878,34 @@ function render(){
   if (S.D) warmUp();
 }
 function logAdd(t, text){ S.log.push({t: clock(t), text}); }
-function journal(){
-  // the time is written only on the first line of each hour; a short screen squeezes the journal down to three lines
-  const n = Math.min(3, S.log.length), min = `calc(${(n*1.3).toFixed(1)}em + ${Math.max(0, n-1)*2 + 14}px)`;
-  return `<div class="log" id="log" style="min-height:${min}">${S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('')}</div>`;
+function journal(){   // the time is written only on the first line of each hour; fitLog() sizes it
+  return `<div class="log"><div class="rows" id="log">${S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('')}</div></div>`;
+}
+// The journal shows whole lines. Its lines get the room from where they start down to the buttons, less the
+// frame's bottom and the panel's gap, and never fewer than its last LOG_MIN lines, even where a short screen has less
+// room; their top edge lies on the top of a line: an entry may show only its last lines, never a line cut in half. They are scrolled to the newest line. In a window too low for a day screen (LOW, the CSS's max-height:
+// 540px) the page scrolls and the journal keeps LOG_LINES lines. Measured, as the lines depend on the width and
+// the font: on every screen, and again when the window changes size and when the font has loaded.
+const LOG_MIN = 3, LOG_LINES = 5, LOW = window.matchMedia ? matchMedia('(max-height: 540px)') : {matches: false};
+function fitLog(){
+  const el = $('log'); if (!el) return;
+  const cs = getComputedStyle(el.parentNode), acts = $('panel').querySelector('.actions');
+  el.style.maxHeight = 'none'; el.style.height = '0px';   // with no lines the buttons stand at the bottom of the screen
+  const top = el.getBoundingClientRect().top, lh = parseFloat(getComputedStyle(el).lineHeight) || 19;
+  const tops = []; let end = 0;   // the top of every line and the bottom of the last, from the top of the lines
+  for (const row of el.children){
+    const b = row.getBoundingClientRect(), y = b.top - top + el.scrollTop, n = Math.max(1, Math.round(b.height / lh));
+    for (let k = 0; k < n; k++) tops.push(y + k * b.height / n);
+    end = y + b.height;
+  }
+  const below = parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth) + (parseFloat(getComputedStyle($('panel')).rowGap) || 0);
+  const room = LOW.matches ? end - (tops[tops.length - LOG_LINES] || 0) : acts.getBoundingClientRect().top - below - top;
+  let i = tops.findIndex(y => end - y <= room + .01);   // the first line from which all the rest fit
+  if (i < 0) i = tops.length;
+  const from = tops[Math.max(0, Math.min(i, tops.length - LOG_MIN))] || 0;
+  el.style.height = `${end - from}px`; el.scrollTop = el.scrollHeight;
+  const more = () => el.classList.toggle('more', el.scrollTop > .5);   // older lines above: the top edge fades
+  more(); el.onscroll = more;
 }
 // The journal is drawn anew on every screen, so a screen reader hears its new lines from a lasting region (#say);
 // a line the toast has just said is not said twice
@@ -2888,7 +2919,6 @@ function announce(){
   saidN = S.log.length;
   if (fresh.length) $('say').textContent = fresh.join(' ');
 }
-function scrollLog(){ const el = $('log'); if (el) el.scrollTop = el.scrollHeight; }
 // what is seen on the water at the start of hour t
 function lookAround(){
   const w = S.loc, D = S.D, t = S.t, nb = D.nb;
@@ -3077,8 +3107,8 @@ function fitEvening(){
   const best = document.querySelector('.sum .best'), line = document.querySelector('.sum > span');
   $('wrap').style.setProperty('--eve-more', best ? `${Math.max(0, best.offsetHeight - 2*line.offsetHeight)}px` : '0px');
 }
-addEventListener('resize', fitEvening);
-if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', fitEvening);
+addEventListener('resize', () => { fitEvening(); fitLog(); });
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); fitLog(); });
 let askRestart = false;   // the evening's 'start again' waits for a second tap
 function nextDay(){
   askRestart = false; S.day++; startDay(); save(); render();
