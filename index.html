@@ -2704,17 +2704,32 @@ window.addEventListener('storage', onStorage);
 // screen (render) or the next hour (sit) takes it away at once, so a quick tap never carries it over to the evening.
 // It is told at a water, right under the hud on the side away from the old man (TOAST_SIDE): clear of his rod, also
 // when a strike raises it, and of the float on every phone; on a tall screen over the sky and the far bank, on the
-// shortest over the far side of the water
+// shortest over the far side of the water.
+// Its time runs only while the page is shown, as the scenes' clock does: a phone locked and unlocked finds it still there.
 const TOAST_SIDE = {river: 'left', omut: 'right', lake: 'left'}, TOAST_GAP = 10;
 function toast(text, ms=1300){
   const el = $('toast'), side = TOAST_SIDE[S.loc] || '';
   el.textContent = text; el.dataset.side = side;
   el.style.top = side ? `${Math.max($('hudTime').getBoundingClientRect().bottom, $('hudMoney').getBoundingClientRect().bottom)
     - el.parentNode.getBoundingClientRect().top + TOAST_GAP}px` : '';
-  el.classList.add('show'); toast.fresh = true; clearTimeout(toast._t); toast._t = setTimeout(()=>el.classList.remove('show'), ms);
+  el.classList.add('show'); toast.fresh = true;
+  if (toast.stop) toast.stop();
+  toast.stop = shownTimeout(() => el.classList.remove('show'), ms);
+}
+// a timer that counts only the time the page is shown, as the scenes' clock does (a hidden page's scenes stand still):
+// fn is called once ms of it have passed. Returns a function that cancels it.
+function shownTimeout(fn, ms){
+  let left = Math.max(0, ms), from = 0, id = 0, over = false;
+  const run = () => { if (!over && !id && !document.hidden){ from = performance.now(); id = setTimeout(fire, left); } };
+  const stop = () => { if (id){ clearTimeout(id); id = 0; left = Math.max(0, left - (performance.now() - from)); } };
+  const vis = () => document.hidden ? stop() : run();
+  const cancel = () => { over = true; stop(); document.removeEventListener('visibilitychange', vis); };
+  const fire = () => { id = 0; if (document.hidden){ left = 0; return; } cancel(); fn(); };   // due while hidden: on showing
+  document.addEventListener('visibilitychange', vis); run();
+  return cancel;
 }
 function hideToast(){
-  const el = $('toast'); clearTimeout(toast._t); toast.fresh = false;
+  const el = $('toast'); if (toast.stop) toast.stop(); toast.stop = null; toast.fresh = false;
   if (!el.classList.contains('show')) return;
   el.style.transition = 'none'; el.classList.remove('show'); void el.offsetWidth; el.style.transition = '';   // no fade-out
 }
@@ -3119,11 +3134,12 @@ async function sit(){
   let told = false;
   if (n || D.lost[w][h]){
     // the strike starts on the scene's next even tick, up to two ticks (half its second frame) after the call: the toast
-    // half a frame into the second frame comes while the rod is up, and stays its time over the next hour
+    // half a frame into the second frame comes while the rod is up, and stays its time over the next hour. Its wait
+    // runs on the time the page is shown, as the strike runs on the scene's clock, which stands while it is hidden
     const E = LiveScenes.EVENTS.strike, up = E.frames[0] + E.frames[1]/2;
     await wait(HOUR_MS - E.frames[0]);
-    const timer = setTimeout(() => { told = true; toast(what, E.ms - up + TOAST_MS); }, up);
-    const shown = await oneShot('strike'); clearTimeout(timer);
+    const stop = shownTimeout(() => { told = true; toast(what, E.ms - up + TOAST_MS); }, up);
+    const shown = await oneShot('strike'); stop();
     if (!shown) await wait(t0 + HOUR_MS - performance.now());
   }
   else if (D.scare[w][h]){
