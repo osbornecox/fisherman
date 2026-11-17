@@ -2218,11 +2218,12 @@ function startEvent(s, kind, done) {
   }
   if (ev.mode === 'wall') toWall(s, 0);
 }
-function endEvent(s, ok) {   // the event is over (ok) or cut short; a still scene shows its frame without it
+function endEvent(s, ok) {   // the event is over (ok) or cut short; a still scene shows its frame without it, and so does
+  // one cut short while it plays (destroy() draws no more frames, so its canvas would keep the event's last one)
   const ev = s.ev;
   if (!ev) return;
   s.ev = null; clearTimeout(ev.timer);
-  if (ev.mode === 'wall' && !s.dead && s.layer && s.ctx && !s.running) render(s, s.tick);
+  if (!s.dead && s.layer && s.ctx && (!ok || (ev.mode === 'wall' && !s.running))) render(s, ev.mode === 'wall' ? s.tick : s.drawn);
   ev.done(ok);
 }
 function toWall(s, e) {   // the event goes on by the wall clock from its tick e, over the scene's still frame
