@@ -2485,16 +2485,16 @@ const LEVEL_P = {
   omut:[[.35,.35,.3],[.3,.35,.35],[.45,.35,.2],[.45,.35,.2],[.4,.35,.25],[.55,.3,.15]],
   lake:[[.3,.25,.45],[.65,.25,.1],[.5,.3,.2],[.85,.1,.05],[.45,.3,.25],[.75,.2,.05]],
 };
-const RUMOR_TRUE = .7;   // the village tells the truth about the best water this often, else a made-up story
+const RUMOR_TRUE = .7;   // the village's rumour: drawn from the day or made up (rumorAt() in genDay())
 // events at the water: P(seen in an hour | bite level none / weak / good)
-const RIPPLE = [.1,.35,.6];     // small fish playing (weak sign)
-const BOIL = [.01,.05,.25];     // a predator chasing fry (strong sign)
+const RIPPLE = [.1,.35,.6];     // small fish playing
+const BOIL = [.01,.05,.25];     // a predator chasing fry
 const BUBBLES = [.05,.2,.4];    // bubbles from the bottom, fish feeding
 const LOST = [0,.2,.35];        // a bite, but the fish came off
 const SCARE = .05;              // a pike passes the shore: the hour is empty at any level
 const MIDGE = [.04,.15,.3];     // midges swarm over the water, fish feed at the surface
 const CALM = [0,1,4];           // midges only in still weather: overcast, sun, fog
-const NEIGHBOR_P = .8, NEIGHBOR_SMART = .5;  // he fishes most days; half the time at the morning's best water
+const NEIGHBOR_P = .8, NEIGHBOR_SMART = .5;  // the neighbour: whether he fishes, and how he picks his water (genDay())
 // some days the village has no power all day long (never a new game's first day). Only the story: no window or street
 // lamp lights up at 18:00, the kerosene lamp burns in the izba, a few journal lines; the fish and the money do not change
 const NO_POWER_P = 1/8;
