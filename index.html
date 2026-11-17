@@ -189,10 +189,11 @@
 //     signs are the signs on the water of the hour, as the journal wrote them: a list of {kind: 'splash', variant:
 //     'shore' | 'under' | 'calm'}, {kind: 'boil'}, {kind: 'bubbles'}, {kind: 'midge'} (LiveScenes.SIGNS lists them).
 //     Each shows at three sites on the water that the seed picks (an integer; the game's number for the day, the hour
-//     and the place), never by the float, at an uneven pace of its own: a splash every 5-9 s, a boil every 1-2 s, a
-//     chain of bubbles every 6-10 s, midges all the time. The first show comes within about 2 s of the signs being
-//     given (create, or a set() that changes the signs or the seed). Only on the waters (river, omut, lake); never
-//     with baked. With reduced motion and nothing playing each sign is drawn still, at its first site.
+//     and the place; in sun the bubbles keep clear of the hour's glints, so there the hour picks too), never by the
+//     float, at an uneven pace of its own: a splash every 5-9 s, a boil every 1-2 s, a chain of bubbles every 6-10 s,
+//     midges all the time. The first show comes within about 2 s of the signs being given (create, or a set() that
+//     changes the signs or the seed). Only on the waters (river, omut, lake); never with baked. With reduced motion
+//     and nothing playing each sign is drawn still, at its first site.
 //     life is the hour's drawn life around the water, as the game picked it for the journal: {kind: id} (or the id), one
 //     of LiveScenes.LIFE[place], e.g. a log drifting down the river. It is in sight from the start, plays out slowly by
 //     the time since it was given (create, or a set() that changes the life, the seed or the place) and the seed, and
@@ -1096,6 +1097,9 @@ const RING_FOG = pack(92, 106, 112), FOG_PALE = 150;   // on the fog's pale wate
 const SIGN_APART = 18, SIGN_OTHERS = 10;   // px between the sites of a sign, and from another sign's (rows count double)
 const RING_C = pack(218, 226, 226), FRY_C = pack(208, 214, 212), MIDGE_C = pack(34, 36, 32);   // clean colours, toned by the weather
 const BEAD_C = pack(70, 82, 88);   // the shaded underside of a bubble
+// Signs of small light dots that the sun's glints would hide (a glint is a light dot too): in sun their sites keep
+// GLARE_NEAR px clear of every glint of the hour, where the water has room for three such sites.
+const GLARE_SHY = new Set(['bubbles']), GLARE_NEAR = 4;
 const SIGNS = [
   {kind: 'splash', variant: 'shore', name: 'у берега плеснуло'},   // «У берега плеснуло, пошли круги.»
   {kind: 'splash', variant: 'under', name: 'под берегом плеснуло'},   // «Под берегом тихонько плеснуло.»
@@ -1261,17 +1265,41 @@ function footprints(id) {   // every pixel a show may draw, [dx, dy, ...]: one l
     return q;
   });
 }
-// The scene's signs: for each, its seed and three sites, spread out, picked in the seed's order among its candidates.
+// The scene's signs: for each, its seed and three sites, spread out, picked in the seed's order among its candidates
+// (in sun, those of a glare-shy sign clear of the hour's glints, if there are enough of them).
 const seedOf = (seed, i, P) => (Math.imul(seed, 7919) + 104729 * (i + 1) + 1299709 * PLACES.indexOf(P.name)) | 0;
-function signPlan(P, seed, ids) {
+function signPlan(P, seed, ids, glints) {
   const G = signGround(P), taken = [], plan = [];
   for (const id of ids) {
-    const sd = seedOf(seed, SIGN_IDS.indexOf(id), P), sites = pickSites(G.cand[id], sd, taken);
+    const c = glints && GLARE_SHY.has(id) ? clearOfGlints(G.cand[id], footprints(id), glints) : G.cand[id];
+    const sd = seedOf(seed, SIGN_IDS.indexOf(id), P), sites = pickSites(c, sd, taken);
     if (!sites.length) continue;
     taken.push(...sites);
     plan.push({id, sh: SHOWS[id], sd, sites});
   }
   return plan;
+}
+function clearOfGlints(c, prints, g) {   // the candidates c whose ways keep GLARE_NEAR px clear of the glints g, or all
+  // of them if fewer than three do
+  if (!g.near) {   // the pixels within GLARE_NEAR px of a glint, found once per still layer
+    g.near = new Uint8Array(N);
+    for (let i = 0; i < g.n; i++) {
+      const x = g.p[i] % W, y = (g.p[i] / W) | 0;
+      for (let yy = Math.max(0, y - GLARE_NEAR); yy <= Math.min(H - 1, y + GLARE_NEAR); yy++)
+        for (let xx = Math.max(0, x - GLARE_NEAR); xx <= Math.min(W - 1, x + GLARE_NEAR); xx++) g.near[yy * W + xx] = 1;
+    }
+  }
+  const out = [];
+  for (let j = 0; j < c.length; j += 3) {
+    let ways = 0;
+    prints.forEach((q, i) => {
+      if (!(c[j + 2] & 1 << i)) return;
+      for (let k = 0; k < q.length; k += 2) if (g.near[(c[j + 1] + q[k + 1]) * W + c[j] + q[k]]) return;
+      ways |= 1 << i;
+    });
+    if (ways) out.push(c[j], c[j + 1], ways);
+  }
+  return out.length >= 9 ? out : c;
 }
 function pickSites(c, sd, taken) {   // three of the candidates c in the seed's order, apart from each other and from taken
   const order = [];
@@ -2014,12 +2042,14 @@ function change(s, o) {   // create() and set(): the picture and the still layer
 function ready(s) {   // the picture is analysed: the still layer, the signs' sites, the life, the frame, and on with the
   // clock if the scene plays. New signs, a new seed or a new place start the signs' steps from the scene's tick; a new
   // life, seed or place the life's. A drift's lane keeps off the signs, so new signs may move it.
-  const c = s.cfg, P = s.pic.P, key = `${P.id}/${c.seed}/${c.signs}`, lkey = `${P.id}/${c.seed}/${c.life}`;
+  // In sun a glare-shy sign's sites depend on the hour's glints: a new hour (or the sun) starts its signs anew too.
+  const c = s.cfg, P = s.pic.P, lkey = `${P.id}/${c.seed}/${c.life}`;
   s.layer = layerFor(P, c.weather, c.baked ? null : c.hour, c.baked, c.lit);
-  const fresh = s.signKey !== key;
+  const ids = c.signs ? c.signs.split(',') : [], glints = s.layer.glints && ids.some(id => GLARE_SHY.has(id)) ? s.layer.glints : null;
+  const key = `${P.id}/${c.seed}/${c.signs}/${glints ? c.hour : ''}`, fresh = s.signKey !== key;
   if (fresh) {
     s.signKey = key; s.X.n0 = s.tick;
-    s.X.plan = P.float && c.signs ? signPlan(P, c.seed, c.signs.split(',')) : null;
+    s.X.plan = P.float && ids.length ? signPlan(P, c.seed, ids, glints) : null;
     s.scare = P.float ? scarePlan(P, c.seed) : null;
   }
   const freshLife = s.lifeKey !== lkey;
