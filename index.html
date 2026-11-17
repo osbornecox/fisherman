@@ -208,9 +208,9 @@
 //   scene.ready() -> a promise of true once the scene has drawn its settings (at once if it has), or of false if it
 //     cannot (bad input, destroyed).
 //   scene.at(t): pause and draw the frame of t seconds, as the demo's ?t=…&pause=1 does.
-//   scene.event(kind) -> a promise: a one-shot over the scene from its next tick, resolved true when it is over; false
-//     at once if the scene cannot show it (not a water, baked, nothing drawn yet, an unknown kind), or when it is cut
-//     short (another event, a set() that changes the scene, destroy()), and then nothing of it stays drawn.
+//   scene.event(kind) -> a promise: a one-shot over the scene from its next even tick, resolved true when it is over;
+//     false at once if the scene cannot show it (not a water, baked, nothing drawn yet, an unknown kind), or when it is
+//     cut short (another event, a set() that changes the scene, destroy()), and then nothing of it stays drawn.
 //     'strike', a fish or a lost fish alike: the rod comes out of the water in three frames (LiveScenes.EVENTS.strike
 //     .frames, in ms): as it lies; steeply up, the float pulled out and a small ring where it was; nearly upright, the
 //     float hanging under the tip. Then it lies in the water again. No fish is drawn.
@@ -405,6 +405,7 @@ const DRIZZLE_N = 60, DRIZZLE_EVERY = 2, DOWNPOUR_N = 100, DOWNPOUR_STEP = 2;
 
 // ---------- small helpers ----------
 const mod = (a, m) => ((a % m) + m) % m;
+const even = n => n - mod(n, 2);   // the even tick at or before tick n
 function noise(s, x, y) {   // the game's pixelNoise: a fixed number in [0, 1) for any three integers
   let v = (Math.imul(s, 73856093) ^ Math.imul(x, 19349663) ^ Math.imul(y, 83492791)) >>> 0;
   v = Math.imul(v ^ (v >>> 16), 0x45d9f3b); v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
@@ -941,22 +942,27 @@ function layerFor(P, w, hour, bk, power) {
 
 // ---------- the frame ----------
 // drawFrame(L, n, dst, X) draws tick n of the still layer L into dst (a Uint32Array of N pixels), with the scene's signs,
-// its life and its one-shot event: X ({plan, n0, still, ev, e, life, l0}, see signs(), life() and the events). Unlit effects draw weather.py's
-// colours into U; the pixels they touch are lit for the hour afterwards (as their class, or as F.kx gives one), and the
-// sun is painted over them again. Lit effects (objects: smoke, the float, leaves) draw over the lit frame, lit as land, so a faint puff over the
-// sky stays a puff; the wind's gusts and what they bend draw there too, from lit colours. U, stamp, dirty and F are scratch for one call and nothing carries over to the next, so any number
-// of scenes can be drawn in one tick, each into its own buffer (the game's crossfade, a page of many scenes).
+// its life and its one-shot event: X ({plan, n0, still, ev, e, life, l0, open}, see signs(), life() and the events).
+// Unlit effects draw weather.py's colours into U; the pixels they touch are lit for the hour afterwards (as their class,
+// or as F.kx gives one), and the sun is painted over them again. Lit effects (objects: smoke, the float, leaves) draw
+// over the lit frame, lit as land, so a faint puff over the sky stays a puff; the wind's gusts and what they bend draw
+// there too, from lit colours. U, stamp, dirty and F are scratch for one call and nothing carries over to the next, so
+// any number of scenes can be drawn in one tick, each into its own buffer (the game's crossfade, a page of many scenes).
+// Everything but the rain moves on even ticks only: the effects see the time of the frame's even tick (F.t), and the
+// signs, the life and the one-shot events count their steps of two ticks from an even tick. So where two of them meet
+// on a pixel (a ring over a glint, a bird over a cloud), the pixel still holds two ticks or more. The rain's streaks fall
+// on every tick, each position held two ticks.
 const U = new Uint32Array(N), stamp = new Uint32Array(N), dirty = new Int32Array(N);
 let nd = 0, fid = 0, out = null;
 // A frame with no signs, life or event (open: the water lilies that stand open, see life()).
 const NO_X = {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0, open: null};
-const F = {P: null, L: null, S: null, X: NO_X, kx: null, w: '', windy: false, t: 0, tg: 0, n: 0, baked: false, top: new Int16Array(3 * W),
+const F = {P: null, L: null, S: null, X: NO_X, kx: null, w: '', windy: false, t: 0, n: 0, baked: false, top: new Int16Array(3 * W),
            bot: new Int16Array(3 * W)};
 function drawFrame(L, n, dst, X) {
   out = dst; U.set(L.unlit); dst.set(L.lit);
   fid++; nd = 0;
-  F.P = L.P; F.L = L; F.S = L.S; F.X = X || NO_X; F.kx = null; F.w = L.w; F.windy = WINDY.has(L.w); F.n = n; F.t = n / FPS; F.baked = L.baked;
-  F.tg = 2 * Math.floor(n / 2) / FPS; gustsNow();   // the gusts move every other tick
+  F.P = L.P; F.L = L; F.S = L.S; F.X = X || NO_X; F.kx = null; F.w = L.w; F.windy = WINDY.has(L.w); F.n = n; F.baked = L.baked;
+  F.t = 2 * Math.floor(n / 2) / FPS; gustsNow();   // the time of the even tick: what moves, moves every other tick
   for (let i = 0; i < EFFECTS.length; i++) if (!EFFECTS[i].lit) EFFECTS[i].draw();
   const cls = L.P.cls, light = L.light, kx = F.kx;   // kx: a class an effect gave a pixel for this frame, plus one; life is land
   for (let i = 0; i < nd; i++) { const p = dirty[i]; dst[p] = light(U[p], p, lk[p] === fid ? LAND : kx && kx[p] ? kx[p] - 1 : cls[p]); }
@@ -1013,12 +1019,12 @@ const BUMP = Float64Array.from({length: 65}, (_, i) => .5 + .5 * Math.cos(Math.P
 const bump = u => u <= -1 || u >= 1 ? 0 : BUMP[(u + 1) * 32 | 0];   // 1 in the middle, 0 at the ends
 const bumpSum = u => u <= -1 ? 0 : u >= 1 ? 1 : (u + 1 + Math.sin(Math.PI * u) / Math.PI) / 2;   // its integral from -1
 // The gusts on the scene in this frame: G.g[i] and how far it has come, G.s[i]; its patch of ripple on the water is
-// centred on row G.yc[i], G.hh[i] rows either way. Looked at every other tick (F.tg).
+// centred on row G.yc[i], G.hh[i] rows either way. Looked at every other tick (F.t).
 const G = {n: 0, g: [], s: new Float64Array(GUST_SLOTS), yc: new Float64Array(GUST_SLOTS), hh: new Float64Array(GUST_SLOTS)};
 function gustsNow() {
   G.n = 0;
   if (!F.windy || F.baked) return;
-  const t = F.tg, P = F.P;
+  const t = F.t, P = F.P;
   for (let k = Math.floor((t - GUST_LONGEST) / GUST_EVERY); k <= Math.floor(t / GUST_EVERY) && G.n < GUST_SLOTS; k++) {
     const g = gustOf(k);
     if (!g || t < g.t0 || g.v * (t - g.t0) > gustGone(g)) continue;
@@ -1623,7 +1629,7 @@ function bearPose(sd, s) {   // a bear on the bank sniffing the air: its head li
 const LIFE_IDS = Object.fromEntries(Object.entries(LIFE).map(([p, o]) => [p, Object.keys(o)]));
 
 // ---------- the effects ----------
-// Each draws one frame from F: F.t seconds and F.n ticks, F.P the place (masks, anchors), F.L the still layer of the
+// Each draws one frame from F: F.t seconds (of the frame's even tick) and F.n ticks, F.P the place (masks, anchors), F.L the still layer of the
 // hour (F.L.light lights a colour as sky, water or land), F.S weather.py's sites, F.w the weather, F.windy for wind.
 // With F.baked (?baked=1) each draws what weather.py baked into its picture, which checks the port; weather.py's
 // whitecaps and rings are then in the still layer already.
@@ -1846,7 +1852,8 @@ function signDot(dx, dy, c, a) {   // a pixel of a sign: on free water only, col
   lk[p] = 0;   // over a pixel of life: lit as the water again
 }
 // ---------- the one-shot events: scene.event(kind), drawn while F.X.ev is on, F.X.e ticks into it ----------
-const STRIKE = [4, 4, 5];   // ticks of the strike's three frames: the rod as it lies, steeply up, nearly upright
+const STRIKE = [4, 4, 6];   // ticks of the strike's three frames: the rod as it lies, steeply up, nearly upright (even,
+// so it ends on an even tick too)
 const EVENT_TICKS = {strike: STRIKE[0] + STRIKE[1] + STRIKE[2], scare: SHOWS.scare.dur * SIGN_STEP};
 function strikeFrame() {   // 0 (no strike, or its first frame, the rod as it lies), 1 or 2: the raised rod's frame
   const X = F.X;
@@ -1919,7 +1926,7 @@ function leaves() {   // wind: now and then a leaf crosses the scene with the wi
     for (let j = 0; j < 2; j++) if (x + j >= 0 && x + j < W && y >= 0 && y < H && !F.P.quiet[y * W + x + j]) over(y * W + x + j, c, 1, LAND);
   }
   for (let i = 0; i < G.n; i++) {
-    const g = G.g[i], age = F.tg - g.t0;
+    const g = G.g[i], age = F.t - g.t0;
     if (!g.leaf) continue;
     const y0 = Math.round(40 + 90 * g.ly), x = Math.round(g.off[y0] + G.s[i] - .3 * g.hw);
     const y = Math.round(y0 + .9 * age + 3 * Math.sin(2.1 * age + g.ly * 6)), c = LEAF_C[Math.floor(3 * g.wh)];
@@ -2072,12 +2079,12 @@ function ready(s) {   // the picture is analysed: the still layer, the signs' si
   const ids = c.signs ? c.signs.split(',') : [], glints = s.layer.glints && ids.some(id => GLARE_SHY.has(id)) ? s.layer.glints : null;
   const key = `${P.id}/${c.seed}/${c.signs}/${glints ? c.hour : ''}`, fresh = s.signKey !== key;
   if (fresh) {
-    s.signKey = key; s.X.n0 = s.tick;
+    s.signKey = key; s.X.n0 = even(s.tick);
     s.X.plan = P.float && ids.length ? signPlan(P, c.seed, ids, glints) : null;
     s.scare = null;   // found at the first scare (startEvent)
   }
   const freshLife = s.lifeKey !== lkey;
-  if (freshLife) { s.lifeKey = lkey; s.X.l0 = s.tick; }
+  if (freshLife) { s.lifeKey = lkey; s.X.l0 = even(s.tick); }
   if (fresh || freshLife) s.X.life = c.life ? lifePlan(P, c.seed, c.life, s.X.plan) : null;
   s.X.open = c.lilies ? lilyBuds(P) : null;
   trimSoon();
@@ -2220,7 +2227,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ---------- one-shot events ----------
-// scene.event(kind) plays a one-shot over the scene from the next tick and resolves its promise when it is over. A
+// scene.event(kind) plays a one-shot over the scene from the next even tick and resolves its promise when it is over. A
 // playing scene plays it on its own clock ('run': tick n shows its tick n - n0). A scene that does not play (paused,
 // reduced motion, autoplay off) keeps its frame still and plays the event over it by the wall clock ('wall', a timer a
 // tick); at() steps it with the scene's ticks ('manual', for checks). play() and pause() carry it from one to the other.
@@ -2236,7 +2243,7 @@ function startEvent(s, kind, done) {
   if (P && P.float && !s.cfg.baked && kind === 'scare' && !s.scare) s.scare = scarePlan(P, s.cfg.seed);   // the first scare
   const sc = s.scare;
   if (!P || s.cfg.baked || (kind === 'strike' ? !P.rod : !sc || !sc.sites.length)) { done(false); return; }   // not here
-  const ev = s.ev = {kind, dur: EVENT_TICKS[kind], done, mode: s.running ? 'run' : 'wall', n0: s.running ? ticks() + s.k + 1 : s.tick,
+  const ev = s.ev = {kind, dur: EVENT_TICKS[kind], done, mode: s.running ? 'run' : 'wall', n0: s.running ? even(ticks() + s.k + 2) : s.tick,
                      e: 0, w0: 0, timer: 0, x: 0, y: 0, d: 1};
   if (kind === 'scare') {   // a site and a way by the seed and the moment
     const q = sc.sites[Math.floor(sc.sites.length * noise(sc.sd, ev.n0, 7))];
@@ -2280,7 +2287,7 @@ function create(canvas, opts) {
       if (s.dead) return;
       const ev = s.ev;
       if (ev && ev.mode !== 'run' && s.layer) {   // the event goes on with the scene's clock from where it is
-        clearTimeout(ev.timer); if (ev.mode === 'wall') ev.n0 = s.tick - ev.e; ev.mode = 'run';
+        clearTimeout(ev.timer); if (ev.mode === 'wall') ev.n0 = even(s.tick - ev.e); ev.mode = 'run';
       }
       s.playing = true; run(s);
     },
@@ -2299,7 +2306,7 @@ function create(canvas, opts) {
     at(t) {
       if (s.dead) return;
       s.playing = false; halt(s); idle();
-      if (s.ev) { clearTimeout(s.ev.timer); if (s.ev.mode === 'wall') s.ev.n0 = s.tick - s.ev.e; s.ev.mode = 'manual'; }
+      if (s.ev) { clearTimeout(s.ev.timer); if (s.ev.mode === 'wall') s.ev.n0 = even(s.tick - s.ev.e); s.ev.mode = 'manual'; }
       s.tick = Math.floor((isFinite(t) ? +t : 0) * FPS + 1e-9);
       if (s.layer) show(s);
       if (s.ev && s.tick - s.ev.n0 >= s.ev.dur) endEvent(s, true);
