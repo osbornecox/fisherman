@@ -227,8 +227,8 @@
 //   LiveScenes.dayLight(hour) -> {sky, land, glow, g}: the light of an hour (tints, glow colour and strength), and
 //     LiveScenes.DAY = {first, last, litFrom}: the game lights the izba with these, so the light is written once.
 //   LiveScenes.SIGNS: [{kind, variant?, name}], every sign a scene draws, name a short Russian label (the demo's).
-//   LiveScenes.LIFE: {river: [id, ...], omut: [...]}, the life each water draws, and LIFE_NAME: {id: a short Russian
-//     label} (the demo's). The journal line each id draws is by it in LIFE below.
+//   LiveScenes.LIFE: {river: [id, ...], omut: [...], lake: [...]}, the life each water draws, and LIFE_NAME: {id: a
+//     short Russian label} (the demo's). The journal line each id draws is by it in LIFE below.
 //   LiveScenes.EVENTS: {strike: {frames: [ms, ms, ms], ms}, scare: {ms}}, how long the one-shots take.
 //   LiveScenes.PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version.
 // Bad input (an unknown place or weather, a picture that does not load) gets one console.warn and a scene that draws
@@ -269,7 +269,9 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 // tremble on calm water.
 // Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; circle, [cx,
 // cy, rx, ry], where a bird of prey circles; sky, the rows a flock may fly at; bank, the row the far bank's beasts
-// stand on and the left edges they may take; lilies, the buds of the water lilies [x, y].
+// stand on and the left edges they may take (or the two ends of the shore a beast walks along); lilies, the buds of the
+// water lilies [x, y]; hover, [x, y], where a bird of prey hangs on the wind; perch, the top of the dead trunk a raven
+// sits on.
 const ANCHORS = {
   home: {
     smoke: {x: 37, y: 90, n: 12},       // scene_home: px(38 + i % 3 - 1, 90 - 2 * i) above the chimney rect(37, 92, 3, 12)
@@ -312,6 +314,12 @@ const ANCHORS = {
     reeds: [106, 136, 24, 12],          // the sedge at the water on the right: scene_lake's tufts rect(x, y - randint(2, 6),
                                         // 1, 3) poking above its shore line (150 - x // 26 + 2 * (x // 9 % 2)), the water above
     tufts: [0, 136, 130, 44],           // all the sedge's tufts on the shore
+    circle: [100, 40, 10, 3],           // over the round hill: top = 52 + 14 * min(1, ((x - 90) / 40) ** 2), its top at x 90
+    hover: [72, 47],                    // over the hill's slope (row 55 at x 72), into the wind
+    sky: [10, 30],                      // high over the lake
+    bank: {y: 85, x: [8, 122]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
+                                        // walks along row 85 between these x
+    perch: [112, 94],                   // the shorter dead trunk: rect(112, 112 - 18, 1, 18, (110, 104, 96)), its top pixel
   },
 };
 
@@ -1302,6 +1310,7 @@ const LIFE_C = {   // the clean colours of the sprites, by the letters they are 
   f: [140, 104, 72], F: [114, 84, 60],                                            // the calf, its head
   m: [96, 70, 50], M: [62, 46, 34],                                               // a bear, its snout and paws
   W: [240, 238, 228], Y: [222, 196, 92],                                          // a water lily's petals and heart
+  u: [80, 82, 84], s: [36, 32, 30], v: [30, 30, 34],                              // cranes, the dark spot, a raven
 };
 // The sprites, rows split by '/', '.' for nothing. Beasts face left; their feet are on row `feet` of the sprite. A drift's
 // waterline is its row `wl`.
@@ -1327,6 +1336,10 @@ const LIFE_ART = {
   bearUp: ['.m..mmm..../Mmm.mmmmmm./.mmmmmmmmmm/..mmmmmmmmm/..mm....mm./..MM....MM.', {feet: 5}],
   bearWalk: ['....mmm..../.m.mmmmmmm./mmmmmmmmmmm/Mmmmmmmmmmm/..m.m...m.m/..M.M...M.M', {feet: 5}],
   lilyHalf: ['W.W'], lilyOpen: ['.W./WYW'],
+  crane: ['.u.../uuuuu/.....'], crane2: ['...../uuuuu/.u...'],
+  spot: ['.sss./sssss/s.s.s', {feet: 2}], spot2: ['.sss./sssss/.s.s.', {feet: 2}],
+  raven: ['vv../.vvv/..v.', {feet: 2}], ravenShift: ['vv../.vvvv/..v..', {feet: 2}],
+  ravenFly: ['vv.vv/..v..'], ravenFly2: ['..v../vv.vv'],
 };
 // the elk cow: an elk without antlers
 for (const k of ['Up', 'Down', 'Walk', 'Walk2']) LIFE_ART['cow' + k] = [LIFE_ART['elk' + k][0].replace(/a/g, '.'), LIFE_ART['elk' + k][1]];
@@ -1339,16 +1352,19 @@ for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, 
 // and how often are; the game keeps to them). `is` is how it shows:
 //   drift: down the river from left to right at v, on one of the lanes, in sight from the start; `fog`: it comes out of
 //     the fog on the left and goes into it on the right; `bird`: a wagtail rides it, pumping its tail.
-//   circle: a bird of prey circles round ANCHORS.circle (a lap in about `lap`); in the wind it hangs on the spot,
-//     shifting a pixel now and then. After `stay` it drifts off sideways and away.
+//   circle: a bird of prey circles round ANCHORS.circle (a lap in about `lap`); in the wind, or with `hover` at
+//     ANCHORS.hover, it hangs on the spot, shifting a pixel now and then. After `stay` it drifts off sideways and away.
 //   flock: a flock (`form`, each bird's place flying left; it flies either way) crosses the sky at v, at a height in
 //     ANCHORS.sky, its wings beating slowly, in sight from the start.
 //   beast: on the far bank or shore (ANCHORS.bank), there from the start: an elk drinks and lifts its head now and then
 //     (`calf`: her calf beside her), a bear sniffs the air; after `stay` it walks off, fading into the forest, and later
-//     comes back out of it.
+//     comes back out of it. `walk`: the dark spot plods along the shore all the while, fading in and out at the ends.
+//   perch: a raven sits on the dead trunk (ANCHORS.perch) and shifts now and then; after `stay` it flies off, and later
+//     comes back.
 //   lilies: the water lilies' buds (ANCHORS.lilies) open, or the open flowers close, one after another in the first 20 s,
 //     and stay so. Between the two the game passes lilies: true, and they stand open all the hour.
 const GEESE = [[0, 0], [4, -2], [8, -4], [12, -6], [4, 2], [8, 4], [12, 6], [16, 8]];   // a wedge, one arm longer
+const CRANES = [[0, 0], [6, 1], [11, 3], [17, 4], [23, 6], [28, 7]];                   // a slanting, uneven line
 const LIFE = {
   river: {
     log: {is: 'drift', art: 'log', v: 1.2, gap: [240, 360]},                   // «Мимо медленно проплыло бревно»
@@ -1367,11 +1383,20 @@ const LIFE = {
     'lilies-open': {is: 'lilies', open: true},    // «Раскрылись кувшинки»
     'lilies-close': {is: 'lilies', open: false},  // «Кувшинки закрылись»
   },
+  lake: {
+    geese: {is: 'flock', art: 'goose', form: GEESE, v: 3, flap: 4, gap: [300, 420]},   // «Высоко над озером идёт гусиный клин. Его слышно ещё долго после того, как он скрылся»
+    cranes: {is: 'flock', art: 'crane', form: CRANES, v: 2.4, flap: 6, gap: [300, 420]},   // «Высоко пролетели журавли, перекликаясь»
+    hawk: {is: 'circle', art: 'hawk', lap: 16, stay: [150, 210], gap: [240, 300]},   // «Над сопкой кружит ястреб»
+    'hawk-hover': {is: 'circle', art: 'hawk', hover: true, stay: [120, 180], gap: [240, 300]},   // «Ястреб висит на ветру над склоном, не двигаясь»
+    raven: {is: 'perch', art: 'raven', stay: [60, 90], gap: [180, 240]},   // «На сухой ствол в воде сел ворон. Посидел и улетел»
+    'dark-spot': {is: 'beast', art: 'spot', walk: true, stay: [80, 110], gap: [300, 360]},   // «По тому берегу бредёт что-то большое и тёмное. Медведь, наверно»
+  },
 };
 const LIFE_NAME = {   // a short Russian label of each (the demo's)
   log: 'бревно', 'log-fog': 'бревно из тумана', 'log-dark': 'тёмное бревно', spruce: 'ёлка с корнями', wagtail: 'бревно с трясогузкой',
   kite: 'коршун', geese: 'гусиный клин', elk: 'лось', 'elk-calf': 'лосиха с лосёнком', bear: 'медведь', hawk: 'ястреб',
-  'lilies-open': 'кувшинки раскрылись', 'lilies-close': 'кувшинки закрылись',
+  'lilies-open': 'кувшинки раскрылись', 'lilies-close': 'кувшинки закрылись', cranes: 'журавли', 'hawk-hover': 'ястреб висит',
+  raven: 'ворон', 'dark-spot': 'тёмное пятно',
 };
 // The life of a scene: its spec, its seed and where it goes. A drift takes a lane whose rows no sign's site comes within
 // SIGN_REACH rows of, or the one with the fewest such sites (ties by the seed), so it passes no sign if it can help it
@@ -1390,7 +1415,7 @@ function lifePlan(P, seed, id, signs) {
     g.lane = A.lanes.map(y => [near(y), noise(sd, y, 1), y]).sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2];
   } else if (L.is === 'beast') {
     const xs = A.bank.x;
-    g.x = xs[Math.floor(xs.length * noise(sd, 0, 2))];
+    g.x = L.walk ? xs[0] + Math.floor((xs[1] - xs[0]) * noise(sd, 0, 2)) : xs[Math.floor(xs.length * noise(sd, 0, 2))];
   } else if (L.is === 'lilies') g.flowers = lilyBuds(P);
   return g;
 }
@@ -1454,7 +1479,7 @@ const LIVES = {
     const e = EP.e, k = EP.k, side = noise(sd, k, 5) < .5 ? -1 : 1;
     let f = 0;   // how far off it has drifted: it comes in at the start of an episode (not the first) and goes at its end
     if (k > 0 && e < out) f = 1 - e / out; else if (e >= len - out) f = (e - (len - out)) / out;
-    const hang = F.windy, [cx, cy, rx, ry] = A.circle;
+    const hang = L.hover || F.windy, [cx, cy, rx, ry] = L.hover ? [...A.hover, 0, 0] : A.circle;
     let x = cx + side * 100 * f, y = cy - 8 * f;
     if (hang) {   // hangs on the wind, shifting a pixel now and then
       const j = Math.floor(e / 27);
@@ -1480,10 +1505,14 @@ const LIVES = {
   beast(g, L, m) {
     const sd = g.sd, A = ANCHORS[F.P.name], walkIn = 4 * LIFE_SPS, stay = span(sd, 1, L.stay), len = walkIn + stay + walkIn;
     if (!episode(m, len, span(sd, 2, L.gap), walkIn + 3)) return;
-    const e = EP.e;   // which way it faces and walks: as the seed says each time
-    const dir = noise(sd, EP.k, 4) < .5 ? -1 : 1, flip = dir > 0;
+    const e = EP.e;   // which way it faces and walks: as the seed says each time, or the dark spot towards the middle
+    const dir = L.walk ? (g.x < W / 2 ? 1 : -1) : noise(sd, EP.k, 4) < .5 ? -1 : 1, flip = dir > 0;
     let x = g.x, a = 1, pose = 'up';
-    if (e < walkIn || e >= walkIn + stay) {   // walks out of the forest, or back into it, fading
+    if (L.walk) {   // the dark spot plods along the shore all the while, a pixel every 2.5 s, its legs stepping
+      x += dir * Math.floor((e - walkIn - 3) / 15);
+      pose = Math.floor(e / 8) & 1 ? 'walk' : 'stand';
+      a = Math.min(1, Math.ceil(4 * Math.min(e, len - e) / walkIn) / 4);
+    } else if (e < walkIn || e >= walkIn + stay) {   // walks out of the forest, or back into it, fading
       const w = e < walkIn ? e - walkIn : e - walkIn - stay;   // -walkIn..0 coming, 0..walkIn going
       x += dir * Math.floor(w / 4);
       a = Math.ceil(4 * (1 - Math.abs(w) / walkIn)) / 4;
@@ -1496,6 +1525,21 @@ const LIVES = {
       sprite(C2, dir < 0 ? x + 13 : x - 8, A.bank.y - C2.feet, flip, a);   // a pixel's gap from her
     }
   },
+  perch(g, L, m) {
+    const sd = g.sd, [px, py] = ANCHORS[F.P.name].perch, fly = 6 * LIFE_SPS, stay = span(sd, 1, L.stay), len = fly + stay + fly;
+    if (!episode(m, len, span(sd, 2, L.gap), fly + 3)) return;
+    const e = EP.e;
+    if (e < fly || e >= fly + stay) {   // flies in from the right and down to the trunk, or off up to the right
+      const d = e < fly ? fly - e : e - fly - stay, S = LIFE_ART[Math.floor(e / 3) & 1 ? 'ravenFly' : 'ravenFly2'];
+      sprite(S, px - 2 + d, py - 2 - (d >> 1), false, 1);
+      return;
+    }
+    const s = e - fly, j = Math.floor(s / 54), o = s - 54 * j, at = 6 + Math.floor(34 * noise(sd, j, 3));
+    let turns = 0; for (let i = 0; i < j; i++) turns += noise(sd, i, 4) < .5;   // it turned at these blocks' moments
+    if (o >= at && noise(sd, j, 4) < .5) turns++;
+    const S = LIFE_ART[o >= at && o < at + 3 && noise(sd, j, 4) >= .5 ? 'ravenShift' : 'raven'], flip = (turns & 1) === 1;
+    sprite(S, flip ? px - S.w + 3 : px - 2, py - 1 - S.feet, flip, 1);   // its foot (column 2 facing left) on the trunk's top
+  },
   lilies(g, L, m) {
     for (let i = 0; i < g.flowers.length; i++) {
       const [x, y] = g.flowers[i], at = Math.round((4 + 10 * i + 4 * noise(g.sd, i, 1)) * LIFE_SPS), half = 3 * LIFE_SPS;
@@ -1506,7 +1550,8 @@ const LIVES = {
   },
 };
 const BEASTS = {elk: {up: 'elkUp', down: 'elkDown', walk: 'elkWalk', walk2: 'elkWalk2'}, cow: {up: 'cowUp', down: 'cowDown', walk: 'cowWalk', walk2: 'cowWalk2'},
-                bear: {up: 'bearUp', stand: 'bear', walk: 'bearWalk', walk2: 'bear'}};
+                bear: {up: 'bearUp', stand: 'bear', walk: 'bearWalk', walk2: 'bear'},
+                spot: {up: 'spot', stand: 'spot', walk: 'spot2'}};
 function elkPose(sd, s, block) {   // an elk at the water: it looks about for a few seconds, then drinks, lifting its head now
   // and then for two or three seconds (a block of `block` steps, now and then skipped)
   if (s < 3 * LIFE_SPS) return 'up';
