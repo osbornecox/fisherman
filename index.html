@@ -2675,7 +2675,7 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
-  S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {} };
+  S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {} };
   newHouse();
 }
 function genDay(){
@@ -2893,6 +2893,8 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   // evening saved then gets its page now (and a page that cannot be written leaves the game as it was)
   if (!Array.isArray(S.trail)) S.trail = S.D && Array.isArray(S.log) ? trailFromLog() : [];
   if (!Array.isArray(S.book)) S.book = [];
+  // saved before the book: its flyleaf counts from now, as its pages do. (A save from before then keeps S.history, the
+  // old evenings' earnings day by day; nothing reads it, and nothing adds to it any more.)
   if (!S.totals || typeof S.totals !== 'object' || !Array.isArray(S.totals.weathers)) S.totals = noTotals();
   if (S.phase === 'evening' && S.D && !(S.book.length && S.book[S.book.length - 1].d === S.day)) try { closePage(); } catch (e) {}
   delete S.path;   // the route was kept once and never shown
@@ -3597,10 +3599,7 @@ async function sit(){
 }
 function endDay(){
   if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
-  const earned = S.earnFish + S.earnWork, spent = spendDay();
-  S.money -= spent;   // what life took today (S.purchases): the evening's remainder is the next morning's money
-  // the day's length and the pay for an hour of tackle, as the day was
-  S.history.push({day:S.day, earned, hours:HOURS, wage:WAGE, spent});
+  S.money -= spendDay();   // what life took today (S.purchases): the evening's remainder is the next morning's money
   closePage();   // the evening's page goes into the book, the day into the flyleaf's counts
   S.phase = 'evening'; save(); render();
 }
@@ -3781,10 +3780,13 @@ function closePage(){
   const sat = WATERS.reduce((s, w) => s + S.presence[w].length, 0);
   const quiet = WATERS.reduce((s, w) => s + S.presence[w].filter(h => !D.catchT[w][h] && !D.lost[w][h] && !D.scare[w][h]).length, 0);
   const home = Math.max(0, HOURS - sat - trail.reduce((s, e) => s + (TRAVEL[e.k] || 0), 0));
-  T.days++; T.water += sat; T.quiet += quiet; T.home += home; T.craft += Math.min(home, Math.round((S.earnWork || 0)/WAGE));
+  // the hours at the tackle as the day went (S.trail), and the pay they got: a day saved before the tackle paid 5 an
+  // hour was paid 10, and so would tackle all day have been
+  const craft = trail.reduce((s, e) => s + (e.k === 'craft' ? e.n || 1 : 0), 0), wage = craft && S.earnWork ? Math.round(S.earnWork/craft) : WAGE;
+  T.days++; T.water += sat; T.quiet += quiet; T.home += home; T.craft += Math.min(home, craft);
   T.village += trail.filter(e => e.k === 'shop').length; T.nb += parts.some(p => p.nb) ? 1 : 0;
   T.weathers = [...new Set([...T.weathers, ...(D.weathers || [D.weather])])];
-  T.earned += (S.earnFish || 0) + (S.earnWork || 0); T.crafted += HOURS*WAGE;
+  T.earned += (S.earnFish || 0) + (S.earnWork || 0); T.crafted += HOURS*wage;
 }
 // a one-letter word stays with the next one, and a dash with the word before it (no-break spaces, in the font)
 const tie = s => s.replace(/ —/g, '\u00a0—').replace(/(^|\s)([вВиИаАсСуУкКоО]) /g, '$1$2\u00a0').replace(/(^|\s)([вВиИаАсСуУкКоО]) /g, '$1$2\u00a0');
@@ -3832,19 +3834,26 @@ function openBook(){
 }
 function closeBook(){ bookOpen = false; render(); }
 // a day saved before S.trail: its way so far from the journal's lines (a trip by its arrival, an hour at home by the
-// line written when it was over); at the evening, the hours «Мастерить до вечера» took, which wrote no line then
+// line written when it was over); at the evening, the hours «Мастерить до вечера» took, which wrote no line then: from
+// the hour he was back home to the evening, if the day earned more at the tackle than its hour lines say. Counted in
+// hours, not in money: a day saved before the tackle paid 5 an hour paid 10
 const IDLE_LINES = ['Посидел у окна.', 'Попил чаю, посмотрел в окно.', 'Посидел в полумраке, послушал ходики.', 'Посидел просто так.', KETTLE];
 function trailFromLog(){
   const trail = [], at = e => parseInt(e.t, 10) - START, arrived = {'Деревня. Бабки на лавке у магазина.': 'shop'};
   WATERS.forEach(w => { arrived[`${NAME[w]}. Закинул удочку.`] = w; });
+  let paid = 0;   // what the hour lines at the tackle say they earned
   for (const e of S.log){
     if (!e || typeof e.text !== 'string' || !Number.isFinite(at(e))) continue;
+    const m = /^Мастерил снасти, \+(\d+) ₽\.$/.exec(e.text);
     if (arrived[e.text]) trail.push({k: arrived[e.text], t: at(e)});
-    else if (/^Мастерил снасти, \+\d+ ₽\.$/.test(e.text)) trail.push({k: 'craft', t: at(e) - 1});
+    else if (m){ trail.push({k: 'craft', t: at(e) - 1}); paid += +m[1]; }
     else if (IDLE_LINES.includes(e.text)) trail.push({k: 'idle', t: at(e) - 1});
   }
-  const n = S.phase === 'evening' ? Math.round((S.earnWork || 0)/WAGE) - trail.filter(e => e.k === 'craft').length : 0;
-  if (n > 0) trail.push({k: 'craft', t: HOURS - n, n});
+  const last = trail[trail.length - 1], P = S.presence || {};
+  // back home: after the last hour at home, the hours sat at the last water (the walk home takes none), or the village
+  const home = !last ? 0 : last.k === 'craft' || last.k === 'idle' ? last.t + 1
+    : WATERS.includes(last.k) ? last.t + ((P[last.k] || []).filter(h => h >= last.t).length) : last.t;
+  if (S.phase === 'evening' && (S.earnWork || 0) > paid && home < HOURS) trail.push({k: 'craft', t: home, n: HOURS - home});
   return trail;
 }
 addEventListener('resize', () => { fitEvening(); aimAll(); fitLog(); });
