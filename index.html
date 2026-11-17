@@ -191,9 +191,9 @@
 //     Each shows at three sites on the water that the seed picks (an integer; the game's number for the day, the hour
 //     and the place; in sun the bubbles keep clear of the hour's glints, so there the hour picks too), never by the
 //     float, at an uneven pace of its own: a splash every 5-9 s, a boil every 1-2 s, a chain of bubbles every 6-10 s,
-//     midges all the time. The first show comes within about 2 s of the signs being given (create, or a set() that
-//     changes the signs or the seed). Only on the waters (river, omut, lake); never with baked. With reduced motion
-//     and nothing playing each sign is drawn still, at its first site.
+//     midges all the time. The first show comes about 0.6 to 2.7 s after the signs are given (a boil's within 1.2 s,
+//     the midges' at once; create, or a set() that changes the signs or the seed). Only on the waters (river, omut,
+//     lake); never with baked. With reduced motion and nothing playing each sign is drawn still, at its first site.
 //     life is the hour's drawn life around the water, as the game picked it for the journal: {kind: id} (or the id), one
 //     of LiveScenes.LIFE[place], e.g. a log drifting down the river. It is in sight from the start, plays out slowly by
 //     the time since it was given (create, or a set() that changes the life, the seed or the place) and the seed, and
@@ -303,8 +303,9 @@ const ANCHORS = {
     reflection: {c: [44, 54, 50], y: 86},   // the wall's reflection: rect(x, 86, 3, randint(6, 14), (44, 54, 50)) for x in
                                             // range(10, 120, 6), hanging from the top of the pool
     bank: {y: 84, x: [40, 47, 56, 64, 72, 80]},   // the far bank: rect(0, 84, W, 96, (58, 66, 50)) under the spruce wall,
-                                            // with the pool's ellipse([-20, 84, 150, 150]) at row 85 for x 40..90, where a
-                                            // beast standing on row 84 drinks
+                                            // and the pool's ellipse([-20, 84, 150, 150]) over it from row 84 for x 51..79
+                                            // (row 85 for x 40..90): a beast's feet on row 84 stand on the strip of bank
+                                            // or, in the middle, at the very edge of the water, where it drinks
     circle: [28, 12, 12, 3],            // the gap of sky over the pool, rect(0, 0, W, 40, sky2), on its left, where the spires
                                         // of the spruce wall stay below row 19 for x 14..42: the sun of the hawk's hours
                                         // (11-15, sunPath) crosses the gap at x 55..94 and would put the bird on its disc
@@ -319,7 +320,7 @@ const ANCHORS = {
     tufts: [0, 136, 130, 44],           // all the sedge's tufts on the shore
     circle: [100, 45, 10, 3],           // over the round hill: top = 52 + 14 * min(1, ((x - 90) / 40) ** 2), its top at x 90;
                                         // under the 15:00 sun's halo (down to row 38), the lowest of the hawk's hours (11-15)
-    hover: [72, 47],                    // over the hill's slope (row 55 at x 72), into the wind
+    hover: [72, 47],                    // over the hill's slope (row 54 at x 72), into the wind
     sky: [10, 30],                      // high over the lake
     bank: {y: 85, x: [8, 122]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
                                         // walks along row 85 between these x
@@ -630,8 +631,10 @@ function makePlace(name, rgba) {
     if (P.clean[p] !== RED || P.clean[p + W] !== RED || P.clean[p + 2 * W] !== PAPER) warn('the float');
     P.float = {x, y, under: P.clean[p + 2 * W - 1], underK: P.cls[p + 2 * W - 1]};
     // The quiet box: the player reads the float for bites, so by it the water keeps its still picture. No whitecap,
-    // ring, glint or shimmer flickers there and the fog does not creep; weather.py's whitecaps and rings that fall in
-    // the box stay where it put them. The box runs from the top of the line (rod's float_dy 10) to the ripple under it.
+    // ring, glint, shimmer, sign or life flickers there and the fog does not creep; weather.py's whitecaps and rings
+    // that fall in the box stay where it put them. Only the float itself (in wind and downpour), a strike and the rain
+    // move there: the rain's streaks fall in front of the whole scene, the box too. The box runs from the top of the
+    // line (rod's float_dy 10) to the ripple under it.
     for (let yy = y - 12; yy <= y + 4; yy++) for (let xx = x - 4; xx <= x + 4; xx++) P.quiet[yy * W + xx] = 1;
   }
   // The calm round the box: 0 in it, rising to 1 at CALM_NEAR px from it (1 everywhere without a float). Glints and a
@@ -1355,7 +1358,8 @@ function pickSites(c, sd, taken) {   // three of the candidates c in the seed's 
   for (let j = 0; j < c.length; j += 3) { order.push(j); key[j] = noise(sd, c[j], c[j + 1]); }
   order.sort((a, b) => key[a] - key[b]);
   const sites = [], far = (x, y, s, r) => s.every(q => (q.x - x) ** 2 + (2 * (q.y - y)) ** 2 >= r * r);
-  for (const k of [1, .6, .3]) for (const j of order) {   // closer together only if there is no room
+  for (const k of [1, .6, .3, .15]) for (const j of order) {   // closer together only if there is no room (the lake's
+    // narrow zone right under the bank needs .15 now and then, with all six signs)
     if (sites.length >= 3) break;
     const x = c[j], y = c[j + 1];
     if (far(x, y, sites, SIGN_APART * k) && far(x, y, taken, SIGN_OTHERS * k)) sites.push({x, y, ways: c[j + 2]});
