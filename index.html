@@ -2704,11 +2704,13 @@ window.addEventListener('storage', onStorage);
 // screen (render) or the next hour (sit) takes it away at once, so a quick tap never carries it over to the evening.
 // It is told at a water, right under the hud on the side away from the old man (TOAST_SIDE): clear of his rod, also
 // when a strike raises it, and of the float on every phone; on a tall screen over the sky and the far bank, on the
-// shortest over the far side of the water.
+// shortest over the far side of the water. At 18:00 the village across the river lights up on the left, under the
+// river's toast: the toast of the river's last hour that comes with no rod raised (a quiet hour, a scare) goes to the
+// right there (EVENING_SIDE), over the hill; a strike's stays clear of the raised rod.
 // Its time runs only while the page is shown, as the scenes' clock does: a phone locked and unlocked finds it still there.
-const TOAST_SIDE = {river: 'left', omut: 'right', lake: 'left'}, TOAST_GAP = 10;
-function toast(text, ms=1300){
-  const el = $('toast'), side = TOAST_SIDE[S.loc] || '';
+const TOAST_SIDE = {river: 'left', omut: 'right', lake: 'left'}, EVENING_SIDE = {river: 'right'}, TOAST_GAP = 10;
+function toast(text, ms=1300, evening=false){
+  const el = $('toast'), side = (evening && EVENING_SIDE[S.loc]) || TOAST_SIDE[S.loc] || '';
   el.textContent = text; el.dataset.side = side;
   el.style.top = side ? `${Math.max($('hudTime').getBoundingClientRect().bottom, $('hudMoney').getBoundingClientRect().bottom)
     - el.parentNode.getBoundingClientRect().top + TOAST_GAP}px` : '';
@@ -3152,7 +3154,7 @@ async function sit(){
       await oneShot('scare');
     }
     else await wait(HOUR_MS);
-    if (!told) toast(what);
+    if (!told) toast(what, TOAST_MS, h + 1 >= HOURS);
     // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
     // a scare says nothing about the place (S.dry is null until the first hour that counts)
     if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
