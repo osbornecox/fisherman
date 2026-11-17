@@ -1171,11 +1171,13 @@ const SHOWS = {
     }
   }},
   midge: {always: true, draw(m, c, sd, dot, col) {   // a column of six midges, one over another, each dancing slowly up and
-    // down by its own height and now and then a pixel aside
+    // down by its own height and now and then a pixel aside. A midge moves only once in `hold` steps (4 to 7: up to a
+    // second), at its own moment, so the column stirs a midge at a time instead of fizzing
     for (let i = 0; i < 6; i++) {
-      const per = 2.8 + 1.6 * noise(sd, c, 10 + i), ph = noise(sd, c, 20 + i), hold = 3 + Math.floor(3 * noise(sd, c, 30 + i));
-      const y = -3 - Math.round(1.4 * i) + Math.round(1.5 * Math.sin(2 * Math.PI * (m * SIGN_STEP / FPS / per + ph)));
-      dot(Math.floor(3 * noise(sd + i, c, Math.floor(m / hold))) - 1, y, col, .75);
+      const per = 2.8 + 1.6 * noise(sd, c, 10 + i), ph = noise(sd, c, 20 + i), hold = 4 + Math.floor(4 * noise(sd, c, 30 + i));
+      const lag = Math.floor(hold * noise(sd, c, 40 + i)), j = Math.floor((m + lag) / hold), at = j * hold - lag;   // its last move
+      const y = -3 - Math.round(1.4 * i) + Math.round(1.5 * Math.sin(2 * Math.PI * (at * SIGN_STEP / FPS / per + ph)));
+      dot(Math.floor(3 * noise(sd + i, c, j)) - 1, y, col, .75);
     }
   }},
 };
