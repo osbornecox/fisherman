@@ -140,6 +140,7 @@
      screen with the journal at its three lines still fits the screen */
   @media (max-height: 620px) {
     :root { --reserve: 266px; }
+    .actions { padding-bottom: calc(8px + var(--bot)); }   /* 4px less under the buttons: the izba fits a 548px screen too */
     .scene { max-height: max(calc(min(100vw, 430px) * .8), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
              max-height: max(calc(min(100vw, 430px) * .8), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
     /* and the evening's scene may shrink to a strip, so the whole hour grid and the question stay above the buttons */
