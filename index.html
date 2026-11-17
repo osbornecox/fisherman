@@ -306,8 +306,8 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 // bird flies at is from y0 up to (not with) y1, and it drifts up to 5 rows up or down over a crossing, the geese's
 // wedge spanning that row -6..+9 and the cranes' line 0..+9; bank, the row the far bank's beasts stand on and the
 // left edges they may take (or the two ends of the shore a beast's walk starts between); lilies, the buds of the water
-// lilies [x, y]; hover, [x, y], where a bird of prey hangs on the wind; perch, the top of the dead trunk a raven sits
-// on.
+// lilies [x, y]; hover, [x, y], where a bird of prey hangs on the wind; perch, the pixel of the dead trunk a raven's
+// foot is on.
 // The game shows a scene whole across, standing on its bottom edge: a shorter phone loses the top rows (the 375x548
 // screen shows rows 76 and below, 320x568 rows 57, 375x667 rows 38, 390x664 rows 44), and the hud's two chips lie
 // over its top corners, about 18 rows deep, from the left edge to x 50 and from x 97 to the right edge (x 59 and 92
@@ -373,7 +373,9 @@ const ANCHORS = {
                                         // 375x667 shows its lowest birds now and then, 390x664 (rows 44 and below) none
     bank: {y: 85, x: [50, 84]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
                                         // starts between these x, between the hud's chips, and walks along row 85
-    perch: [112, 94],                   // the shorter dead trunk: rect(112, 112 - 18, 1, 18, (110, 104, 96)), its top pixel
+    perch: [113, 104],                  // the stub on the right of the shorter dead trunk, rect(112, 112 - 18, 1, 18):
+                                        // px(tx + 1, 112 - th + 10); the trunk's top (row 94) is under the money chip on
+                                        // the 375x548 screen (down to row 96), the stub and the raven on it (101..103) not
   },
 };
 
@@ -1693,7 +1695,7 @@ const LIVES = {
     let turns = 0; for (let i = 0; i < j; i++) turns += noise(sd, i, 4) < .5;   // it turned at these blocks' moments
     if (o >= at && noise(sd, j, 4) < .5) turns++;
     const S = LIFE_ART[o >= at && o < at + 3 && noise(sd, j, 4) >= .5 ? 'ravenShift' : 'raven'], flip = (turns & 1) === 1;
-    sprite(S, flip ? px - S.w + 3 : px - 2, py - 1 - S.feet, flip, 1);   // its foot (column 2 facing left) on the trunk's top
+    sprite(S, flip ? px - S.w + 3 : px - 2, py - 1 - S.feet, flip, 1);   // its foot (column 2 facing left) on the perch
   },
   lilies(g, L, m) {
     for (let i = 0; i < g.flowers.length; i++) {
