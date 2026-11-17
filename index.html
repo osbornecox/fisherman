@@ -2463,6 +2463,65 @@ const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1
   '4-1':'Туман сошёл, выглянуло солнце.', '4-0':'Туман поднялся, небо серое.', '5-2':'Ливень стих, моросит.'};
 const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Разве что омут под лесом.', 'В туман на реке обычно берёт ровно.', 'В ливень поплавок колотит каплями, рыба почти не берёт. В омуте под лесом потише.'];
 
+// ---------- household numbers ----------
+// What life takes from the piggy bank, every evening (the household block below): food, kerosene and soap run out,
+// tackle and tools wear, now and then something breaks, the summer asks for its things, now and then a treat. It
+// never touches the fish or the decisions. A purchase never waits: what is needed is bought that evening, and the
+// piggy bank may go below zero, into debt, with no other effect. A day never costs less than a day of tackle
+// (LIFE_MIN), about 65 on average, and no day much more: what runs out soon is bought ahead on a light day, and a big
+// thing is paid in parts. Keep these numbers and should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
+// GOODS: what one purchase costs and how many days it lasts (`acc`: its name after «на» and «за»); the morning's words
+// when it is low, two days left (`low`), and on its last day (`out`); a good with no words is bought without a thought.
+// The last four are tackle and tools that wear.
+const GOODS = {
+  milk:     {acc:'молоко', price:20, days:1},
+  bread:    {acc:'хлеб', price:30, days:5, low:'Хлеб почти весь.', out:'Хлеба нет.'},
+  sugar:    {acc:'сахар', price:30, days:5, low:'Сахару на пару дней.', out:'Сахар кончается.'},
+  flour:    {acc:'муку', price:20, days:8, out:'Мука кончается.'},
+  pasta:    {acc:'макароны', price:15, days:5, out:'Макарон почти нет.'},
+  groats:   {acc:'крупу', price:15, days:5, out:'Крупы осталось немного.'},
+  tea:      {acc:'чай', price:30, days:8, out:'Чай на донышке.'},
+  oil:      {acc:'масло', price:30, days:10, out:'Масло кончается.'},
+  kerosene: {acc:'керосин', price:15, days:8, low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит — керосин нужен.'},
+  soap:     {acc:'мыло', price:10, days:8},
+  salt:     {acc:'соль', price:5, days:15, out:'Соль на донышке.'},
+  matches:  {acc:'спички', price:5, days:10, low:'Спичек осталось немного.', out:'Надо спичек.'},
+  line:     {acc:'леску', price:25, days:12},
+  hooks:    {acc:'крючки', price:10, days:5},
+  nails:    {acc:'гвозди', price:15, days:8},
+  tar:      {acc:'смолу', price:30, days:20},
+};
+// what breaks now and then (never in a new game's first BREAK_FROM days, never two close together): the morning's
+// words, and what is bought for it that evening
+const BREAKS = {
+  roof:   {acc:'доску', price:50, thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
+  glass:  {acc:'стекло', price:70, thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
+  bucket: {acc:'ведро', price:35, thought:'Ведро дало течь.'},
+  shovel: {acc:'лопату', price:35, thought:'Лопата треснула по черенку.'},
+  saw:    {acc:'точильный камень', price:25, thought:'Пила тупая — камень нужен.'},
+};
+// once a summer (SUMMER days, then it comes round again), on a morning between days `from` and `to` of it: the thought,
+// and that evening the thing
+const SEASON = {
+  net:   {acc:'накомарник', price:30, from:3, to:10, thought:'Комары замучили — накомарник нужен.'},
+  seeds: {acc:'семена', price:30, from:10, to:20, thought:'Огород бы посадить, срок подходит.'},
+  socks: {acc:'носки', price:40, from:35, to:45, thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
+  boots: {acc:'сапоги', price:150, from:70, to:85, thought:'К осени сапоги бы новые.'},
+};
+const TREATS = {gingerbread: {acc:'пряники', price:15}, condensed: {acc:'сгущёнку', price:20}};   // every TREAT_GAP days, no thought
+// the morning when nothing in the house asks for a thought
+const THOUGHTS = ['Проснулся до света.', 'Поясница ныла к ночи. К дождю, что ли.', 'Снилось что-то, не вспомнить.',
+  'Тихо во дворе, птицы ещё молчат.', 'Ночью где-то далеко собака лаяла.', 'Ходики идут, а кукушка молчит.', 'Утро. Чай — и на воду.'];
+const LIFE_MIN = HOURS*WAGE;      // a day never costs less than a day of tackle
+const LIFE_TOP = LIFE_MIN + 5;    // buying ahead fills a day up to here
+const PART_TOP = 70;              // a part of a big thing lifts a day up to here
+const LIFE_MAX = 85;              // a thing that would lift a day past this is paid in parts
+const LOOK_LOAD = 75, LOOK_TOP = 80;   // when the next two days' run-outs come to more, some are bought today, up to LOOK_TOP
+const AHEAD = 4, NEED_DAYS = 2;   // bought ahead with AHEAD days left; thought of in the morning with NEED_DAYS left
+const BIG = 50, PART = 30, PART_MIN = 10;   // a thing from BIG up is paid in parts of up to PART, at least PART_MIN
+const SUMMER = 90, TREAT_GAP = [8, 12];
+const BREAK_FROM = 10, BREAK_GAP = 8, BREAK_P = .2, BREAK_ROOM = 40;   // a breakdown: on a quiet morning whose evening's run-outs are BREAK_ROOM or less
+
 // ---------- daylight ----------
 // The outdoor places are living scenes: the engine (scenes.js, the script before this one) paints each from its clean
 // picture in the weather of the hour, lights it for the hour, and lets the clouds, the smoke and the water move. The
@@ -2601,6 +2660,7 @@ let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
   S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647) };
+  newHouse();
 }
 function genDay(){
   const weather = pick(WEATHER_P);   // the morning
@@ -2656,8 +2716,119 @@ function startDay(){
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
   S.signs = {};   // the signs lookAround() wrote, by water and hour
-  S.phase = 'izba';
+  S.phase = 'izba'; S.purchases = [];   // nothing bought yet today
   logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
+  logAdd(0, morningThought());   // the first thought of the day, at 6:00
+}
+
+// ---------- the household ----------
+// What life takes, by the household numbers at the top. Its draws come from hashOf() (the game's number for its
+// scenes, the day and a tag), never from rnd(): the fishing days stay as they were, and a reload gives the same thoughts
+// and purchases. State, all saved: S.stock, the days each good still lasts counting today (bought on the evening it
+// comes to 0); S.house, what is owed for big things, this morning's breakdown and thought, the summer's purchases, the
+// next treat and the last background thought; S.purchases, what the evening bought, [{id, price, part}], `part` 'first',
+// 'more' or 'last' for a big thing paid in parts (nameOf(id) is its name after «на» or «за»).
+const HOUSE_TAG = 0x484f5553;
+function hashOf(...vals){   // a number in [0, 1) from the game's number and vals
+  let x = S.sceneSeed | 0;
+  for (const v of vals){ x = Math.imul(x ^ (v | 0), 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16; }
+  return (x >>> 0) / 4294967296;
+}
+const hh = (...v) => hashOf(HOUSE_TAG, S.day, ...v);
+const GOOD_IDS = Object.keys(GOODS);
+const nameOf = id => (GOODS[id] || BREAKS[id] || SEASON[id] || TREATS[id]).acc;
+// the household of a new game, or of a game saved before it had one, from the evening of day `from`: that evening milk,
+// bread and a cheap good run out, the next one sugar and another (a day of tackle a little short, then a little more),
+// the rest later, each on the least loaded day between a third of its days and all of them
+function newHouse(from = S.day){
+  const hf = (...v) => hashOf(HOUSE_TAG, from, ...v), stock = {}, load = {};
+  const put = (g, d) => { stock[g] = d; load[d] = (load[d] || 0) + GOODS[g].price; };
+  const one = (list, k) => list[Math.floor(hf(k)*list.length)];
+  const first = one(GOOD_IDS.filter(g => GOODS[g].price === 15), 12);
+  const second = one(GOOD_IDS.filter(g => g !== first && GOODS[g].days > 1 && (GOODS[g].price === 15 || GOODS[g].price === 20)), 13);
+  put('milk', 1); put('bread', 1); put(first, 1); put('sugar', 2); put(second, 2);
+  GOOD_IDS.filter(g => !(g in stock)).sort((a, b) => hf(14, GOOD_IDS.indexOf(a)) - hf(14, GOOD_IDS.indexOf(b))).forEach((g, i) => {
+    let best = 3, low = Infinity;
+    for (let d = Math.max(3, Math.ceil(GOODS[g].days*.3)); d <= Math.max(3, GOODS[g].days); d++){
+      const l = (load[d] || 0) + hf(15, i, d); if (l < low){ low = l; best = d; } }
+    put(g, best);
+  });
+  S.stock = stock; S.purchases = [];
+  S.house = {from, owe: [], broke: null, said: null, lastBreak: from, lastBroke: null, season: {}, treat: from + 5 + Math.floor(hf(3)*6), thought: -1};
+}
+// The morning's thought, by priority: the season's thing on the last day of its time; what runs low, NEED_DAYS or
+// fewer days left (the good with the fewest, and a second one when both are on their last day); what broke, only on a
+// morning when nothing runs low and the evening has room, so it is told and never piles on; the season's thing in its
+// time; else a background thought, never the last one again. Never about the fish.
+function morningThought(){
+  const H = S.house, cyc = (S.day - 1) % SUMMER + 1, yr = Math.floor((S.day - 1)/SUMMER);
+  const season = ids => ids.find(s => H.season[s] !== yr && cyc >= SEASON[s].from && cyc <= SEASON[s].to);
+  const say = (kind, id, text) => { H.said = {kind, id}; return text; };
+  H.broke = null; H.said = null;
+  const last = season(Object.keys(SEASON).filter(s => cyc === SEASON[s].to));
+  if (last) return say('season', last, SEASON[last].thought);
+  const low = GOOD_IDS.filter(g => GOODS[g].out && S.stock[g] <= NEED_DAYS).sort((a, b) => S.stock[a] - S.stock[b] || GOODS[b].days - GOODS[a].days);
+  if (low.length){
+    const words = g => S.stock[g] > 1 && GOODS[g].low || GOODS[g].out;
+    const two = low.length > 1 && S.stock[low[1]] <= 1, w2 = two ? words(low[1]) : '';
+    return say('need', low[0], words(low[0]) + (two ? ' И ' + w2.charAt(0).toLowerCase() + w2.slice(1) : ''));
+  }
+  const tonight = GOOD_IDS.reduce((s, g) => s + (S.stock[g] <= 1 ? GOODS[g].price : 0), 0);
+  if (S.day > BREAK_FROM && S.day - H.lastBreak >= BREAK_GAP && tonight <= BREAK_ROOM && hh(1) < BREAK_P){
+    const ids = Object.keys(BREAKS).filter(b => b !== H.lastBroke), b = ids[Math.floor(hh(2)*ids.length)];
+    H.broke = H.lastBroke = b; H.lastBreak = S.day;
+    return say('break', b, BREAKS[b].thought);
+  }
+  const due = season(Object.keys(SEASON));
+  if (due) return say('season', due, SEASON[due].thought);
+  const pool = THOUGHTS.map((_, i) => i).filter(i => i !== H.thought), i = pool[Math.floor(hh(4)*pool.length)];
+  H.thought = i;
+  return say('thought', i, THOUGHTS[i]);
+}
+// The evening: what is bought and paid today; sets S.purchases and returns the sum. What ran out is bought, then what
+// broke this morning and the season's thing thought of, and a treat when one is due and the day has room. When the next
+// two days would see much run out at once, some of it is bought today. Then, while the day is under LIFE_MIN: what
+// would be thought of tomorrow, a part of what is owed for a big thing (up to PART_TOP), what runs out within AHEAD days
+// (each up to LIFE_TOP), and at last the cheapest good not yet full.
+function spendDay(){
+  const H = S.house, buy = [];
+  let sum = 0;
+  const add = (id, price, part) => { buy.push(part ? {id, price, part} : {id, price}); sum += price; };
+  const ahead = g => { S.stock[g] += GOODS[g].days; add(g, GOODS[g].price); };
+  const take = (id, price) => {   // a big thing, or one the evening has no room for, is paid in parts
+    const first = Math.max(PART_MIN, Math.min(price >= BIG ? PART : price, Math.floor((LIFE_MAX - sum)/10)*10));
+    if (first < price){ add(id, first, 'first'); H.owe.push({id, left: price - first}); } else add(id, price);
+  };
+  for (const g of GOOD_IDS) if (--S.stock[g] <= 0){ S.stock[g] += GOODS[g].days; add(g, GOODS[g].price); }
+  if (H.broke) take(H.broke, BREAKS[H.broke].price);
+  if (H.said && H.said.kind === 'season'){ H.season[H.said.id] = Math.floor((S.day - 1)/SUMMER); take(H.said.id, SEASON[H.said.id].price); }
+  if (S.day >= H.treat){
+    const ids = Object.keys(TREATS), t = ids[Math.floor(hh(5)*ids.length)];
+    if (sum + TREATS[t].price <= LIFE_TOP){ add(t, TREATS[t].price); H.treat = S.day + TREAT_GAP[0] + Math.floor(hh(6)*(TREAT_GAP[1] - TREAT_GAP[0] + 1)); }
+  }
+  // the goods not bought today, the fewest days left first; `all`: also those with more than a purchase's days left
+  const free = all => GOOD_IDS.filter(g => GOODS[g].days > 1 && !buy.some(b => b.id === g) && (all || S.stock[g] <= GOODS[g].days))
+    .sort((a, b) => S.stock[a] - S.stock[b] || GOODS[a].price - GOODS[b].price);
+  if (S.day > H.from) for (let d = 1; d <= 2; d++) for (;;){
+    const due = free(true).filter(g => S.stock[g] === d), load = GOODS.milk.price + due.reduce((s, g) => s + GOODS[g].price, 0);
+    const g = due.filter(g => sum + GOODS[g].price <= LOOK_TOP).sort((a, b) => GOODS[b].price - GOODS[a].price)[0];
+    if (load > LOOK_LOAD && g) ahead(g); else break;
+  }
+  const quiet = g => !!GOODS[g].out && S.stock[g] <= NEED_DAYS;   // would be thought of tomorrow morning
+  const fill = only => { for (;;){
+    const g = free(false).sort((a, b) => quiet(b) - quiet(a)).find(g => S.stock[g] <= AHEAD && (!only || quiet(g)) && sum + GOODS[g].price <= LIFE_TOP);
+    if (!g || sum >= LIFE_MIN) return; ahead(g); } };
+  fill(true);
+  H.owe.forEach(o => {
+    if (buy.some(b => b.id === o.id) || sum >= PART_TOP) return;
+    const part = Math.min(o.left, PART, Math.max(PART_MIN, Math.ceil((PART_TOP - sum)/10)*10));
+    o.left -= part; add(o.id, part, o.left ? 'more' : 'last');
+  });
+  H.owe = H.owe.filter(o => o.left > 0);
+  fill(false);
+  while (sum < LIFE_MIN){ const f = free(false), h = f.length ? f : free(true); ahead(h.reduce((m, g) => GOODS[g].price < GOODS[m].price ? g : m)); }
+  S.purchases = buy;
+  return sum;
 }
 
 // ---------- helpers ----------
@@ -2672,6 +2843,13 @@ function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({S, seed}));
 function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){
   if (v.S.phase === 'winter') return false;   // the old 35-day season ended in winter: a new game
   S = v.S; seed = Number.isFinite(v.seed) ? v.seed >>> 0 : Math.floor(Math.random()*1e9);   // a broken seed would hang rnd()
+  // saved before the scenes showed the signs: a number for the game's scenes from the saved draws (the same until the
+  // next save keeps it); the household draws from it too
+  if (!Number.isInteger(S.sceneSeed)) S.sceneSeed = seed % 2147483647;
+  // saved before the household: it starts now, its first evening this day's (the next one's, when saved at the
+  // evening); the money stays as it was
+  if (!S.stock || typeof S.stock !== 'object' || !S.house || typeof S.house !== 'object') newHouse(S.phase === 'evening' ? S.day + 1 : S.day);
+  if (!Array.isArray(S.purchases)) S.purchases = [];
   // saved when the day was 8 or 10 hours long, or before the water had its events (in the 8-hour days too): the
   // evening goes on to a new day, a day in progress starts again without what it had earned
   if (S.D && (!S.D.boil || (S.D.level && S.D.level.river.length !== HOURS))){
@@ -2680,9 +2858,7 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   }
   if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
   S.noPower = S.noPower === true;   // saved before the days without power: the power is on
-  // saved before the scenes showed the signs: a number for the game's scenes from the saved draws (the same until the
-  // next save keeps it), and the hour at a water gets its signs back from its journal lines
-  if (!Number.isInteger(S.sceneSeed)) S.sceneSeed = seed % 2147483647;
+  // saved before the scenes showed the signs: the hour at a water gets its signs back from its journal lines
   if (!S.signs || typeof S.signs !== 'object'){
     S.signs = {};
     if (S.D && WATERS.includes(S.loc) && S.t < HOURS && Array.isArray(S.log)){
@@ -2863,7 +3039,8 @@ function hud(){
   const left = S.D ? Math.max(0, HOURS - S.t) : 0;   // hours of the day left
   $('hudTime').innerHTML = S.phase==='evening' ? `День ${S.day} · вечер`
     : S.D ? `День ${S.day} · ${clock(Math.min(S.t, HOURS))}<small>до вечера ${left} ч</small>` : `День ${S.day}`;
-  $('hudMoney').innerHTML = `${S.money} ₽<small>в копилке</small>`;
+  // below zero the piggy bank is in debt, with a true minus sign (the font has it)
+  $('hudMoney').innerHTML = S.money < 0 ? `−${-S.money} ₽<small>в долгу</small>` : `${S.money} ₽<small>в копилке</small>`;
 }
 
 function moveButtons(){
@@ -3178,9 +3355,10 @@ async function sit(){
 }
 function endDay(){
   if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
-  const earned = S.earnFish + S.earnWork;
+  const earned = S.earnFish + S.earnWork, spent = spendDay();
+  S.money -= spent;   // what life took today (S.purchases): the evening's remainder is the next morning's money
   // the day's length and the pay for an hour of tackle: the evening counts crafting alone day by day
-  S.history.push({day:S.day, earned, hours:HOURS, wage:WAGE});
+  S.history.push({day:S.day, earned, hours:HOURS, wage:WAGE, spent});
   S.phase = 'evening'; save(); render();
 }
 // the best the day could give, knowing every hour: the moves the game has (an hour of tackle at home, a trip to a
@@ -3233,13 +3411,14 @@ function eveningHTML(){
   // crafting alone over all the days, each day by its own length and pay: days saved before the length was kept had
   // 10 hours, days saved before the pay was kept paid 10 an hour
   const homeAll = S.history.reduce((s, e) => s + (e.hours || 10)*(e.wage || 10), 0);
+  const earnedAll = S.history.reduce((s, e) => s + e.earned, 0);   // what was earned, before life took its share
   return `<div class="title">Итог дня ${S.day}</div>
     <div class="sum"><span>Рыба</span><b>+${S.earnFish} ₽</b><span>Снасти</span><b>+${S.earnWork} ₽</b>
     <span>Всего</span><b>+${earned} ₽</b><span>Если бы весь день снасти</span><b>+${HOURS*WAGE} ₽</b>
     ${best.label === BEST_NONE ? '' : `<span class="best">Лучший вариант: ${best.label}</span><b>+${best.val} ₽</b>`}</div>
     <div class="reveal" style="--hours:${HOURS}">${rows}</div>
     <div class="note">Рамка — где вы сидели. Цифры — сколько рыбы попалось бы за час. ${wLine} ${nbLine} ${verdict}</div>
-    <div class="note">Всего за ${S.day} ${plural(S.day,'день','дня','дней')}: ${S.money} ₽. Одни снасти дома дали бы ${homeAll} ₽.</div>`;
+    <div class="note">Всего за ${S.day} ${plural(S.day,'день','дня','дней')}: ${earnedAll} ₽. Одни снасти дома дали бы ${homeAll} ₽.</div>`;
 }
 // The evening keeps room (--eve) for the best plan in two lines; a longer plan gets the room of its lines past two,
 // so the whole hour grid stays above the buttons. Measured, as the lines depend on the width and the font: again
