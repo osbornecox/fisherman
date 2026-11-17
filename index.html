@@ -2835,9 +2835,10 @@ function morningThought(){
 }
 // The evening: what is bought and paid today; sets S.purchases and returns the sum. What ran out is bought, then what
 // broke this morning and the season's thing thought of, and a treat when one is due and the day has room. When the next
-// two days would see much run out at once, some of it is bought today. Then, while the day is under LIFE_MIN: what
-// would be thought of tomorrow, a part of what is owed for a big thing (up to PART_TOP), what runs out within AHEAD days
-// (each up to LIFE_TOP), and at last the cheapest good not yet full.
+// two days would see much run out at once, some of it is bought today. Then, while the day is under LIFE_MIN, what
+// would be thought of tomorrow; while it is under PART_TOP, a part of what is owed for a big thing; while it is under
+// LIFE_MIN again, what runs out within AHEAD days (each bought ahead only up to LIFE_TOP); and at last, if the day is
+// still under LIFE_MIN, the cheapest good not yet full.
 function spendDay(){
   const H = S.house, buy = [];
   let sum = 0;
