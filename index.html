@@ -116,6 +116,10 @@
                  font-size:18px; font-weight:500; text-shadow:0 2px 0 rgba(0,0,0,.35); }
   .story { gap:8px; }
   .story p { margin:0; }
+  /* the backstory scrolls: its picture is shown whole (river, cliff and forest at its top), the text under it, and
+     the button after the text, not over it */
+  .wrap.intro .scene { max-height: none; }
+  .wrap.intro .actions { position: static; }
   /* too low for the scene and the panel together (a short window): the page scrolls; a phone on its side gets .turn */
   @media (max-height: 540px) { .wrap.fit { height: auto; } }
   /* a phone with the browser's bars: a little less air in the panel, so the scene keeps more of its picture */
@@ -2801,6 +2805,7 @@ function render(){
   tapLock = performance.now() + TAP_LOCK;
   hud(); P.innerHTML='';
   $('wrap').classList.toggle('fit', FIT.has(S.phase));
+  $('wrap').classList.toggle('intro', S.phase === 'intro');
   $('wrap').classList.toggle('eve', S.phase === 'evening');
   $('wrap').classList.toggle('ask', S.phase === 'evening' && askRestart);   // the restart question needs room (--ask)
   if (S.phase !== shownPhase){ shownPhase = S.phase; if (window.scrollTo) scrollTo(0, 0); }   // a new screen starts at the top
