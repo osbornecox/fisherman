@@ -3643,11 +3643,16 @@ const dateWords = day => { const t = dayDate(day); return `${t.getUTCDate()} ${M
 const HOUR_GEN = ['двенадцати', 'часу', 'двух', 'трёх', 'четырёх', 'пяти', 'шести', 'семи', 'восьми', 'девяти', 'десяти', 'одиннадцати'];
 const hourGen = t => HOUR_GEN[(START + t) % 12];
 const WATER_GEN = {river: 'реки', omut: 'омута', lake: 'озера'};
-// a count of fish in words, as «рыба» wants it: «одна», «две», «двадцать пять»; past 99 in figures
+// a count of fish in words, as «рыба» wants it: «одна», «две», «двадцать пять»; past 99 in figures. acc: as the object
+// of a verb («брало двадцать одну»), which changes only «одна»
 const NUM_F = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять', 'десять', 'одиннадцать', 'двенадцать',
   'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
 const NUM_TENS = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
-const countWords = n => n < 1 || n > 99 ? String(n) : n < 20 ? NUM_F[n] : NUM_TENS[Math.floor(n/10)] + (n % 10 ? ' ' + NUM_F[n % 10] : '');
+const countWords = (n, acc = false) => {
+  if (n < 1 || n > 99) return String(n);
+  const s = n < 20 ? NUM_F[n] : NUM_TENS[Math.floor(n/10)] + (n % 10 ? ' ' + NUM_F[n % 10] : '');
+  return acc ? s.replace(/одна$/, 'одну') : s;
+};
 const fishWords = n => n ? `${countWords(n)} ${plural(n, 'рыба', 'рыбы', 'рыб')}` : 'ни одной';
 const noTotals = () => ({days: 0, water: 0, quiet: 0, home: 0, craft: 0, village: 0, nb: 0, weathers: [], earned: 0, crafted: 0});
 // The day as it went, from S.trail ({k, t, n}: n hours at home from hour t, at the tackle, 'craft', or not, 'idle';
@@ -3682,19 +3687,22 @@ function dayParts(){
 function dayProse(parts){
   const D = S.D, ws = D.weathers || [D.weather], w0 = ws[0], w1 = ws[ws.length - 1], trips = parts.some(p => p.k !== 'home');
   const date = `${dateWords(S.day)}. ${cap(WEATHER_NAME[w0])}${w1 !== w0 ? ', к обеду ' + WEATHER_NAME[w1] : ''}.`;
-  const said = parts.map((p, i) => {
+  const said = [];
+  parts.forEach((p, i) => said.push(sentence(p, i)));
+  function sentence(p, i){
     if (p.k === 'home'){
       if (!trips) return p.craft && p.craft >= p.idle ? 'Весь день дома, снасти.' : 'Весь день дома.';
       if (i === 0) return p.craft < 2 ? '' : p.to <= CHANGE_HOUR ? 'Утром дома, снасти.' : `До ${hourGen(p.to)} дома, снасти.`;
       return p.craft ? 'Потом дома, снасти.' : 'Потом дома.';
     }
-    if (p.k === 'shop'){   // straight after the morning at home: «Потом»
-      const r = p.rumor, then = i === 1 && parts[0].k === 'home' && parts[0].craft >= 2;
-      return `${then ? 'Потом' : p.t <= CHANGE_HOUR ? 'Утром' : 'Днём'} в деревню. `
-        + (r.w && r.lv ? `Говорят, ${WHERE[r.w]} ${r.lv === 2 ? 'берёт' : 'клюёт помаленьку'}.` : 'Говорят, нигде не клюёт.');
+    if (p.k === 'shop'){   // after anything already told: «Потом»; the village again: «опять», and its word only if new
+      const r = p.rumor, then = said.some(Boolean), before = parts.slice(0, i).filter(q => q.k === 'shop');
+      const heard = before.some(q => q.rumor.w === r.w && q.rumor.lv === r.lv);
+      return `${then ? 'Потом' : p.t <= CHANGE_HOUR ? 'Утром' : 'Днём'}${before.length ? ' опять' : ''} в деревню.` + (heard ? ''
+        : r.w && r.lv ? ` Говорят, ${WHERE[r.w]} ${r.lv === 2 ? 'берёт' : 'клюёт помаленьку'}.` : ' Говорят, нигде не клюёт.');
     }
     return p.to > p.from ? `${NAME[p.w]} с ${hourGen(p.from)} до ${hourGen(p.to)} — ${fishWords(p.fish)}.` : `Дошёл до ${WATER_GEN[p.w]} и повернул назад.`;
-  });
+  }
   if (!parts.length) said.push('Весь день дома.');
   const ev = EVENTS.map(f => f(parts)).find(Boolean);
   if (ev) said.splice(ev[0] < 0 ? said.length : ev[0] + 1, 0, ev[1]);
@@ -3704,7 +3712,6 @@ function dayProse(parts){
 // the day's events, the most notable first: each looks for its own in the day's parts and gives [the part it goes
 // after (-1: the end), its words], or nothing
 const EVENTS = [
-  parts => { const i = parts.findIndex(p => p.scare); return i >= 0 && [i, 'У берега мелькнула большая тень.']; },
   parts => { const i = parts.findIndex(p => p.nbLeft && S.D.nb.reason === 'full');
     return i >= 0 && [i, `Михалыч сидел до ${hourGen(S.D.nb.leave + 1)}, ушёл с полным ведром.`]; },
   parts => {   // the village's word, checked on the water the old man went to straight from it
@@ -3715,9 +3722,12 @@ const EVENTS = [
       if (!(r.w && r.lv) && v.fish !== 1) return [i + 1, v.fish ? 'Бабки наврали.' : 'Бабки не соврали.'];
     }
   },
-  parts => { const p = parts.filter(p => p.lost).sort((a, b) => b.lost - a.lost)[0];
-    return p && [parts.indexOf(p), p.lost === 1 ? 'Одна сорвалась.' : `${cap(countWords(p.lost))} сорвались.`]; },
   parts => { const i = parts.findIndex(p => p.boil); return i >= 0 && [i, 'У камыша плескало, потому и остался.']; },
+  // a pike's shadow comes an hour in twenty: after the neighbour's full bucket, the village's word and the reeds, so
+  // that it does not take the place of the rarer ones on most days at the water
+  parts => { const i = parts.findIndex(p => p.scare); return i >= 0 && [i, 'У берега мелькнула большая тень.']; },
+  parts => { const p = parts.filter(p => p.lost).sort((a, b) => b.lost - a.lost)[0];
+    return p && [parts.indexOf(p), `${cap(countWords(p.lost))} ${plural(p.lost, 'сорвалась', 'сорвались', 'сорвались')}.`]; },
   parts => { const i = parts.findIndex(p => p.nb);
     return i >= 0 && [i, !parts[i].nbLeft ? 'Михалыч сидел рядом.' : nbCaught() ? 'Михалыч ушёл, когда перестало клевать.' : 'Михалыч ушёл пустым.']; },
   parts => { const ws = S.D.weathers || [S.D.weather];   // a day at home in the rain
@@ -3732,7 +3742,8 @@ function ifLine(parts){
   const C = S.D.catchT, waters = parts.filter(p => p.k === 'water'), last = waters[waters.length - 1];
   if (last && last.to < HOURS){
     const n = C[last.w].slice(last.to).reduce((s, x) => s + x, 0);
-    return n >= 2 ? `Если бы остался, было бы ещё ${countWords(n)}. Жаль.` : n ? '' : 'Если бы остался, больше ничего не взял бы. Хорошо, что ушёл.';
+    const was = plural(n, 'была', 'было', 'было');   // «была бы ещё двадцать одна», «было бы ещё четыре»
+    return n >= 2 ? `Если бы остался, ${was} бы ещё ${countWords(n)}. Жаль.` : n ? '' : 'Если бы остался, больше ничего не взял бы. Хорошо, что ушёл.';
   }
   const best = bestPlan(), by = {};
   for (const r of best.runs){
@@ -3742,7 +3753,7 @@ function ifLine(parts){
   const top = Object.values(by).sort((a, b) => b.fish - a.fish)[0];
   if (top && !waters.some(p => p.w === top.w && p.to > p.from) && top.fish - S.fishToday >= 3){
     const from = START + top.from === 12 || START + top.from === 13 ? 'с обеда' : `с ${hourGen(top.from)}`;
-    return `А ${WHERE[top.w]} ${from} брало ${countWords(top.fish)}.`;
+    return `А ${WHERE[top.w]} ${from} брало ${countWords(top.fish, true)}.`;
   }
   return !best.runs.length && S.earnFish + S.earnWork < HOURS*WAGE ? 'Дома, за снастями, вышло бы больше.' : '';
 }
@@ -3809,7 +3820,9 @@ function bookHTML(){
   const pages = S.book.slice(), last = pages[pages.length - 1], today = S.phase === 'evening' && last && last.d === S.day ? pages.pop() : null;
   return `<div class="book">${S.totals.days ? `<div class="flyleaf">${flyleaf().map(s => `<p>${tie(s)}</p>`).join('')}</div>` : ''}`
     + pages.map(pg => `<div class="day">${pageHTML(pg)}</div>`).join('')
-    + `<div class="day">${today ? '' : `<p class="date">${dateWords(S.day)}.</p>`}<div class="rows">${logRows()}</div>${today ? pageHTML(today) : ''}</div></div>`;
+    // today: its date on top (at the evening the page's own date and weather), the journal, then the rest of the page
+    + `<div class="day"><p class="date">${today ? tie(today.p[0]) : `${dateWords(S.day)}.`}</p><div class="rows">${logRows()}</div>`
+    + `${today ? today.p.slice(1).map(s => `<p>${tie(s)}</p>`).join('') : ''}</div></div>`;
 }
 function openBook(){
   if (busy) return;
