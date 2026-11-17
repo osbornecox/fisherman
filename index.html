@@ -3380,9 +3380,10 @@ const LIFE_LINES = [
   {at: 'all', id: 'ladybird', f: 'some', w: '1', m: '9', s: 'По рукаву ползёт божья коровка.'},
   {at: 'all', id: 'gossamer', f: 'some', w: '1', h: '11-17', m: '9', s: 'На леске блестит паутинка.'},
   {at: 'all', id: 'raven', f: 'some', w: '01234', s: 'Над головой пролетел ворон, гулко крикнул.'},
-  // the old man himself: tea in the morning and a bite at noon
-  {at: 'all', id: 'tea', f: 'clock', w: '01234', h: '7-9', s: 'Налил чаю из термоса.'},
-  {at: 'all', id: 'lunch', f: 'clock', w: '01234', h: '12-13', s: 'Перекусил: хлеб, варёное яйцо, луковица.'},
+  // the old man himself: tea in the morning and a bite at noon. No tea on a day without power (the kettle is electric,
+  // the thermos was not filled), and no bread on its last day, when the morning finds «Хлеба нет.»
+  {at: 'all', id: 'tea', f: 'clock', w: '01234', h: '7-9', s: 'Налил чаю из термоса.', need: () => !S.noPower},
+  {at: 'all', id: 'lunch', f: 'clock', w: '01234', h: '12-13', s: 'Перекусил: хлеб, варёное яйцо, луковица.', need: () => !(S.stock && S.stock.bread <= 1)},
 ];
 const CUCKOO = ['два раза', 'три раза', 'четыре раза', 'пять раз', 'шесть раз', 'семь раз'];
 const LIFE_RARE = {season: .008, rare: .02};    // a rarer line's own chance in an hour it fits (times its q)
