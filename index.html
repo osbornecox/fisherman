@@ -23,9 +23,7 @@
   :root { --paper:#e6e0d2; --ink:#2b2925; --sub:#5a554c; --line:#2b2925; --red:#b5452f;
           --top: env(safe-area-inset-top, 0px); --bot: env(safe-area-inset-bottom, 0px);
           --reserve: 292px;     /* room the panel keeps under the scene on a day screen */
-          --eve: 404px;         /* on the evening: the sums (the best plan in two lines), the hour grid and the buttons */
-          --eve-more: 0px;      /* and the best plan's lines past two, when it has more (fitEvening) */
-          --ask: 0px; }         /* and the restart question with its buttons, while it is asked (.wrap.ask) */
+          --eve: 300px; }       /* on the evening: the page and the buttons, as fitEvening() measures them */
   * { box-sizing: border-box; }
   html, body { margin:0; background:#1d1c1a; color:var(--ink); font-family:'Stay Pixel', monospace; }
   body { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
@@ -40,11 +38,10 @@
   .scene { position: relative; flex: none; width: 100%; aspect-ratio: 130 / 180; overflow: hidden; background:#9ea7a8;
            max-height: max(calc(min(100vw, 430px) * 1.04), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
            max-height: max(calc(min(100vw, 430px) * 1.04), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
-  /* the evening scrolls, but its first screen shows the sums and the hour grid above the buttons: the scene gives way */
-  .wrap.eve .scene { max-height: max(calc(min(100vw, 430px) * .6), calc(100vh - var(--top) - var(--bot) - var(--eve) - var(--eve-more) - var(--ask)));
-                     max-height: max(calc(min(100vw, 430px) * .6), calc(100dvh - var(--top) - var(--bot) - var(--eve) - var(--eve-more) - var(--ask))); }
-  .wrap.ask { --ask: 36px; }
-  @media (max-width: 371px) { .wrap.ask { --ask: 56px; } }   /* the question takes two lines */
+  /* the evening fits the screen: the scene gives the page and the buttons the room they take (--eve, with the safe
+     area under the buttons), down to its floor; a page longer than that scrolls in its own box over the buttons */
+  .wrap.eve .scene { max-height: max(calc(min(100vw, 430px) * .6), calc(100vh - var(--top) - var(--eve)));
+                     max-height: max(calc(min(100vw, 430px) * .6), calc(100dvh - var(--top) - var(--eve))); }
   /* the scene's two layers, one fading in over the other; each holds a still picture or a living scene: a canvas
      scaled to the width and standing on the bottom edge, as the picture's object-fit: cover does */
   .scene .layer { position:absolute; inset:0; }
@@ -75,20 +72,36 @@
   .primary { min-height:54px; background:var(--ink); color:var(--paper); border:none; font-size:18px; font-weight:600; }
   .secondary { min-height:50px; background:transparent; border:2px solid var(--ink); font-size:14px; line-height:1.15; padding:4px; }
   .link { min-height:44px; background:transparent; border:none; font-size:15px; text-decoration:underline; }
-  /* the evening's hour grid: the waters' names, then a column for every hour of the day (eveningHTML sets --hours) */
-  .reveal { display:grid; grid-template-columns: 62px repeat(var(--hours), minmax(0,1fr)); gap:2px; font-size:12px; align-items:center; }
-  .reveal .h { text-align:center; color:var(--sub); }
-  .cell { height:22px; background:#d6cfbf; display:flex; align-items:center; justify-content:center; font-size:11px; }
-  .cell.you { box-shadow: inset 0 0 0 2px var(--ink); }
-  .cell.f { background:#9fb0a2; }
-  .cell.big { background:#c99a5a; }
-  .cell.na { background: repeating-linear-gradient(135deg, #d6cfbf 0 2px, transparent 2px 6px); opacity:.7; }   /* still on the way there */
-  .sum { display:grid; grid-template-columns: 1fr auto; gap:2px 10px; font-size:15px; }
-  .sum b { font-weight:600; }
-  /* the best plan breaks after its commas: a run stays on one line, and its hours never break (on a very narrow
-     screen a run may break after the water's name, or the plan would take a line for every run) */
-  .sum .run, .sum .hrs { white-space:nowrap; }
-  @media (max-width: 359px) { .sum .run { white-space:normal; } }
+  /* two quiet links side by side, in the height of one: in the izba «Мастерить до вечера» and the book, on the
+     evening the book and «Начать заново»; a long one breaks into two lines in its half */
+  .links { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; }
+  .links .link { line-height:1.1; padding:0 4px; }
+  /* the evening: a handwritten page, its lines plain text; it scrolls in its own box when the screen is too short
+     for it, and an edge with more text beyond it fades (.up, .down) */
+  .page { flex: 0 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; font-size:16px; line-height:1.35;
+          -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
+  .page p, .book p { margin:0; }
+  .page .date, .book .date { font-weight:600; }
+  .page.down { -webkit-mask-image: linear-gradient(#000 calc(100% - 1.6em), rgba(0,0,0,.15)); mask-image: linear-gradient(#000 calc(100% - 1.6em), rgba(0,0,0,.15)); }
+  .page.up { -webkit-mask-image: linear-gradient(rgba(0,0,0,.15), #000 1.6em); mask-image: linear-gradient(rgba(0,0,0,.15), #000 1.6em); }
+  .page.up.down { -webkit-mask-image: linear-gradient(rgba(0,0,0,.15), #000 1.6em, #000 calc(100% - 1.6em), rgba(0,0,0,.15));
+                  mask-image: linear-gradient(rgba(0,0,0,.15), #000 1.6em, #000 calc(100% - 1.6em), rgba(0,0,0,.15)); }
+  /* the book: the whole screen is paper (no scene, no hud) and scrolls; the flyleaf, then a page for every evening,
+     the newest at the bottom; today's page holds the journal hour by hour. A page off screen is not laid out until it
+     comes near (content-visibility), so a long book opens at once */
+  .wrap.book .scene { display:none; }
+  .wrap.book .panel { border-top:none; padding-top:18px; }
+  .book { display:flex; flex-direction:column; font-size:16px; line-height:1.35; user-select: text; -webkit-user-select: text; }
+  .book .flyleaf { display:flex; flex-direction:column; gap:6px; padding-bottom:14px; color:var(--sub); font-size:15px; }
+  .book .day { display:flex; flex-direction:column; gap:6px; padding:12px 0; border-top:1px solid #b9b1a0; content-visibility:auto; contain-intrinsic-size:auto 150px; }
+  .book .day:last-child { content-visibility:visible; }
+  .book > .day:first-child { border-top:none; padding-top:0; }
+  .book .rows { display:flex; flex-direction:column; gap:2px; font-size:15px; line-height:19px; }
+  .book .rows > div { display:flex; gap:8px; }
+  .book .tm { flex: 0 0 2.9em; color: var(--sub); }
+  .book .rows + p { margin-top:6px; }   /* today's evening, under its journal */
+  .wrap.book .actions::before { content:''; position:absolute; left:0; right:0; bottom:100%; height:20px; pointer-events:none;
+                                background:linear-gradient(rgba(230,224,210,0), var(--paper)); }   /* the page goes under the button softly */
   /* the journal: a frame (.log) round the lines that scroll (#log). It shows whole lines only: fitLog() gives it the
      room down to the buttons (on a short screen at least its last three lines), its top edge on the top of a line,
      scrolled to the newest line; while older lines lie above, its top edge fades (.more). Five lines until it is fitted.
@@ -129,7 +142,7 @@
   @media (max-height: 540px) { .wrap.fit { height: auto; } }
   /* a phone with the browser's bars: a little less air in the panel, so the scene keeps more of its picture */
   @media (max-height: 800px) {
-    :root { --reserve: 256px; --eve: 376px; }
+    :root { --reserve: 256px; }
     .panel { padding-top: 10px; gap: 8px; }
     .actions { gap: 6px; padding: 2px 0 calc(12px + var(--bot)); }
     .primary { min-height: 48px; }
@@ -143,9 +156,10 @@
     .actions { padding-bottom: calc(8px + var(--bot)); }   /* 4px less under the buttons: the izba fits a 548px screen too */
     .scene { max-height: max(calc(min(100vw, 430px) * .8), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
              max-height: max(calc(min(100vw, 430px) * .8), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
-    /* and the evening's scene may shrink to a strip, so the whole hour grid and the question stay above the buttons */
-    .wrap.eve .scene { max-height: max(calc(min(100vw, 430px) * .4), calc(100vh - var(--top) - var(--bot) - var(--eve) - var(--eve-more) - var(--ask)));
-                       max-height: max(calc(min(100vw, 430px) * .4), calc(100dvh - var(--top) - var(--bot) - var(--eve) - var(--eve-more) - var(--ask))); }
+    /* and the evening's scene may shrink to a strip, so the whole page stays above the buttons; the lamp under the
+       shade is at its top, the kerosene lamp on the sill is kept in sight by aim() */
+    .wrap.eve .scene { max-height: max(calc(min(100vw, 430px) * .4), calc(100vh - var(--top) - var(--eve)));
+                       max-height: max(calc(min(100vw, 430px) * .4), calc(100dvh - var(--top) - var(--eve))); }
   }
   /* a phone on its side: the game is made for an upright phone, so it only asks to turn it */
   .turn { display:none; }
@@ -2570,8 +2584,10 @@ const DIGITS = glyphs({0:'.XXX. XX.XX XX.XX XX.XX XX.XX XX.XX .XXX.', 1:'..XX. .
   8:'.XXX. XX.XX XX.XX .XXX. XX.XX XX.XX .XXX.', 9:'.XXX. XX.XX XX.XX .XXXX ...XX ...XX .XXX.'});
 const FONT3 = glyphs({'П':'XXX X.X X.X X.X X.X', 'Н':'X.X X.X XXX X.X X.X', 'В':'XX. X.X XX. X.X XX.', 'Т':'XXX .X. .X. .X. .X.',
   'С':'XXX X.. X.. X.. XXX', 'Р':'XXX X.X XXX X.. X..', 'Ч':'X.X X.X XXX ..X ..X', 'Б':'XXX X.. XXX X.X XXX'});
-// day 1 is Sunday the 15th, then the days go by a real calendar from 15 June; the month is not shown
-function dateOf(day){ const t = new Date(Date.UTC(2025, 5, 14 + day)); return [String(t.getUTCDate()), WEEKDAY[t.getUTCDay()], t.getUTCDay() === 0]; }
+// day 1 is Sunday the 15th, then the days go by a real calendar from 15 June; the month is not shown on the calendar
+// (the evening's page names it)
+const dayDate = day => new Date(Date.UTC(2025, 5, 14 + day));
+function dateOf(day){ const t = dayDate(day); return [String(t.getUTCDate()), WEEKDAY[t.getUTCDay()], t.getUTCDay() === 0]; }
 let izCache = {}, izMask = null;
 function izbaScene(open, weather, h, day, noPower = false){
   const key = `${open}/${weather}/${h}/${day}/${noPower}`;
@@ -2659,7 +2675,7 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
-  S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647) };
+  S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals() };
   newHouse();
 }
 function genDay(){
@@ -2716,6 +2732,7 @@ function startDay(){
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
   S.signs = {};   // the signs lookAround() wrote, by water and hour
+  S.trail = [];   // where the day went, for the evening's page
   S.phase = 'izba'; S.purchases = [];   // nothing bought yet today
   logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
   logAdd(0, morningThought());   // the first thought of the day, at 6:00
@@ -2868,6 +2885,12 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
     }
   }
   if (S.phase === 'morning'){ S.phase = 'izba'; S.curtain = false; }  // saved before the izba had a curtain and a yard
+  // saved before the evening was a page of the diary: the day's way so far from its journal, and an empty book; an
+  // evening saved then gets its page now (and a page that cannot be written leaves the game as it was)
+  if (!Array.isArray(S.trail)) S.trail = S.D && Array.isArray(S.log) ? trailFromLog() : [];
+  if (!Array.isArray(S.book)) S.book = [];
+  if (!S.totals || typeof S.totals !== 'object' || !Array.isArray(S.totals.weathers)) S.totals = noTotals();
+  if (S.phase === 'evening' && S.D && !(S.book.length && S.book[S.book.length - 1].d === S.day)) try { closePage(); } catch (e) {}
   delete S.path;   // the route was kept once and never shown
   return true; } }catch(e){} return false; }
 // another tab or the installed app saved the game: take its state, unless an hour is passing here
@@ -3056,23 +3079,32 @@ function moveButtons(){
 }
 
 // ---------- render ----------
-const FIT = new Set(['izba', 'yard', 'shop', 'water']);   // day screens fit the screen; the backstory and the evening scroll
+// day screens and the evening fit the screen; the backstory and the book scroll
+const FIT = new Set(['izba', 'yard', 'shop', 'water', 'evening']);
 let shownPhase = null;
 function render(){
   const P = $('panel'), hadFocus = !!document.activeElement && P.contains(document.activeElement);
   tapLock = performance.now() + TAP_LOCK;
   if (toast.fresh) toast.fresh = false; else hideToast();   // a toast is shown on the screen drawn right after it only
   hud(); P.innerHTML='';
-  $('wrap').classList.toggle('fit', FIT.has(S.phase));
+  if (bookOpen && S.phase !== 'izba' && S.phase !== 'evening') bookOpen = false;   // the book opens from the izba and the evening
+  const book = bookOpen, shown = book ? 'book' : S.phase;
+  $('wrap').classList.toggle('fit', !book && FIT.has(S.phase));
   $('wrap').classList.toggle('intro', S.phase === 'intro');
-  $('wrap').classList.toggle('eve', S.phase === 'evening');
-  $('wrap').classList.toggle('ask', S.phase === 'evening' && askRestart);   // the restart question needs room (--ask)
-  if (S.phase !== shownPhase){ shownPhase = S.phase; if (window.scrollTo) scrollTo(0, 0); }   // a new screen starts at the top
+  $('wrap').classList.toggle('eve', !book && S.phase === 'evening');
+  $('wrap').classList.toggle('book', book);
+  if (shown !== shownPhase){ shownPhase = shown; if (window.scrollTo) scrollTo(0, 0); }   // a new screen starts at the top
   document.querySelector('.hud').style.visibility = S.phase === 'intro' ? 'hidden' : '';
   const add = html => { const d=document.createElement('div'); d.innerHTML=html; while(d.firstChild) P.appendChild(d.firstChild); };
   const actions = document.createElement('div'); actions.className='actions';
+  const links = (...bs) => { const l = document.createElement('div'); l.className = 'links'; bs.forEach(b => l.appendChild(b)); return l; };
 
-  if (S.phase==='intro'){   // the backstory, once, before the very first day
+  if (book){   // the diary over the izba or the evening; the scene behind it stays as it is
+    add(bookHTML());
+    actions.appendChild(btn('Закрыть дневник', '', closeBook, 'primary'));
+  }
+
+  else if (S.phase==='intro'){   // the backstory, once, before the very first day
     setScene('story');
     add(`<div class="lines story">
       <p>Река, поля, лес. Среди этой сибирской природы затерялась деревенька.</p>
@@ -3091,7 +3123,7 @@ function render(){
     g.appendChild(btn('Мастерить снасти', `1 ч · +${WAGE} ₽`, craft, 'secondary', left < 1));
     g.appendChild(btn('Ничего не делать', '1 ч', idle, 'secondary', left < 1));
     actions.appendChild(g);
-    actions.appendChild(btn(`Мастерить до вечера · +${left*WAGE} ₽`, '', craftAll, 'link'));
+    actions.appendChild(links(btn(`Мастерить до вечера · +${left*WAGE} ₽`, '', craftAll, 'link'), btn('Полистать дневник', '', openBook, 'link')));
   }
 
   else if (S.phase==='yard'){   // outside the izba: where to go; back inside costs no time
@@ -3119,9 +3151,9 @@ function render(){
 
   else if (S.phase==='evening'){
     setScene('izbaEvening');   // nowWeather() is the last hour's weather: the evening comes with S.t = HOURS
-    add(eveningHTML()); fitEvening();
+    add(eveningHTML());
     actions.appendChild(btn('Лечь спать', '', nextDay, 'primary'));
-    if (!askRestart) actions.appendChild(btn('Начать заново', '', ()=>{ askRestart = true; render(); }, 'link'));
+    if (!askRestart) actions.appendChild(links(btn('Полистать дневник', '', openBook, 'link'), btn('Начать заново', '', ()=>{ askRestart = true; render(); }, 'link')));
     else {   // the second tap: the whole game is wiped; the question stays with the buttons, in sight
       const q = document.createElement('div'); q.className = 'note'; q.textContent = 'Начать всё заново? Дни и деньги не сохранятся.';
       actions.appendChild(q);
@@ -3133,7 +3165,7 @@ function render(){
   }
 
   P.appendChild(actions);
-  aimAll(); fitLog();
+  fitEvening(); aimAll(); fitLog();
   if (hadFocus){   // a keyboard or screen reader user stays on the buttons: the main one, or the first
     const b = P.querySelector('button.primary:not(:disabled)') || P.querySelector('button:not(:disabled)');
     if (b) b.focus({preventScroll: true});
@@ -3142,9 +3174,9 @@ function render(){
   if (S.D) warmUp();
 }
 function logAdd(t, text){ S.log.push({t: clock(t), text}); }
-function journal(){   // the time is written only on the first line of each hour; fitLog() sizes it
-  return `<div class="log"><div class="rows" id="log">${S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('')}</div></div>`;
-}
+// the journal's lines: the time is written only on the first line of each hour
+const logRows = () => S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('');
+function journal(){ return `<div class="log"><div class="rows" id="log">${logRows()}</div></div>`; }   // fitLog() sizes it
 // The journal shows whole lines. Its lines get the room from where they start down to the buttons, less the
 // frame's bottom and the panel's gap, and never fewer than its last LOG_MIN lines, even where a short screen has less
 // room; their top edge lies on the top of a line: an entry may show only its last lines, never a line cut in half. They are scrolled to the newest line. In a window too low for a day screen (LOW, the CSS's max-height:
@@ -3239,6 +3271,7 @@ function homeHour(paid){
   if (paid){ S.money += WAGE; S.earnWork += WAGE; }
   // on a day without power the first hour of sitting finds it out, and there is no tea all day
   const kettle = !paid && S.noPower && !S.log.some(e => e.text === KETTLE);
+  S.trail.push({k: paid ? 'craft' : 'idle', t: S.t});
   logAdd(S.t + 1, paid ? `Мастерил снасти, +${WAGE} ₽.` : kettle ? KETTLE
     : choice(S.curtain ? ['Посидел у окна.', ...(S.noPower ? [] : ['Попил чаю, посмотрел в окно.'])] : ['Посидел в полумраке, послушал ходики.', 'Посидел просто так.']));
   advance(1);
@@ -3251,6 +3284,7 @@ function craftAll(){
   if (busy) return;
   const r = remaining(), pay = r*WAGE;
   S.money += pay; S.earnWork += pay;
+  S.trail.push({k: 'craft', t: S.t, n: r}); logAdd(S.t, `Мастерил снасти до вечера, +${pay} ₽.`);   // today's page in the book
   advance(r); endDay();
 }
 // from a water or the village straight back to the izba; the day goes on there
@@ -3267,6 +3301,7 @@ function canGo(dest){ return S.t + TRAVEL[dest] + (dest === 'shop' ? Math.min(..
 function go(dest){
   if (busy || WATERS.includes(S.loc) || !canGo(dest)) return;
   advance(TRAVEL[dest]); S.loc = dest; S.dry = null; S.hoursHere = 0;
+  S.trail.push({k: dest, t: S.t});   // arrived at hour S.t
   if (dest === 'shop'){ logAdd(S.t, 'Деревня. Бабки на лавке у магазина.'); rumorLines().forEach(x=>logAdd(S.t, x)); S.phase='shop'; }
   else { logAdd(S.t, `${NAME[dest]}. Закинул удочку.`); S.phase='water'; lookAround(); }
   save(); render();
@@ -3357,14 +3392,15 @@ function endDay(){
   if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
   const earned = S.earnFish + S.earnWork, spent = spendDay();
   S.money -= spent;   // what life took today (S.purchases): the evening's remainder is the next morning's money
-  // the day's length and the pay for an hour of tackle: the evening counts crafting alone day by day
+  // the day's length and the pay for an hour of tackle, as the day was
   S.history.push({day:S.day, earned, hours:HOURS, wage:WAGE, spent});
+  closePage();   // the evening's page goes into the book, the day into the flyleaf's counts
   S.phase = 'evening'; save(); render();
 }
 // the best the day could give, knowing every hour: the moves the game has (an hour of tackle at home, a trip to a
 // water that earns nothing on the way, an hour of fishing, the free walk home), as many trips as pay.
 // V[t][p] is the most from hour t on, at home or at a water; ties keep the old man at home or on the same water.
-const BEST_NONE = 'весь день снасти';
+// It is never shown: the evening's «если бы» line takes its fish from it ({val, runs}; no runs: tackle all day).
 function bestPlan(){
   const C = S.D.catchT, V = [], how = [];
   for (let t = HOURS; t >= 0; t--){
@@ -3385,48 +3421,211 @@ function bestPlan(){
     else { const r = runs[runs.length-1];
       if (r && r.w === p && r.to === t) r.to++; else runs.push({w: p, from: t, to: t+1}); t++; }
   }
-  // a run stays on one line (.run) and its hours never break (.hrs), so a long plan breaks after its commas
-  const label = runs.map(r => `<span class="run">${NAME[r.w].toLowerCase()} <span class="hrs">${clock(r.from)}–${clock(r.to)}</span></span>`).join(', ') || BEST_NONE;
-  return {val: V[0].home, label};
+  return {val: V[0].home, runs};
 }
-function eveningHTML(){
-  const earned = S.earnFish + S.earnWork, best = bestPlan();
-  best.val = Math.max(best.val, earned);   // the plan above is the most the day could give; never show less than was earned
-  let rows = `<div></div>${Array.from({length:HOURS},(_,h)=>`<div class="h">${START+h}</div>`).join('')}`;
-  for (const w of WATERS){
-    rows += `<div>${NAME[w]}</div>`;
-    for (let h=0; h<HOURS; h++){
-      if (h < TRAVEL[w]){ rows += '<div class="cell na"></div>'; continue; }   // still on the way there: no one could fish it
-      const n = S.D.catchT[w][h]; const you = S.presence[w].includes(h);
-      rows += `<div class="cell ${n?(n>1?'big':'f'):''} ${you?'you':''}" title="${n ? fishWord(n) : 'пусто'}">${n || ''}</div>`;
+
+// ---------- the evening page and the book ----------
+// The evening is a page of the diary in the old man's hand (should_I_lab's docs/05-dnevnik-i-hozyaystvo.md): the
+// date and the weather; where and how long, the fish in words; the day's one event; at most one line of «если бы»;
+// and what life took and what is left, always last. No table, no figures but the money. endDay() puts the page into
+// the book (S.book, {d: day, p: [its lines]}) and adds the day to the flyleaf's counts (S.totals); both are saved,
+// and a new game starts an empty book.
+const MONTH_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const WEEKDAY_NAME = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];   // by getUTCDay()
+const dateWords = day => { const t = dayDate(day); return `${t.getUTCDate()} ${MONTH_GEN[t.getUTCMonth()]}, ${WEEKDAY_NAME[t.getUTCDay()]}`; };
+// the clock's hour after «с» and «до», as it is said: «с восьми до часу», «с одиннадцати до шести»
+const HOUR_GEN = ['двенадцати', 'часу', 'двух', 'трёх', 'четырёх', 'пяти', 'шести', 'семи', 'восьми', 'девяти', 'десяти', 'одиннадцати'];
+const hourGen = t => HOUR_GEN[(START + t) % 12];
+const WATER_GEN = {river: 'реки', omut: 'омута', lake: 'озера'};
+// a count of fish in words, as «рыба» wants it: «одна», «две», «двадцать пять»; past 99 in figures
+const NUM_F = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять', 'десять', 'одиннадцать', 'двенадцать',
+  'тринадцать', 'четырнадцать', 'пятнадцать', 'шестнадцать', 'семнадцать', 'восемнадцать', 'девятнадцать'];
+const NUM_TENS = ['', '', 'двадцать', 'тридцать', 'сорок', 'пятьдесят', 'шестьдесят', 'семьдесят', 'восемьдесят', 'девяносто'];
+const countWords = n => n < 1 || n > 99 ? String(n) : n < 20 ? NUM_F[n] : NUM_TENS[Math.floor(n/10)] + (n % 10 ? ' ' + NUM_F[n % 10] : '');
+const fishWords = n => n ? `${countWords(n)} ${plural(n, 'рыба', 'рыбы', 'рыб')}` : 'ни одной';
+const noTotals = () => ({days: 0, water: 0, quiet: 0, home: 0, craft: 0, village: 0, nb: 0, weathers: [], earned: 0, crafted: 0});
+// The day as it went, from S.trail ({k, t, n}: n hours at home from hour t, at the tackle, 'craft', or not, 'idle';
+// or a trip to a water or the village, 'shop', that arrived at hour t): the stays at home, the village with the
+// rumour heard there, and every water with the hours sat (one after another from the arrival), its fish, what was
+// lost, scared or seen there, and the neighbour if the old man saw him there.
+function dayParts(){
+  const D = S.D, nb = D.nb, trail = S.trail || [], parts = [];
+  trail.forEach((e, i) => {
+    if (e.k === 'craft' || e.k === 'idle'){
+      let p = parts[parts.length - 1];
+      if (!p || p.k !== 'home') parts.push(p = {k: 'home', craft: 0, idle: 0});
+      p[e.k] += e.n || 1; p.to = e.t + (e.n || 1);
     }
-  }
-  const verdict = earned >= best.val ? 'Лучше было не придумать.' : earned >= HOURS*WAGE ? 'День не зря.' : 'Сегодня дома вышло бы больше.';
-  const wd = S.D.weathers || [S.D.weather], wl = wd[wd.length-1];
-  const wLine = wl === S.D.weather ? `Погода: ${WEATHER_NAME[S.D.weather]}.` : `Погода: ${WEATHER_NAME[S.D.weather]}, с ${clock(CHANGE_HOUR)} ${WEATHER_NAME[wl]}.`;
-  const nb = S.D.nb;
-  const nbLine = !nb.w ? 'Михалыч сегодня не выходил.'
-    : `Михалыч сидел ${WHERE[nb.w]}${nb.reason === 'empty' ? (nbCaught() ? ' и ушёл, когда перестало клевать' : ' и ушёл пустым')
-      : nb.reason === 'full' ? ' и ушёл с полным ведром' : ''}.`;
-  // crafting alone over all the days, each day by its own length and pay: days saved before the length was kept had
-  // 10 hours, days saved before the pay was kept paid 10 an hour
-  const homeAll = S.history.reduce((s, e) => s + (e.hours || 10)*(e.wage || 10), 0);
-  const earnedAll = S.history.reduce((s, e) => s + e.earned, 0);   // what was earned, before life took its share
-  return `<div class="title">Итог дня ${S.day}</div>
-    <div class="sum"><span>Рыба</span><b>+${S.earnFish} ₽</b><span>Снасти</span><b>+${S.earnWork} ₽</b>
-    <span>Всего</span><b>+${earned} ₽</b><span>Если бы весь день снасти</span><b>+${HOURS*WAGE} ₽</b>
-    ${best.label === BEST_NONE ? '' : `<span class="best">Лучший вариант: ${best.label}</span><b>+${best.val} ₽</b>`}</div>
-    <div class="reveal" style="--hours:${HOURS}">${rows}</div>
-    <div class="note">Рамка — где вы сидели. Цифры — сколько рыбы попалось бы за час. ${wLine} ${nbLine} ${verdict}</div>
-    <div class="note">Всего за ${S.day} ${plural(S.day,'день','дня','дней')}: ${earnedAll} ₽. Одни снасти дома дали бы ${homeAll} ₽.</div>`;
+    else if (e.k === 'shop') parts.push({k: 'shop', t: e.t, rumor: D.rumor[Math.min(e.t, HOURS - 1)]});
+    else if (WATERS.includes(e.k)){
+      const w = e.k, until = trail[i + 1] ? trail[i + 1].t : HOURS, hrs = S.presence[w].filter(h => h >= e.t && h < until);
+      const v = {k: 'water', w, from: e.t, to: e.t + hrs.length, hrs, fish: 0, lost: 0, scare: false, boil: false, nb: false, nbLeft: false};
+      for (const h of hrs){ v.fish += D.catchT[w][h]; v.lost += D.lost[w][h] ? 1 : 0; v.scare = v.scare || D.scare[w][h]; v.boil = v.boil || D.boil[w][h]; }
+      if (nb.w === w && hrs.length){   // he was there while the old man sat: the hours sat, and the look round after them
+        v.nb = nb.present.some((on, h) => on && h >= v.from && h <= Math.min(v.to, HOURS - 1));
+        v.nbLeft = nb.leave != null && nb.leave >= v.from && nb.leave < v.to;
+      }
+      parts.push(v);
+    }
+  });
+  return parts;
 }
-// The evening keeps room (--eve) for the best plan in two lines; a longer plan gets the room of its lines past two,
-// so the whole hour grid stays above the buttons. Measured, as the lines depend on the width and the font: again
-// when the window changes size and when the font has loaded.
+// The prose: the date and the weather («, к обеду …» when it changed at 11:00), then where and how long, a sentence
+// for every part of the day, with the day's one event after the part it happened in (the first of EVENTS the day
+// has), and on a day without power the evening's kerosene lamp
+function dayProse(parts){
+  const D = S.D, ws = D.weathers || [D.weather], w0 = ws[0], w1 = ws[ws.length - 1], trips = parts.some(p => p.k !== 'home');
+  const date = `${dateWords(S.day)}. ${cap(WEATHER_NAME[w0])}${w1 !== w0 ? ', к обеду ' + WEATHER_NAME[w1] : ''}.`;
+  const said = parts.map((p, i) => {
+    if (p.k === 'home'){
+      if (!trips) return p.craft && p.craft >= p.idle ? 'Весь день дома, снасти.' : 'Весь день дома.';
+      if (i === 0) return p.craft < 2 ? '' : p.to <= CHANGE_HOUR ? 'Утром дома, снасти.' : `До ${hourGen(p.to)} дома, снасти.`;
+      return p.craft ? 'Потом дома, снасти.' : 'Потом дома.';
+    }
+    if (p.k === 'shop'){   // straight after the morning at home: «Потом»
+      const r = p.rumor, then = i === 1 && parts[0].k === 'home' && parts[0].craft >= 2;
+      return `${then ? 'Потом' : p.t <= CHANGE_HOUR ? 'Утром' : 'Днём'} в деревню. `
+        + (r.w && r.lv ? `Говорят, ${WHERE[r.w]} ${r.lv === 2 ? 'берёт' : 'клюёт помаленьку'}.` : 'Говорят, нигде не клюёт.');
+    }
+    return p.to > p.from ? `${NAME[p.w]} с ${hourGen(p.from)} до ${hourGen(p.to)} — ${fishWords(p.fish)}.` : `Дошёл до ${WATER_GEN[p.w]} и повернул назад.`;
+  });
+  if (!parts.length) said.push('Весь день дома.');
+  const ev = EVENTS.map(f => f(parts)).find(Boolean);
+  if (ev) said.splice(ev[0] < 0 ? said.length : ev[0] + 1, 0, ev[1]);
+  if (S.noPower) said.push('Света так и нет. Зажёг керосинку.');
+  return [date, said.filter(Boolean).join(' ')];
+}
+// the day's events, the most notable first: each looks for its own in the day's parts and gives [the part it goes
+// after (-1: the end), its words], or nothing
+const EVENTS = [
+  parts => { const i = parts.findIndex(p => p.scare); return i >= 0 && [i, 'У берега мелькнула большая тень.']; },
+  parts => { const i = parts.findIndex(p => p.nbLeft && S.D.nb.reason === 'full');
+    return i >= 0 && [i, `Михалыч сидел до ${hourGen(S.D.nb.leave + 1)}, ушёл с полным ведром.`]; },
+  parts => {   // the village's word, checked on the water the old man went to straight from it
+    for (let i = 0; i + 1 < parts.length; i++){
+      const p = parts[i], v = parts[i + 1], r = p.rumor;
+      if (p.k !== 'shop' || v.k !== 'water' || v.to === v.from) continue;
+      if (r.w && r.lv && r.w === v.w) return [i + 1, v.fish ? 'Бабки не соврали.' : 'Бабки наврали.'];
+      if (!(r.w && r.lv) && v.fish !== 1) return [i + 1, v.fish ? 'Бабки наврали.' : 'Бабки не соврали.'];
+    }
+  },
+  parts => { const p = parts.filter(p => p.lost).sort((a, b) => b.lost - a.lost)[0];
+    return p && [parts.indexOf(p), p.lost === 1 ? 'Одна сорвалась.' : `${cap(countWords(p.lost))} сорвались.`]; },
+  parts => { const i = parts.findIndex(p => p.boil); return i >= 0 && [i, 'У камыша плескало, потому и остался.']; },
+  parts => { const i = parts.findIndex(p => p.nb);
+    return i >= 0 && [i, !parts[i].nbLeft ? 'Михалыч сидел рядом.' : nbCaught() ? 'Михалыч ушёл, когда перестало клевать.' : 'Михалыч ушёл пустым.']; },
+  parts => { const ws = S.D.weathers || [S.D.weather];   // a day at home in the rain
+    return !parts.some(p => p.k !== 'home') && (ws.includes(5) ? [-1, 'За окном лило.'] : ws.includes(2) && [-1, 'За окном моросило.']); },
+  () => !S.fishToday && [-1, 'Тихий день был.'],
+];
+// «Если бы»: what the old man could not have known, in fish, one construction and one feeling. His own water, when he
+// left it before the evening: what it gave after he left (two or more: a pity; none: good that he left; one:
+// nothing). Else the day's best plan (bestPlan()): on a water he did not fish, three fish or more over his catch; or
+// tackle all day, when that would have earned more than he did. Else nothing.
+function ifLine(parts){
+  const C = S.D.catchT, waters = parts.filter(p => p.k === 'water'), last = waters[waters.length - 1];
+  if (last && last.to < HOURS){
+    const n = C[last.w].slice(last.to).reduce((s, x) => s + x, 0);
+    return n >= 2 ? `Если бы остался, было бы ещё ${countWords(n)}. Жаль.` : n ? '' : 'Если бы остался, больше ничего не взял бы. Хорошо, что ушёл.';
+  }
+  const best = bestPlan(), by = {};
+  for (const r of best.runs){
+    const b = by[r.w] || (by[r.w] = {w: r.w, from: r.from, fish: 0});
+    for (let h = r.from; h < r.to; h++) b.fish += C[r.w][h];
+  }
+  const top = Object.values(by).sort((a, b) => b.fish - a.fish)[0];
+  if (top && !waters.some(p => p.w === top.w && p.to > p.from) && top.fish - S.fishToday >= 3){
+    const from = START + top.from === 12 || START + top.from === 13 ? 'с обеда' : `с ${hourGen(top.from)}`;
+    return `А ${WHERE[top.w]} ${from} брало ${countWords(top.fish)}.`;
+  }
+  return !best.runs.length && S.earnFish + S.earnWork < HOURS*WAGE ? 'Дома, за снастями, вышло бы больше.' : '';
+}
+// What life took this evening (S.purchases, from spendDay()) and what is left, always the page's last line: the
+// purchases in one phrase after «На», a big thing with its first part among them, its later parts each after «За»
+const known = p => !!p && !!(GOODS[p.id] || BREAKS[p.id] || SEASON[p.id] || TREATS[p.id]);
+function spendLine(){
+  const all = (S.purchases || []).filter(known), later = p => p.part === 'more' || p.part === 'last', now = all.filter(p => !later(p));
+  const names = now.map(p => nameOf(p.id)), out = [];
+  if (names.length) out.push(`На ${names.length > 1 ? names.slice(0, -1).join(', ') + ' и ' + names[names.length - 1] : names[0]} ушло ${now.reduce((s, p) => s + p.price, 0)}.`);
+  all.filter(later).forEach(p => out.push(`За ${nameOf(p.id)} отдал ${p.part === 'last' ? 'последние' : 'ещё'} ${p.price}.`));
+  out.push(S.money > 0 ? `В копилке осталось ${S.money}.` : S.money < 0 ? `В долгу ${-S.money}.` : 'В копилке пусто.');
+  return out.join(' ');
+}
+// the evening's page, as the book keeps it
+function eveningPage(parts = dayParts()){ return {d: S.day, p: [...dayProse(parts), ifLine(parts), spendLine()].filter(Boolean)}; }
+// The evening: its page into the book, and the day into the flyleaf's counts: the days; the hours on the water and,
+// of them, the quiet ones (no fish, none lost, nothing scared); the hours at home (the day less the ways there and the
+// water) and, of them, at the tackle; the trips to the village; the days the neighbour was there; the weathers seen;
+// what was earned, and what tackle alone would have given
+function closePage(){
+  const D = S.D, T = S.totals, parts = dayParts(), trail = S.trail || [];
+  S.book.push(eveningPage(parts));
+  const sat = WATERS.reduce((s, w) => s + S.presence[w].length, 0);
+  const quiet = WATERS.reduce((s, w) => s + S.presence[w].filter(h => !D.catchT[w][h] && !D.lost[w][h] && !D.scare[w][h]).length, 0);
+  const home = Math.max(0, HOURS - sat - trail.reduce((s, e) => s + (TRAVEL[e.k] || 0), 0));
+  T.days++; T.water += sat; T.quiet += quiet; T.home += home; T.craft += Math.min(home, Math.round((S.earnWork || 0)/WAGE));
+  T.village += trail.filter(e => e.k === 'shop').length; T.nb += parts.some(p => p.nb) ? 1 : 0;
+  T.weathers = [...new Set([...T.weathers, ...(D.weathers || [D.weather])])];
+  T.earned += (S.earnFish || 0) + (S.earnWork || 0); T.crafted += HOURS*WAGE;
+}
+// a one-letter word stays with the next one, and a dash with the word before it (no-break spaces, in the font)
+const tie = s => s.replace(/ —/g, '\u00a0—').replace(/(^|\s)([вВиИаАсСуУкКоО]) /g, '$1$2\u00a0').replace(/(^|\s)([вВиИаАсСуУкКоО]) /g, '$1$2\u00a0');
+const pageHTML = pg => pg.p.map((s, i) => `<p${i ? '' : ' class="date"'}>${tie(s)}</p>`).join('');
+function eveningHTML(){
+  const last = S.book[S.book.length - 1];
+  return `<div class="page" id="page">${pageHTML(last && last.d === S.day ? last : eveningPage())}</div>`;
+}
+// The evening fits the screen: the scene gives the page and the buttons the room they take (--eve), down to its
+// floor; past that the page scrolls in its box, and an edge with more beyond it fades. Measured, as the lines depend
+// on the width and the font: on every screen, and again when the window changes size and when the font has loaded.
 function fitEvening(){
-  if (S.phase !== 'evening') return;
-  const best = document.querySelector('.sum .best'), line = document.querySelector('.sum > span');
-  $('wrap').style.setProperty('--eve-more', best ? `${Math.max(0, best.offsetHeight - 2*line.offsetHeight)}px` : '0px');
+  const pg = $('page'); if (!pg || S.phase !== 'evening') return;
+  const P = $('panel'), cs = getComputedStyle(P), acts = P.querySelector('.actions');
+  const need = parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth) + pg.scrollHeight + (parseFloat(cs.rowGap) || 0) + acts.offsetHeight;
+  $('wrap').style.setProperty('--eve', `${Math.ceil(need)}px`);
+  const edges = () => { pg.classList.toggle('up', pg.scrollTop > .5); pg.classList.toggle('down', pg.scrollTop + pg.clientHeight < pg.scrollHeight - .5); };
+  edges(); pg.onscroll = edges;
+}
+// The book, a screen of its own over the izba or the evening: the flyleaf (once a day is over), then every evening's
+// page, the newest at the bottom; today's page is the journal hour by hour, and at the evening the evening's page
+// under it. It opens at the bottom, as the journal shows its newest line; closing it goes back where it came from.
+let bookOpen = false;
+function flyleaf(){
+  const T = S.totals, n = (x, a, b, c) => `${x} ${plural(x, a, b, c)}`;
+  return [`Лето: ${n(T.days, 'день', 'дня', 'дней')}. `
+    + (T.water ? `На воде ${n(T.water, 'час', 'часа', 'часов')}, ${T.quiet ? 'тихих ' + T.quiet : 'тихих не было'}. ` : 'На воде ни часу. ')
+    + (T.home ? `Дома ${T.home}, за снастями ${T.craft || 'ни часу'}. ` : 'Дома ни часу. ')
+    + (T.village ? `В деревне ${n(T.village, 'раз', 'раза', 'раз')}. ` : 'В деревне ни разу. ')
+    + `Михалыч — ${T.nb ? n(T.nb, 'день', 'дня', 'дней') : 'ни разу'}. Погод перевидено ${T.weathers.length}.`,
+    `Заработано ${T.earned}. Снасти дома дали бы ${T.crafted}.`];
+}
+function bookHTML(){
+  const pages = S.book.slice(), last = pages[pages.length - 1], today = S.phase === 'evening' && last && last.d === S.day ? pages.pop() : null;
+  return `<div class="book">${S.totals.days ? `<div class="flyleaf">${flyleaf().map(s => `<p>${tie(s)}</p>`).join('')}</div>` : ''}`
+    + pages.map(pg => `<div class="day">${pageHTML(pg)}</div>`).join('')
+    + `<div class="day">${today ? '' : `<p class="date">${dateWords(S.day)}.</p>`}<div class="rows">${logRows()}</div>${today ? pageHTML(today) : ''}</div></div>`;
+}
+function openBook(){
+  if (busy) return;
+  bookOpen = true; render();
+  if (window.scrollTo) scrollTo(0, document.documentElement.scrollHeight);   // today's page, at the bottom
+}
+function closeBook(){ bookOpen = false; render(); }
+// a day saved before S.trail: its way so far from the journal's lines (a trip by its arrival, an hour at home by the
+// line written when it was over); at the evening, the hours «Мастерить до вечера» took, which wrote no line then
+const IDLE_LINES = ['Посидел у окна.', 'Попил чаю, посмотрел в окно.', 'Посидел в полумраке, послушал ходики.', 'Посидел просто так.', KETTLE];
+function trailFromLog(){
+  const trail = [], at = e => parseInt(e.t, 10) - START, arrived = {'Деревня. Бабки на лавке у магазина.': 'shop'};
+  WATERS.forEach(w => { arrived[`${NAME[w]}. Закинул удочку.`] = w; });
+  for (const e of S.log){
+    if (!e || typeof e.text !== 'string' || !Number.isFinite(at(e))) continue;
+    if (arrived[e.text]) trail.push({k: arrived[e.text], t: at(e)});
+    else if (/^Мастерил снасти, \+\d+ ₽\.$/.test(e.text)) trail.push({k: 'craft', t: at(e) - 1});
+    else if (IDLE_LINES.includes(e.text)) trail.push({k: 'idle', t: at(e) - 1});
+  }
+  const n = S.phase === 'evening' ? Math.round((S.earnWork || 0)/WAGE) - trail.filter(e => e.k === 'craft').length : 0;
+  if (n > 0) trail.push({k: 'craft', t: HOURS - n, n});
+  return trail;
 }
 addEventListener('resize', () => { fitEvening(); aimAll(); fitLog(); });
 if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); aimAll(); fitLog(); });
