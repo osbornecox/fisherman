@@ -59,6 +59,8 @@
   .toast { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); background:var(--paper); box-shadow:0 0 0 2px var(--ink);
            padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; z-index:3; }
   .toast.show { opacity:1; }
+  .toast[data-side=left] { left:12px; transform:none; }   /* at a water: under the hud, away from the rod, see toast() */
+  .toast[data-side=right] { left:auto; right:12px; transform:none; }
   .panel { flex:1 1 auto; min-height:0; padding: 14px 16px 0; display:flex; flex-direction:column; gap:10px; border-top: 3px solid var(--line); }
   .panel.busy { pointer-events:none; }   /* while an hour passes: no taps, and nothing on screen changes */
   .meta { display:flex; justify-content:space-between; gap:8px; font-size:14px; color:var(--sub); }
@@ -2595,7 +2597,8 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 // ---------- state ----------
 let S = null;
 function newSeason(){
-  S = { day:1, money:0, history:[], phase:'intro' };
+  // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
+  S = { day:1, money:0, history:[], phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647) };
 }
 function genDay(){
   const weather = pick(WEATHER_P);   // the morning
@@ -2650,6 +2653,7 @@ function startDay(){
   S.noPower = S.day > 1 && rnd() < NO_POWER_P;   // rolled after genDay(), so the day's weather, fish and rumours stay as they were
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
+  S.signs = {};   // the signs lookAround() wrote, by water and hour
   S.phase = 'izba';
   logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
 }
@@ -2674,6 +2678,17 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   }
   if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
   S.noPower = S.noPower === true;   // saved before the days without power: the power is on
+  // saved before the scenes showed the signs: a number for the game's scenes from the saved draws (the same until the
+  // next save keeps it), and the hour at a water gets its signs back from its journal lines
+  if (!Number.isInteger(S.sceneSeed)) S.sceneSeed = seed % 2147483647;
+  if (!S.signs || typeof S.signs !== 'object'){
+    S.signs = {};
+    if (S.D && WATERS.includes(S.loc) && S.t < HOURS && Array.isArray(S.log)){
+      const now = S.log.filter(e => e && e.t === clock(S.t)).map(e => e.text);
+      const ids = Object.keys(SIGN_LINE).filter(id => now.includes(SIGN_LINE[id]));
+      if (ids.length) S.signs[`${S.loc}/${S.t}`] = ids;
+    }
+  }
   if (S.phase === 'morning'){ S.phase = 'izba'; S.curtain = false; }  // saved before the izba had a curtain and a yard
   delete S.path;   // the route was kept once and never shown
   return true; } }catch(e){} return false; }
@@ -2685,8 +2700,18 @@ function onStorage(e){
 }
 window.addEventListener('storage', onStorage);
 // The toast tells how an hour went, over the screen drawn right after it, and belongs to that screen alone: the next
-// screen (render) or the next hour (sit) takes it away at once, so a quick tap never carries it over to the evening
-function toast(text, ms=1300){ const el=$('toast'); el.textContent=text; el.classList.add('show'); toast.fresh = true; clearTimeout(toast._t); toast._t=setTimeout(()=>el.classList.remove('show'), ms); }
+// screen (render) or the next hour (sit) takes it away at once, so a quick tap never carries it over to the evening.
+// It is told at a water, right under the hud on the side away from the old man (TOAST_SIDE): clear of his rod, also
+// when a strike raises it, and of the float on every phone; on a tall screen over the sky and the far bank, on the
+// shortest over the far side of the water
+const TOAST_SIDE = {river: 'left', omut: 'right', lake: 'left'}, TOAST_GAP = 10;
+function toast(text, ms=1300){
+  const el = $('toast'), side = TOAST_SIDE[S.loc] || '';
+  el.textContent = text; el.dataset.side = side;
+  el.style.top = side ? `${Math.max($('hudTime').getBoundingClientRect().bottom, $('hudMoney').getBoundingClientRect().bottom)
+    - el.parentNode.getBoundingClientRect().top + TOAST_GAP}px` : '';
+  el.classList.add('show'); toast.fresh = true; clearTimeout(toast._t); toast._t = setTimeout(()=>el.classList.remove('show'), ms);
+}
 function hideToast(){
   const el = $('toast'); clearTimeout(toast._t); toast.fresh = false;
   if (!el.classList.contains('show')) return;
@@ -2763,8 +2788,19 @@ function frame(img, t){
     const open = IZBA[img];
     return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
   }
-  if (LIVE.has(img)) return {key: `${img}/${w}/${h}/${np}`, live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np}};
+  if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed
+    const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [];
+    return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}`, live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np, seed, signs}};
+  }
   return null;
+}
+// the scenes' number for a day, an hour and a place: the same game shows the same sites of its signs after a reload
+function sceneSeed(place, t){
+  let x = S.sceneSeed | 0;
+  for (const v of [S.day, t, LiveScenes.PLACES.indexOf(place)]){
+    x = Math.imul(x ^ (v | 0), 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16;
+  }
+  return x >>> 1;
 }
 let sceneKey = null, sceneReady = Promise.resolve();
 function setScene(img){
@@ -2941,21 +2977,28 @@ function announce(){
   saidN = S.log.length;
   if (fresh.length) $('say').textContent = fresh.join(' ');
 }
-// what is seen on the water at the start of hour t
+// the signs on the water: the journal's line for each, by the sign the scene draws for it (LiveScenes.SIGNS)
+const SIGN_LINE = {'boil': 'У камыша раз за разом плещет, мелочь выпрыгивает из воды.',
+  'bubbles': 'По воде медленно ползёт цепочка мелких пузырьков.',
+  'splash/calm': 'По тихой воде тут и там расходятся круги.', 'splash/shore': 'У берега плеснуло, пошли круги.',
+  'splash/under': 'Под берегом тихонько плеснуло.', 'midge': 'Над водой столбиками вьётся мошкара.'};
+// what is seen on the water at the start of hour t; the scene of this water and hour shows the signs the journal wrote
+// (S.signs, by `${water}/${hour}`), and no others
 function lookAround(){
-  const w = S.loc, D = S.D, t = S.t, nb = D.nb;
+  const w = S.loc, D = S.D, t = S.t, nb = D.nb, signs = [];
   if (nb.w === w && nb.present[t]){
     if (nb.arrive === t && S.hoursHere > 0) logAdd(t, 'Пришёл Михалыч, сел рядом.');
     else if (S.hoursHere === 0) logAdd(t, nb.arrive === t ? 'Михалыч тоже пришёл сюда.' : 'Михалыч уже здесь.');
   }
+  const sign = id => { logAdd(t, SIGN_LINE[id]); signs.push(id); };
   // the words follow the hour's weather: still water only in still weather (the chances do not change)
-  let seen = false; const wt = nowWeather(), calm = CALM.includes(wt);
-  if (D.boil[w][t]){ logAdd(t, 'У камыша раз за разом плещет, мелочь выпрыгивает из воды.'); seen = true; }
-  if (D.bubbles[w][t]){ logAdd(t, 'По воде медленно ползёт цепочка мелких пузырьков.'); seen = true; }
-  if (D.ripple[w][t]){ logAdd(t, choice([...(calm ? ['По тихой воде тут и там расходятся круги.'] : []),
-    'У берега плеснуло, пошли круги.', 'Под берегом тихонько плеснуло.'])); seen = true; }
-  if (D.midge[w][t]){ logAdd(t, 'Над водой столбиками вьётся мошкара.'); seen = true; }
-  if (!seen) logAdd(t, calm ? 'Вода гладкая, ни всплеска.' : wt === 3 ? 'По воде бежит рябь, всплесков не видно.' : 'Дождь рябит воду, всплесков не видно.');
+  const wt = nowWeather(), calm = CALM.includes(wt);
+  if (D.boil[w][t]) sign('boil');
+  if (D.bubbles[w][t]) sign('bubbles');
+  if (D.ripple[w][t]) sign(choice([...(calm ? ['splash/calm'] : []), 'splash/shore', 'splash/under']));   // one draw, as ever
+  if (D.midge[w][t]) sign('midge');
+  if (!signs.length) logAdd(t, calm ? 'Вода гладкая, ни всплеска.' : wt === 3 ? 'По воде бежит рябь, всплесков не видно.' : 'Дождь рябит воду, всплесков не видно.');
+  if (signs.length) S.signs[`${w}/${t}`] = signs; else delete S.signs[`${w}/${t}`];
 }
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
 
@@ -3035,37 +3078,68 @@ function rumorLines(){
 // the neighbour caught something today (his bites stay 0 after he leaves)
 function nbCaught(){ return S.D.nb.bites.some(n => n > 0); }
 let busy = false;
-function sit(){
+// An hour at the water takes HOUR_MS on screen, then its toast and the next hour. A bite, a fish or a lost fish alike,
+// lifts the rod out of the water in the scene (LiveScenes.EVENTS.strike), so that it goes up about when the toast of
+// a quiet hour comes, and its toast comes with the raised rod. A scare is told in the journal, then its shadow passes,
+// then comes the toast. The next hour is drawn only once the one-shot is over, so its scene never cuts it off; a scene
+// that cannot show it lets the hour go on at once. The taps stay off until the next hour is drawn.
+const HOUR_MS = 750, TOAST_MS = 1300;
+const wait = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
+// a one-shot over the scene the player sees, resolved true when it is over: a fade still going is finished first, as
+// it would destroy the scene it fades out; no scene, or one not drawn yet, resolves false at once
+function oneShot(kind){
+  if (pic.fading){ if (!pic.fading.started) return Promise.resolve(false); endFade(); }
+  const live = pic.live[pic.front];
+  return live ? live.event(kind) : Promise.resolve(false);
+}
+// the journal on screen takes the lines written since it was drawn; the rest of the screen stays as it is
+function showLog(){
+  const el = $('log'); if (!el) return;
+  el.parentNode.outerHTML = journal(); fitLog(); announce();
+}
+async function sit(){
   if (busy || S.t >= HOURS) return; busy = true;
   hideToast();   // the last hour's toast goes as the next hour starts
-  const w = S.loc, h = S.t, n = S.D.catchT[w][h];
+  const w = S.loc, h = S.t, D = S.D, nb = D.nb, n = D.catchT[w][h], t0 = performance.now();
   S.presence[w].push(h);
   $('panel').classList.add('busy');   // no taps while the hour passes; the screen stays as it is
-  setTimeout(()=>{
-    const D = S.D, nb = D.nb;
-    if (D.scare[w][h]) logAdd(h+1, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.');
-    // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
-    // a scare says nothing about the place (S.dry is null until the first hour that counts)
-    if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n;
-      const what = `${n > 1 ? fishWord(n) : 'Рыба'} +${sum} ₽`; toast(what); logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
-    else if (D.lost[w][h]){ toast('Сорвалась'); S.dry = 0; }
-    else if (D.scare[w][h]) toast('Пусто');
-    else { toast('Тихо'); logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
-    if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
-    if (nb.w === w && nb.present[h]){
-      logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
-      if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
-        : nbCaught() ? 'Михалыч сматывает удочки: «Всё, кончился клёв».' : 'Михалыч сматывает удочки: «Пустое дело».');
-    }
-    advance(1); S.hoursHere++;
-    if (S.t < HOURS) lookAround();
-    else {   // the day is over here: the screen offers only the way home. From the river the village across shows its light
-      if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне так и не зажёгся свет. Небось опять отключили.' : 'В деревне зажёгся свет.');
-      logAdd(S.t, 'Вечереет, пора домой.');
-    }
-    busy = false; $('panel').classList.remove('busy');
-    save(); render();
-  }, 750);
+  const what = n ? `${n > 1 ? fishWord(n) : 'Рыба'} +${n*PRICE} ₽` : D.lost[w][h] ? 'Сорвалась' : D.scare[w][h] ? 'Пусто' : 'Тихо';
+  let told = false;
+  if (n || D.lost[w][h]){
+    // the strike starts on the scene's next even tick, up to two ticks (half its second frame) after the call: the toast
+    // half a frame into the second frame comes while the rod is up, and stays its time over the next hour
+    const E = LiveScenes.EVENTS.strike, up = E.frames[0] + E.frames[1]/2;
+    await wait(HOUR_MS - E.frames[0]);
+    const timer = setTimeout(() => { told = true; toast(what, E.ms - up + TOAST_MS); }, up);
+    const shown = await oneShot('strike'); clearTimeout(timer);
+    if (!shown) await wait(t0 + HOUR_MS - performance.now());
+  }
+  else if (D.scare[w][h]){
+    await wait(HOUR_MS);
+    logAdd(h+1, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
+    await oneShot('scare');
+  }
+  else await wait(HOUR_MS);
+  if (!told) toast(what);
+  // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
+  // a scare says nothing about the place (S.dry is null until the first hour that counts)
+  if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
+  else if (D.lost[w][h]) S.dry = 0;
+  else if (!D.scare[w][h]){ logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
+  if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
+  if (nb.w === w && nb.present[h]){
+    logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
+    if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
+      : nbCaught() ? 'Михалыч сматывает удочки: «Всё, кончился клёв».' : 'Михалыч сматывает удочки: «Пустое дело».');
+  }
+  advance(1); S.hoursHere++;
+  if (S.t < HOURS) lookAround();
+  else {   // the day is over here: the screen offers only the way home. From the river the village across shows its light
+    if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне так и не зажёгся свет. Небось опять отключили.' : 'В деревне зажёгся свет.');
+    logAdd(S.t, 'Вечереет, пора домой.');
+  }
+  busy = false; $('panel').classList.remove('busy');
+  save(); render();
 }
 function endDay(){
   if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
