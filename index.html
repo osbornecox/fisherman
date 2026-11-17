@@ -3108,16 +3108,19 @@ let busy = false;
 // lifts the rod out of the water in the scene (LiveScenes.EVENTS.strike), so that it goes up about when the toast of
 // a quiet hour comes, and its toast comes with the raised rod. A scare is told in the journal, under the hour the hud
 // shows, as it passes in that hour; then its shadow passes, then comes the toast. The next hour is drawn only once the
-// one-shot is over, so its scene never cuts it off; a scene that cannot show it lets the hour go on at once. The taps
-// stay off until the next hour is drawn.
+// one-shot is over, so its scene never cuts it off; a scene that cannot show it, or fails to, lets the hour go on at
+// once. The taps stay off until the next hour is drawn, and come back whatever happens on the way.
 const HOUR_MS = 750, TOAST_MS = 1300;
 const wait = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
 // a one-shot over the scene the player sees, resolved true when it is over: a fade still going is finished first, as
-// it would destroy the scene it fades out; no scene, or one not drawn yet, resolves false at once
+// it would destroy the scene it fades out; no scene, or one not drawn yet, resolves false at once, and so does a
+// one-shot that fails
 function oneShot(kind){
-  if (pic.fading){ if (!pic.fading.started) return Promise.resolve(false); endFade(); }
-  const live = pic.live[pic.front];
-  return live ? live.event(kind) : Promise.resolve(false);
+  try {
+    if (pic.fading){ if (!pic.fading.started) return Promise.resolve(false); endFade(); }
+    const live = pic.live[pic.front];
+    return live ? live.event(kind).catch(() => false) : Promise.resolve(false);
+  } catch (e) { return Promise.resolve(false); }
 }
 // the journal on screen takes the lines written since it was drawn; the rest of the screen stays as it is
 function showLog(){
@@ -3126,47 +3129,48 @@ function showLog(){
 }
 async function sit(){
   if (busy || S.t >= HOURS) return; busy = true;
-  hideToast();   // the last hour's toast goes as the next hour starts
-  const w = S.loc, h = S.t, D = S.D, nb = D.nb, n = D.catchT[w][h], t0 = performance.now();
-  S.presence[w].push(h);
   $('panel').classList.add('busy');   // no taps while the hour passes; the screen stays as it is
-  const what = n ? `${n > 1 ? fishWord(n) : 'Рыба'} +${n*PRICE} ₽` : D.lost[w][h] ? 'Сорвалась' : D.scare[w][h] ? 'Пусто' : 'Тихо';
-  let told = false;
-  if (n || D.lost[w][h]){
-    // the strike starts on the scene's next even tick, up to two ticks (half its second frame) after the call: the toast
-    // half a frame into the second frame comes while the rod is up, and stays its time over the next hour. Its wait
-    // runs on the time the page is shown, as the strike runs on the scene's clock, which stands while it is hidden
-    const E = LiveScenes.EVENTS.strike, up = E.frames[0] + E.frames[1]/2;
-    await wait(HOUR_MS - E.frames[0]);
-    const stop = shownTimeout(() => { told = true; toast(what, E.ms - up + TOAST_MS); }, up);
-    const shown = await oneShot('strike'); stop();
-    if (!shown) await wait(t0 + HOUR_MS - performance.now());
-  }
-  else if (D.scare[w][h]){
-    await wait(HOUR_MS);
-    logAdd(h, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
-    await oneShot('scare');
-  }
-  else await wait(HOUR_MS);
-  if (!told) toast(what);
-  // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
-  // a scare says nothing about the place (S.dry is null until the first hour that counts)
-  if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
-  else if (D.lost[w][h]) S.dry = 0;
-  else if (!D.scare[w][h]){ logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
-  if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
-  if (nb.w === w && nb.present[h]){
-    logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
-    if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
-      : nbCaught() ? 'Михалыч сматывает удочки: «Всё, кончился клёв».' : 'Михалыч сматывает удочки: «Пустое дело».');
-  }
-  advance(1); S.hoursHere++;
-  if (S.t < HOURS) lookAround();
-  else {   // the day is over here: the screen offers only the way home. From the river the village across shows its light
-    if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне так и не зажёгся свет. Небось опять отключили.' : 'В деревне зажёгся свет.');
-    logAdd(S.t, 'Вечереет, пора домой.');
-  }
-  busy = false; $('panel').classList.remove('busy');
+  try {
+    hideToast();   // the last hour's toast goes as the next hour starts
+    const w = S.loc, h = S.t, D = S.D, nb = D.nb, n = D.catchT[w][h], t0 = performance.now();
+    S.presence[w].push(h);
+    const what = n ? `${n > 1 ? fishWord(n) : 'Рыба'} +${n*PRICE} ₽` : D.lost[w][h] ? 'Сорвалась' : D.scare[w][h] ? 'Пусто' : 'Тихо';
+    let told = false;
+    if (n || D.lost[w][h]){
+      // the strike starts on the scene's next even tick, up to two ticks (half its second frame) after the call: the
+      // toast half a frame into the second frame comes while the rod is up, and stays its time over the next hour. Its
+      // wait runs on the time the page is shown, as the strike runs on the scene's clock, which stands while it is hidden
+      const E = LiveScenes.EVENTS.strike, up = E.frames[0] + E.frames[1]/2;
+      await wait(HOUR_MS - E.frames[0]);
+      const stop = shownTimeout(() => { told = true; toast(what, E.ms - up + TOAST_MS); }, up);
+      const shown = await oneShot('strike'); stop();
+      if (!shown) await wait(t0 + HOUR_MS - performance.now());
+    }
+    else if (D.scare[w][h]){
+      await wait(HOUR_MS);
+      logAdd(h, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
+      await oneShot('scare');
+    }
+    else await wait(HOUR_MS);
+    if (!told) toast(what);
+    // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
+    // a scare says nothing about the place (S.dry is null until the first hour that counts)
+    if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
+    else if (D.lost[w][h]) S.dry = 0;
+    else if (!D.scare[w][h]){ logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
+    if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
+    if (nb.w === w && nb.present[h]){
+      logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
+      if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
+        : nbCaught() ? 'Михалыч сматывает удочки: «Всё, кончился клёв».' : 'Михалыч сматывает удочки: «Пустое дело».');
+    }
+    advance(1); S.hoursHere++;
+    if (S.t < HOURS) lookAround();
+    else {   // the day is over here: the screen offers only the way home. From the river the village across shows its light
+      if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне так и не зажёгся свет. Небось опять отключили.' : 'В деревне зажёгся свет.');
+      logAdd(S.t, 'Вечереет, пора домой.');
+    }
+  } finally { busy = false; $('panel').classList.remove('busy'); }   // an error on the way must not leave the game untappable
   save(); render();
 }
 function endDay(){
