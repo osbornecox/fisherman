@@ -176,7 +176,7 @@
 // A classic script, no modules and no build step; it defines window.LiveScenes and nothing else. demo.html is its
 // page (build.py inlines this file there); a page with many scenes loads it with <script src>.
 //   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0, lit = true, seed = 0,
-//     signs = []}) -> scene
+//     signs = [], life = null}) -> scene
 //     place one of LiveScenes.PLACES, weather one of LiveScenes.WEATHERS ('rain' is the drizzle), hour 6..18 (rounded
 //     and clamped, 12 when missing). src is the URL of the place's clean picture, 130x180, a data: URI or a
 //     same-origin URL: it is loaded with an Image, analysed once and cached by place and src. baked is the demo's
@@ -193,7 +193,12 @@
 //     chain of bubbles every 6-10 s, midges all the time. The first show comes within about 2 s of the signs being
 //     given (create, or a set() that changes the signs or the seed). Only on the waters (river, omut, lake); never
 //     with baked. With reduced motion and nothing playing each sign is drawn still, at its first site.
-//   scene.set({place, weather, hour, src, baked, lit, seed, signs}): any of them; the clock goes on.
+//     life is the hour's drawn life around the water, as the game picked it for the journal: {kind: id} (or the id), one
+//     of LiveScenes.LIFE[place], e.g. a log drifting down the river. It is in sight from the start, plays out slowly by
+//     the time since it was given (create, or a set() that changes the life, the seed or the place) and the seed, and
+//     comes again only after a long pause. Only on the waters; never with baked; with reduced motion and nothing playing
+//     it is drawn still, as it starts.
+//   scene.set({place, weather, hour, src, baked, lit, seed, signs, life}): any of them; the clock goes on.
 //   scene.play(), scene.pause(), scene.playing.
 //   scene.time: the time of the scene's frame, in seconds.
 //   scene.ready() -> a promise of true once the scene has drawn its settings (at once if it has), or of false if it
@@ -219,6 +224,8 @@
 //   LiveScenes.dayLight(hour) -> {sky, land, glow, g}: the light of an hour (tints, glow colour and strength), and
 //     LiveScenes.DAY = {first, last, litFrom}: the game lights the izba with these, so the light is written once.
 //   LiveScenes.SIGNS: [{kind, variant?, name}], every sign a scene draws, name a short Russian label (the demo's).
+//   LiveScenes.LIFE: {river: [id, ...]}, the life each water draws, and LIFE_NAME: {id: a short Russian label} (the
+//     demo's). The journal line each id draws is by it in LIFE below.
 //   LiveScenes.EVENTS: {strike: {frames: [ms, ms, ms], ms}, scare: {ms}}, how long the one-shots take.
 //   LiveScenes.PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version.
 // Bad input (an unknown place or weather, a picture that does not load) gets one console.warn and a scene that draws
@@ -257,6 +264,8 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // wea
 // tufts is where grass tufts, the meadow's grass dots or the sedge lean in a gust; skyline: a near forest against the
 // sky, whose treetops a gust leans; reflection: the bars of a reflection hanging from row y in colour c, whose feet
 // tremble on calm water.
+// Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; circle, [cx,
+// cy, rx, ry], where a bird of prey circles; sky, the rows a flock may fly at.
 const ANCHORS = {
   home: {
     smoke: {x: 37, y: 90, n: 12},       // scene_home: px(38 + i % 3 - 1, 90 - 2 * i) above the chimney rect(37, 92, 3, 12)
@@ -272,6 +281,10 @@ const ANCHORS = {
     tufts: [0, 130, 32, 50],            // grass on the pebbles: rect(x, y - 3, 1, 3, grass) for x 0..30, y 136..179
     reeds: [1, 110, 26, 30],            // reeds(14, 139): the clump at the water's edge on the left, open water to its right
     skyline: true,                      // dome(92, 84, 64, 42, hill, ...): the wooded hill across the river
+    lanes: [93, 95, 97, 99],            // the far half of water(d, rng, 90, 140), over the hill's reflection rect(x, 90, 1,
+                                        // randint(6, 12)) and 5 rows or more above the float's quiet box (rows 104..120)
+    circle: [32, 34, 12, 3],            // over the village: izba(6, 66), izba(32, 75), izba(54, 83) under the sky of pix.sky
+    sky: [12, 28],                      // high over the river, above the hill's top (dome(92, 84, 64, 42): row 42)
   },
   omut: {
     float: [30, 128],                   // rod(53, 150, 30, 118, 10)
@@ -516,7 +529,7 @@ function sunOf(P, sx, sy, core, halo, mix) {
 function paintSun(buf, s, touchedOnly) {   // touchedOnly: just the pixels an effect drew in this frame
   for (let i = 0; i < s.ps.length; i++) {
     const p = s.ps[i];
-    if (touchedOnly && stamp[p] !== fid) continue;
+    if (touchedOnly && (stamp[p] !== fid || lk[p] === fid)) continue;   // a bird of life stays in front of the sun
     buf[p] = s.inCore[i] ? s.core : s.mix(buf[p], s.halo, .45);
   }
 }
@@ -902,15 +915,16 @@ function layerFor(P, w, hour, bk, power) {
 }
 
 // ---------- the frame ----------
-// drawFrame(L, n, dst, X) draws tick n of the still layer L into dst (a Uint32Array of N pixels), with the scene's signs
-// and its one-shot event: X ({plan, n0, still, ev, e}, see signs() and the events). Unlit effects draw weather.py's
+// drawFrame(L, n, dst, X) draws tick n of the still layer L into dst (a Uint32Array of N pixels), with the scene's signs,
+// its life and its one-shot event: X ({plan, n0, still, ev, e, life, l0}, see signs(), life() and the events). Unlit effects draw weather.py's
 // colours into U; the pixels they touch are lit for the hour afterwards (as their class, or as F.kx gives one), and the
 // sun is painted over them again. Lit effects (objects: smoke, the float, leaves) draw over the lit frame, lit as land, so a faint puff over the
 // sky stays a puff; the wind's gusts and what they bend draw there too, from lit colours. U, stamp, dirty and F are scratch for one call and nothing carries over to the next, so any number
 // of scenes can be drawn in one tick, each into its own buffer (the game's crossfade, a page of many scenes).
 const U = new Uint32Array(N), stamp = new Uint32Array(N), dirty = new Int32Array(N);
 let nd = 0, fid = 0, out = null;
-const NO_X = {plan: null, n0: 0, still: false, ev: null, e: 0};   // a frame with no signs and no event
+// A frame with no signs, life or event.
+const NO_X = {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0};
 const F = {P: null, L: null, S: null, X: NO_X, kx: null, w: '', windy: false, t: 0, tg: 0, n: 0, baked: false, top: new Int16Array(3 * W),
            bot: new Int16Array(3 * W)};
 function drawFrame(L, n, dst, X) {
@@ -919,8 +933,8 @@ function drawFrame(L, n, dst, X) {
   F.P = L.P; F.L = L; F.S = L.S; F.X = X || NO_X; F.kx = null; F.w = L.w; F.windy = WINDY.has(L.w); F.n = n; F.t = n / FPS; F.baked = L.baked;
   F.tg = 2 * Math.floor(n / 2) / FPS; gustsNow();   // the gusts move every other tick
   for (let i = 0; i < EFFECTS.length; i++) if (!EFFECTS[i].lit) EFFECTS[i].draw();
-  const cls = L.P.cls, light = L.light, kx = F.kx;   // kx: a class an effect gave a pixel for this frame, plus one
-  for (let i = 0; i < nd; i++) { const p = dirty[i]; dst[p] = light(U[p], p, kx && kx[p] ? kx[p] - 1 : cls[p]); }
+  const cls = L.P.cls, light = L.light, kx = F.kx;   // kx: a class an effect gave a pixel for this frame, plus one; life is land
+  for (let i = 0; i < nd; i++) { const p = dirty[i]; dst[p] = light(U[p], p, lk[p] === fid ? LAND : kx && kx[p] ? kx[p] - 1 : cls[p]); }
   if (L.sun) paintSun(dst, L.sun, true);
   for (let i = 0; i < EFFECTS.length; i++) if (EFFECTS[i].lit) EFFECTS[i].draw();
 }
@@ -1252,6 +1266,164 @@ function pickSites(c, sd, taken) {   // three of the candidates c in the seed's 
 // Where the scene's scare may go: three sites by the near bank, by the seed; an event takes one by its start.
 function scarePlan(P, seed) { const sd = seedOf(seed, SIGN_IDS.length, P); return {sd, sites: pickSites(signGround(P).cand.scare, sd, [])}; }
 
+// ---------- life around the water ----------
+// One drawn thing of the hour's life (docs/05-zhizn-vokrug: the game picks it and writes its line in the journal), such
+// as a log drifting by or a bird of prey circling. Like the signs, the engine draws only what it is given and decides
+// nothing. It is in sight from the start of the hour and plays out slowly, by the time since it was given and the
+// scene's seed: it comes or is already there, stays or passes, goes, and comes again only after a long pause (`gap`, 3
+// to 7 minutes). It moves in steps of LIFE_STEP ticks, so every pixel of it holds two ticks or more. It is drawn in the
+// weather's tone and lit as land, so the hour's light dims it at 6:00 and 18:00 and the fog veils it as it veils the
+// land and the sky (what floats, as a sign on the water's face: half as much); the rain falls over it, the signs show
+// over it (and a drift takes a lane clear of their sites if there is one) and the sun's disc does not hide a bird in
+// front of it. Nothing of it ever draws in the float's quiet box, and nothing of it splashes. ?baked=1 draws none. Times
+// are in seconds, speeds in px a second.
+const LIFE_STEP = 2;                       // ticks a step
+const LIFE_SPS = FPS / LIFE_STEP;          // steps a second
+const LIFE_C = {   // the clean colours of the sprites, by the letters they are drawn with
+  c: [180, 158, 120], B: [128, 104, 76], D: [82, 66, 50],                         // a log: its cut end, bark, wet underside
+  k: [78, 70, 62], K: [56, 50, 44],                                               // an old dark log, low in the water
+  R: [86, 68, 52], r: [120, 98, 72], T: [96, 76, 58], g: [52, 76, 56], G: [70, 98, 70],   // a spruce: roots, trunk, needles
+  n: [40, 40, 40], w: [226, 226, 220], y: [150, 152, 146],                        // a wagtail: black, its white face, grey
+  h: [74, 60, 50], q: [50, 52, 54],                                               // the kite, geese
+};
+// The sprites, rows split by '/', '.' for nothing. Beasts face left; their feet are on row `feet` of the sprite. A drift's
+// waterline is its row `wl`.
+const LIFE_ART = {
+  log: ['cBBBBBBBBBBB/DDDDDDDDDDDD', {wl: 1}],
+  logDark: ['.kkkkk...kkkk./KKKKKKKKKKKKKK', {wl: 1}],
+  spruce: ['r.r......g...g..../.r..g.g.gGg.gG.g../rRr.gGgGgGgGgGgGg./RRRTTTTTTTTTTTTTTT', {wl: 3}],   // on its side, roots first, its
+  // branches sticking up out of the water
+  wagtail: ['..nw/nyy.'], wagtailBob: ['..nw/.yy./n...'],
+  kite: ['.hh.hh./h..h..h'],
+  goose: ['q.q/.q.'], goose2: ['.../qqq'],
+};
+for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, feet}
+  const [art, o] = LIFE_ART[k], rows = art.split('/'), q = [];
+  rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (r[x] !== '.') q.push(x, y, pk(LIFE_C[r[x]])); });
+  LIFE_ART[k] = Object.assign({w: Math.max(...rows.map(r => r.length)), h: rows.length, q, wl: 0, feet: rows.length - 1}, o);
+}
+// The lives each water has, by id, with the journal's line each draws (05-zhizn-vokrug, where its months, hours, weather
+// and how often are; the game keeps to them). `is` is how it shows:
+//   drift: down the river from left to right at v, on one of the lanes, in sight from the start; `fog`: it comes out of
+//     the fog on the left and goes into it on the right; `bird`: a wagtail rides it, pumping its tail.
+//   circle: a bird of prey circles round ANCHORS.circle (a lap in about `lap`); in the wind it hangs on the spot,
+//     shifting a pixel now and then. After `stay` it drifts off sideways and away.
+//   flock: a flock (`form`, each bird's place flying left; it flies either way) crosses the sky at v, at a height in
+//     ANCHORS.sky, its wings beating slowly, in sight from the start.
+const GEESE = [[0, 0], [4, -2], [8, -4], [12, -6], [4, 2], [8, 4], [12, 6], [16, 8]];   // a wedge, one arm longer
+const LIFE = {
+  river: {
+    log: {is: 'drift', art: 'log', v: 1.2, gap: [240, 360]},                   // «Мимо медленно проплыло бревно»
+    'log-fog': {is: 'drift', art: 'log', v: 1.1, gap: [240, 360], fog: true},  // «Из тумана выплыло бревно и ушло в туман»
+    'log-dark': {is: 'drift', art: 'logDark', v: .9, gap: [300, 420]},         // «Проплыло старое тёмное бревно — ещё со сплава, наверно»
+    spruce: {is: 'drift', art: 'spruce', v: 1, gap: [300, 420]},               // «Проплыла ёлка с корнями — где-то выше подмыло берег»
+    wagtail: {is: 'drift', art: 'log', v: 1.1, gap: [300, 420], bird: true},   // «Проплыло бревно, на нём сидит трясогузка»
+    kite: {is: 'circle', art: 'kite', lap: 22, stay: [150, 210], gap: [240, 300]},   // «Над деревней кружит коршун, тонко посвистывает»
+    geese: {is: 'flock', art: 'goose', form: GEESE, v: 3.2, flap: 4, gap: [300, 420]},   // «Высоко над рекой тянется гусиный клин, его долго слышно»
+  },
+};
+const LIFE_NAME = {   // a short Russian label of each (the demo's)
+  log: 'бревно', 'log-fog': 'бревно из тумана', 'log-dark': 'тёмное бревно', spruce: 'ёлка с корнями', wagtail: 'бревно с трясогузкой',
+  kite: 'коршун', geese: 'гусиный клин',
+};
+// The life of a scene: its spec, its seed and where it goes. A drift takes a lane whose rows no sign's site comes within
+// SIGN_REACH rows of, or the one with the fewest such sites (ties by the seed), so it passes no sign if it can help it
+// (and a sign it passes still shows over it).
+const SIGN_REACH = 3;   // rows a sign's show reaches above and below its site: a splash's jet, its widest ring, a bead
+function lifePlan(P, seed, id, signs) {
+  const L = LIFE[P.name][id], A = ANCHORS[P.name], sd = seedOf(seed, 50 + Object.keys(LIFE[P.name]).indexOf(id), P);
+  const g = {id, L, sd, lane: 0};
+  if (L.is === 'drift') {
+    const S = LIFE_ART[L.art], near = y => {   // the sites near the rows the drift takes on lane y (a wagtail's too)
+      const top = y - S.wl - (L.bird ? 2 : 0), bot = y - S.wl + S.h - 1;
+      let n = 0;
+      for (const sg of signs || []) for (const q of sg.sites) if (q.y + SIGN_REACH >= top && q.y - SIGN_REACH <= bot) n++;
+      return n;
+    };
+    g.lane = A.lanes.map(y => [near(y), noise(sd, y, 1), y]).sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2];
+  }
+  return g;
+}
+const lk = new Uint32Array(N);   // lk[p] === fid: a pixel of life in this frame, lit as land and not under the sun's disc
+function lifeDot(x, y, c, a, veil) {   // a pixel of life: colour c toned by the weather, at alpha a; never in the quiet box.
+  // veil: how much of the fog it takes, 1 as the land and the sky, SIGN_FOG on the water's face
+  if (x < 0 || x >= W || y < 0 || y >= H || a <= 0) return;
+  const p = y * W + x;
+  if (F.P.quiet[p]) return;
+  const col = F.w === 'fog' && veil !== 1 ? mixPy(c, FOG, veil * fogT(y, false, bankNow(x, y))) : wx(c, p, LAND);
+  put(p, a >= 1 ? col : mixPy(U[p], col, a));
+  if (a >= .5) lk[p] = fid;
+}
+function sprite(S, x, y, flip, a, veil = 1) {   // sprite S with its top left at (x, y), mirrored if flip, at alpha a
+  const q = S.q;
+  for (let i = 0; i < q.length; i += 3) lifeDot(x + (flip ? S.w - 1 - q[i] : q[i]), y + q[i + 1], q[i + 2], a, veil);
+}
+const EP = {k: 0, e: 0};
+function episode(m, len, gap, e0) {   // is step m in an episode (len steps, gap steps apart): EP.k is which, EP.e how
+  // far into it; episode 0 is e0 steps in when the clock starts
+  const first = len - e0;
+  if (m < first) { EP.k = 0; EP.e = m + e0; return true; }
+  const r = m - first, per = len + gap, k = Math.floor(r / per);
+  EP.k = k + 1; EP.e = r - k * per - gap;
+  return EP.e >= 0;
+}
+const span = (sd, i, r) => Math.round((r[0] + (r[1] - r[0]) * noise(sd, i, 99)) * LIFE_SPS);   // a time from range r, in steps
+function life() {
+  const g = F.X.life;
+  if (!g || F.baked) return;
+  const m = F.X.still ? 0 : Math.max(0, Math.floor((F.n - F.X.l0) / LIFE_STEP));
+  LIVES[g.L.is](g, g.L, m);
+}
+const LIVES = {
+  drift(g, L, m) {
+    const S = LIFE_ART[L.art], v = L.v / LIFE_SPS, x0 = L.fog ? 2 + Math.floor(6 * noise(g.sd, 0, 1)) : 6 + Math.floor(22 * noise(g.sd, 0, 1));
+    // where it is when the clock starts: well in sight, or just coming out of the fog
+    const len = Math.ceil((W + S.w + 2) / v), e0 = Math.floor((x0 + S.w + 1) / v);
+    if (!episode(m, len, span(g.sd, 0, L.gap), e0)) return;
+    const x = -S.w - 1 + Math.floor(v * EP.e), y = g.lane - S.wl;
+    let a = 1;
+    if (L.fog) {   // out of the fog and back into it: a quarter at a time over 30 px at either side
+      const c = x + S.w / 2, d = Math.min(c - 4, W - 4 - c);
+      a = d <= 0 ? 0 : Math.min(1, Math.ceil(4 * d / 30) / 4);
+    }
+    sprite(S, x, y, false, a, SIGN_FOG);   // on the water's face, as a sign: the fog veils it half as much as the water
+    if (L.bird) {   // the wagtail near the log's back end pumps its tail now and then
+      const j = Math.floor(EP.e / 12), b = Math.floor(8 * noise(g.sd, j, 3)), o = EP.e - 12 * j;
+      sprite(LIFE_ART[noise(g.sd, j, 4) >= .3 && o >= b && o < b + 2 ? 'wagtailBob' : 'wagtail'], x + 4, y - 2, false, a, SIGN_FOG);
+    }
+  },
+  circle(g, L, m) {
+    const S = LIFE_ART[L.art], A = ANCHORS[F.P.name], sd = g.sd, out = 15 * LIFE_SPS, len = span(sd, 1, L.stay);
+    if (!episode(m, len, span(sd, 2, L.gap), out + Math.floor(.3 * len * noise(sd, 0, 3)))) return;
+    const e = EP.e, k = EP.k, side = noise(sd, k, 5) < .5 ? -1 : 1;
+    let f = 0;   // how far off it has drifted: it comes in at the start of an episode (not the first) and goes at its end
+    if (k > 0 && e < out) f = 1 - e / out; else if (e >= len - out) f = (e - (len - out)) / out;
+    const hang = F.windy, [cx, cy, rx, ry] = A.circle;
+    let x = cx + side * 100 * f, y = cy - 8 * f;
+    if (hang) {   // hangs on the wind, shifting a pixel now and then
+      const j = Math.floor(e / 27);
+      x += Math.floor(3 * noise(sd, j, 6)) - 1; y += noise(sd, j, 7) < .3 ? 1 : 0;
+    } else {
+      const lap = L.lap * (.85 + .3 * noise(sd, k, 8)) * LIFE_SPS, th = 2 * Math.PI * (e / lap + noise(sd, k, 9)) * (noise(sd, k, 10) < .5 ? 1 : -1);
+      x += rx * Math.cos(th); y += ry * Math.sin(th);
+    }
+    sprite(S, Math.round(x) - (S.w >> 1), Math.round(y) - (S.h >> 1), false, 1);
+  },
+  flock(g, L, m) {
+    const S = LIFE_ART[L.art], S2 = LIFE_ART[L.art + '2'], sd = g.sd, A = ANCHORS[F.P.name], fm = L.form;
+    let wide = 0; for (const [dx] of fm) wide = Math.max(wide, dx + S.w);
+    const v = L.v * (.9 + .2 * noise(sd, 0, 1)) / LIFE_SPS, len = Math.ceil((W + wide + 4) / v);
+    if (!episode(m, len, span(sd, 2, L.gap), Math.floor(len * (.25 + .2 * noise(sd, 0, 3))))) return;
+    const k = EP.k, e = EP.e, left = noise(sd, k, 4) < .5, gone = v * e, slope = .06 * (noise(sd, k, 6) - .5);
+    const y0 = A.sky[0] + Math.floor((A.sky[1] - A.sky[0]) * noise(sd, k, 5)) + Math.round(gone * slope);
+    for (let i = 0; i < fm.length; i++) {
+      const x = Math.floor(W + 1 - gone) + fm[i][0], up = Math.floor((e + 2 * L.flap * noise(sd, i, 7)) / L.flap) & 1;
+      sprite(up ? S : S2, left ? x : W - x - S.w, y0 + fm[i][1], !left, 1);
+    }
+  },
+};
+const LIFE_IDS = Object.fromEntries(Object.entries(LIFE).map(([p, o]) => [p, Object.keys(o)]));
+
 // ---------- the effects ----------
 // Each draws one frame from F: F.t seconds and F.n ticks, F.P the place (masks, anchors), F.L the still layer of the
 // hour (F.L.light lights a colour as sky, water or land), F.S weather.py's sites, F.w the weather, F.windy for wind.
@@ -1473,6 +1645,7 @@ function signDot(dx, dy, c, a) {   // a pixel of a sign: on free water only, col
   const u = U[p], pale = c === RING_C && F.w === 'fog' && .3 * (u & 255) + .59 * ((u >>> 8) & 255) + .11 * ((u >>> 16) & 255) > FOG_PALE;
   const col = F.w !== 'fog' ? wx(c, p, LAND) : mixPy(pale ? RING_FOG : c, FOG, SIGN_FOG * fogT(y, false, bankNow(x, y)));
   put(p, a >= 1 ? col : mixPy(U[p], col, a));
+  lk[p] = 0;   // over a pixel of life: lit as the water again
 }
 // ---------- the one-shot events: scene.event(kind), drawn while F.X.ev is on, F.X.e ticks into it ----------
 const STRIKE = [4, 4, 5];   // ticks of the strike's three frames: the rod as it lies, steeply up, nearly upright
@@ -1570,6 +1743,7 @@ const EFFECTS = [
   {draw: whitecaps, names: () => F.S.caps.length ? ['барашки'] : []},
   {draw: rings, names: () => F.S.rings.length ? ['круги на воде'] : []},
   {draw: strikeHide, names: () => []},
+  {draw: life, names: () => []},
   {draw: signs, names: () => []},
   {draw: scare, names: () => []},
   {draw: smokeBaked, names: () => []},
@@ -1634,7 +1808,7 @@ function trimSoon() {   // when the code that makes or switches scenes now is do
 // with its ImageData), the settings it was asked for and the ones it draws, their picture and still layer, and its
 // clock. A scene that runs is `k` ticks ahead of the ticker; one that does not (paused, or its picture not analysed
 // yet) stands at `tick`.
-const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit', 'seed', 'signs'];
+const KEYS = ['place', 'weather', 'hour', 'src', 'baked', 'lit', 'seed', 'signs', 'life'];
 const live = new Set();   // every scene not destroyed
 const warn = what => console.warn(`LiveScenes: ${what}`);
 const brief = v => { v = String(v); return v.length > 48 ? v.slice(0, 45) + '...' : v; };   // data: URIs are long
@@ -1645,7 +1819,15 @@ function settings(want, s) {   // what a scene is asked to draw, or why it canno
     : typeof want.src !== 'string' || !want.src ? `no src for ${want.place}` : '';
   return bad ? `${bad}; the scene draws nothing`
     : {place: want.place, weather: want.weather, hour: hourOf(want.hour), src: want.src, baked: !!want.baked, lit: want.lit !== false,
-       seed: isFinite(want.seed) ? Math.floor(+want.seed) | 0 : 0, signs: signsOf(want.signs, s)};
+       seed: isFinite(want.seed) ? Math.floor(+want.seed) | 0 : 0, signs: signsOf(want.signs, s), life: lifeOf(want.life, want.place, s)};
+}
+function lifeOf(o, place, s) {   // the life asked for, as its id, if the place has it; a bad one is told of once a scene
+  if (o == null || o === '') return '';
+  const id = o && typeof o === 'object' ? o.kind : o;
+  if (LIFE[place] && Object.prototype.hasOwnProperty.call(LIFE[place], id)) return id;
+  const what = `no life "${brief(id)}" at ${place}; it is not drawn`;
+  if (!s.told.has(what)) { s.told.add(what); warn(what); }
+  return '';
 }
 function signsOf(list, s) {   // the signs asked for, as their ids in the order of SIGNS joined by commas; a bad one is told of
   // once a scene
@@ -1682,15 +1864,20 @@ function change(s, o) {   // create() and set(): the picture and the still layer
     } else ready(s);
   });
 }
-function ready(s) {   // the picture is analysed: the still layer, the signs' sites, the frame, and on with the clock if the
-  // scene plays. New signs, a new seed or a new place start the signs' steps from the scene's tick.
-  const c = s.cfg, P = s.pic.P, key = `${P.id}/${c.seed}/${c.signs}`;
+function ready(s) {   // the picture is analysed: the still layer, the signs' sites, the life, the frame, and on with the
+  // clock if the scene plays. New signs, a new seed or a new place start the signs' steps from the scene's tick; a new
+  // life, seed or place the life's. A drift's lane keeps off the signs, so new signs may move it.
+  const c = s.cfg, P = s.pic.P, key = `${P.id}/${c.seed}/${c.signs}`, lkey = `${P.id}/${c.seed}/${c.life}`;
   s.layer = layerFor(P, c.weather, c.baked ? null : c.hour, c.baked, c.lit);
-  if (s.signKey !== key) {
+  const fresh = s.signKey !== key;
+  if (fresh) {
     s.signKey = key; s.X.n0 = s.tick;
     s.X.plan = P.float && c.signs ? signPlan(P, c.seed, c.signs.split(',')) : null;
     s.scare = P.float ? scarePlan(P, c.seed) : null;
   }
+  const freshLife = s.lifeKey !== lkey;
+  if (freshLife) { s.lifeKey = lkey; s.X.l0 = s.tick; }
+  if (fresh || freshLife) s.X.life = c.life ? lifePlan(P, c.seed, c.life, s.X.plan) : null;
   trimSoon();
   if (show(s)) run(s);
 }
@@ -1712,7 +1899,8 @@ function render(s, n) {   // tick n into the frame not shown, then onto the canv
   const t0 = performance.now(), back = 1 - s.shown, h = s.hist;
   const X = s.X, ev = s.ev, e = ev ? (ev.mode === 'wall' ? ev.e : n - ev.n0) : -1;
   X.ev = e >= 0 && e < (ev ? ev.dur : 0) ? ev : null; X.e = e;
-  X.still = !s.playing && !!(X.plan || X.ev) && reducedMotion();   // with reduced motion a still frame shows the signs still
+  X.still = !s.playing && !!(X.plan || X.ev || X.life) && reducedMotion();   // with reduced motion a still frame shows the
+  // signs and the life still
   drawFrame(s.layer, n, s.out[back], X);
   s.ctx.putImageData(s.img[back], 0, 0);
   h.ms[h.i] = performance.now() - t0; h.i = (h.i + 1) % FPS; h.n++;
@@ -1877,7 +2065,8 @@ function wallTick(s) {
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 function create(canvas, opts) {
   const s = {cv: canvas, seen: false, want: {}, cfg: null, pic: null, layer: null, ctx: null, out: null, img: null,
-             X: {plan: null, n0: 0, still: false, ev: null, e: 0}, signKey: '', told: new Set(), scare: null, ev: null,
+             X: {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0}, signKey: '', lifeKey: '', told: new Set(),
+             scare: null, ev: null,
              shown: 1, hist: {ms: new Float64Array(FPS), i: 0, n: 0}, playing: false, running: false, tick: 0, k: 0,
              drawn: NaN, dead: false, warned: '', bad: false, fresh: false, waiters: []};
   const scene = Object.freeze({
@@ -1949,9 +2138,11 @@ function lightOf(h) {   // the light of an hour for the game's izba, a copy it m
 window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
   DAY: Object.freeze({first: DAY_FIRST, last: DAY_LAST, litFrom: LIT_FROM}),
   SIGNS: Object.freeze(SIGNS.map(g => Object.freeze({...g}))),
+  LIFE: Object.freeze(Object.fromEntries(Object.entries(LIFE_IDS).map(([p, ids]) => [p, Object.freeze(ids.slice())]))),
+  LIFE_NAME: Object.freeze({...LIFE_NAME}),
   EVENTS: Object.freeze({strike: Object.freeze({frames: STRIKE.map(k => Math.round(k * 1000 / FPS)), ms: Math.round(EVENT_TICKS.strike * 1000 / FPS)}),
                          scare: Object.freeze({ms: Math.round(EVENT_TICKS.scare * 1000 / FPS)})}),
-  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '3'});
+  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '4'});
 })();
 // ---------- end of scenes.js ----------
 </script>
