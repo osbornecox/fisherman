@@ -2448,6 +2448,9 @@ const SCARE = .05;              // a pike passes the shore: the hour is empty at
 const MIDGE = [.04,.15,.3];     // midges swarm over the water, fish feed at the surface
 const CALM = [0,1,4];           // midges only in still weather: overcast, sun, fog
 const NEIGHBOR_P = .8, NEIGHBOR_SMART = .5;  // he fishes most days; half the time at the morning's best water
+// some days the village has no power all day long (never a new game's first day). Only the story: no window or street
+// lamp lights up at 18:00, the kerosene lamp burns in the izba, a few journal lines; the fish and the money do not change
+const NO_POWER_P = 1/8;
 const WEATHER_NAME = ['пасмурно', 'солнце', 'морось', 'ветер', 'туман', 'ливень'];
 const WEATHER_TEXT = ['Пасмурно, тепло, тихо.', 'Солнце, с утра уже жарко.', 'Дождь, моросит.', 'Сильный холодный ветер.', 'Туман над водой, тихо.', 'Ливень, льёт стеной.'];
 // the journal line when the weather steps at 11:00, by 'from-to'
@@ -2644,6 +2647,7 @@ function genDay(){
 }
 function startDay(){
   S.D = genDay();
+  S.noPower = S.day > 1 && rnd() < NO_POWER_P;   // rolled after genDay(), so the day's weather, fish and rumours stay as they were
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
   S.phase = 'izba';
@@ -2669,6 +2673,7 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
     startDay();
   }
   if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
+  S.noPower = S.noPower === true;   // saved before the days without power: the power is on
   if (S.phase === 'morning'){ S.phase = 'izba'; S.curtain = false; }  // saved before the izba had a curtain and a yard
   delete S.path;   // the route was kept once and never shown
   return true; } }catch(e){} return false; }
@@ -2753,11 +2758,12 @@ function endFade(){
 // drawn picture (and its plain picture if drawing fails)
 function frame(img, t){
   const w = WEATHERS[S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
-  if (img in IZBA){   // the izba at this hour of this day, the evening at 18:00 with the lamp on
+  const np = S.noPower === true;   // a day without power: no lights outdoors at 18:00, the kerosene lamp in the izba
+  if (img in IZBA){   // the izba at this hour of this day, the evening at 18:00 with the lamp (or the kerosene lamp) on
     const open = IZBA[img];
-    return {key: `${img}/${w}/${h}/${S.day}`, top: true, draw: () => izbaScene(open, w, h, S.day), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
+    return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
   }
-  if (LIVE.has(img)) return {key: `${img}/${w}/${h}`, live: {place: img, weather: w, hour: h, src: IMG[img]}};
+  if (LIVE.has(img)) return {key: `${img}/${w}/${h}/${np}`, live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np}};
   return null;
 }
 let sceneKey = null, sceneReady = Promise.resolve();
@@ -2978,11 +2984,14 @@ function comeHome(){
   S.loc = 'home'; endDay();
 }
 // an hour at home: making tackle pays the wage, sitting pays nothing
+const KETTLE = 'Хотел поставить чайник, да света нет.';   // the kettle stands on the electric hotplate
 function homeHour(paid){
   if (busy || S.t >= HOURS) return;
   if (paid){ S.money += WAGE; S.earnWork += WAGE; }
-  logAdd(S.t + 1, paid ? `Мастерил снасти, +${WAGE} ₽.`
-    : choice(S.curtain ? ['Посидел у окна.', 'Попил чаю, посмотрел в окно.'] : ['Посидел в полумраке, послушал ходики.', 'Посидел просто так.']));
+  // on a day without power the first hour of sitting finds it out, and there is no tea all day
+  const kettle = !paid && S.noPower && !S.log.some(e => e.text === KETTLE);
+  logAdd(S.t + 1, paid ? `Мастерил снасти, +${WAGE} ₽.` : kettle ? KETTLE
+    : choice(S.curtain ? ['Посидел у окна.', ...(S.noPower ? [] : ['Попил чаю, посмотрел в окно.'])] : ['Посидел в полумраке, послушал ходики.', 'Посидел просто так.']));
   advance(1);
   if (S.t >= HOURS) return endDay();
   save(); render();
@@ -3020,7 +3029,8 @@ function rumorLines(){
           : S.t < CHANGE_HOUR ? 'Баба Нюра: «Говорят, нигде не клюёт. Петрович с утра сидит зазря».'
                               : 'Баба Нюра: «Говорят, нигде не клюёт, Петрович весь день просидел зазря».';
   const b = choice(['Баба Валя: «Да брешут».','Баба Валя: «Ну-ну».','Баба Валя: «Сходите да проверьте».','Баба Валя молча кивает.']);
-  return [a, b];
+  // on a day without power the bench talks of that first; the rumour and its reply are as on any other day
+  return S.noPower ? ['Баба Валя: «Опять свет отключили».', a, b] : [a, b];
 }
 // the neighbour caught something today (his bites stay 0 after he leaves)
 function nbCaught(){ return S.D.nb.bites.some(n => n > 0); }
@@ -3049,12 +3059,16 @@ function sit(){
     }
     advance(1); S.hoursHere++;
     if (S.t < HOURS) lookAround();
-    else logAdd(S.t, 'Вечереет, пора домой.');   // the day is over here: the screen offers only the way home
+    else {   // the day is over here: the screen offers only the way home. From the river the village across shows its light
+      if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне так и не зажёгся свет. Небось опять отключили.' : 'В деревне зажёгся свет.');
+      logAdd(S.t, 'Вечереет, пора домой.');
+    }
     busy = false; $('panel').classList.remove('busy');
     save(); render();
   }, 750);
 }
 function endDay(){
+  if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
   const earned = S.earnFish + S.earnWork;
   S.history.push({day:S.day, earned, hours:HOURS});   // the day's length: the evening counts crafting alone day by day
   S.phase = 'evening'; save(); render();
