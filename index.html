@@ -2495,6 +2495,7 @@ const LAMP_X = 77, LAMP_HW = 12;   // izba.py's lampshade: its cord and bulb at 
 const KERO_X = 45, KERO_FLAME = 97, KERO_CORE = [255,240,178], KERO_TIP = [246,164,72];
 const KERO_WARM = [1.18,.90,.56], KERO_GLOW = [255,188,104], KERO_POOL = .9, KERO_REACH = 15;
 const keroGlass = y => y >= 92 && y <= 98 ? [2,2,3,3,3,3,2][y-92] : y >= 85 && y <= 91 ? 1 : -1;   // its half width (no soot)
+const KERO_KEEP = 112;   // the evening without power keeps rows 0..111 in sight: izba.py's kerosene lamp to its foot (108), the sill
 const INK = [52,48,42], RED = [176,62,44];
 const HOUR_HAND = [[0,-3],[2,-3],[3,-2],[3,0],[3,2],[2,3],[0,3],[-2,3],[-3,2],[-3,0],[-3,-2],[-2,-3]];   // tip per hour
 const CHAIN = [140,128,100], CHAIN_D = [104,94,74], CONE = [124,104,68], CONE_D = [92,76,52];
@@ -2738,10 +2739,19 @@ const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)')
 const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba pictures: is the curtain pulled aside
 const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true};
 const layer = i => $(i ? 'bg2' : 'bg');
+// A drawn picture that must keep its rows down to f.keep in sight (the evening's kerosene lamp on the sill) gives up
+// its top, not its bottom, on a scene too short for them. Placed again whenever the scene may have changed its height:
+// on every screen, when the window changes size and when the font has loaded.
+const PIC_W = 130;   // the pictures' width in pixels; the scene shows it whole across
+function aim(i){
+  const l = layer(i), keep = +l.dataset.keep || 0;
+  l.querySelector('img').style.objectPosition = keep ? `center ${Math.min(0, l.clientHeight - keep*l.clientWidth/PIC_W)}px` : '';
+}
+const aimAll = () => { aim(0); aim(1); };
 // layer i gets frame f, a still picture (f.url) or a living scene (f.live) starting at time t; resolves once it shows
 function fill(i, f, alt, t){
   const l = layer(i), img = l.querySelector('img'), cv = l.querySelector('canvas');
-  l.classList.toggle('top', !!f.top);
+  l.classList.toggle('top', !!f.top); l.dataset.keep = f.keep || ''; aim(i);
   if (pic.live[i]){ pic.live[i].destroy(); pic.live[i] = null; }
   if (f.live){
     img.hidden = true; img.removeAttribute('src'); img.alt = '';
@@ -2785,8 +2795,8 @@ function frame(img, t){
   const w = WEATHERS[S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
   const np = S.noPower === true;   // a day without power: no lights outdoors at 18:00, the kerosene lamp in the izba
   if (img in IZBA){   // the izba at this hour of this day, the evening at 18:00 with the lamp (or the kerosene lamp) on
-    const open = IZBA[img];
-    return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
+    const open = IZBA[img], keep = img === 'izbaEvening' && np ? KERO_KEEP : 0;
+    return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
   }
   if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed
     const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [];
@@ -2810,8 +2820,9 @@ function setScene(img){
     sceneKey = null; showPicture({key: url, url, top}, alt); return; }
   const key = sceneKey = f.key;
   if (f.live){ showPicture(f, alt); return; }
-  sceneReady = f.draw().then(url => { if (sceneKey === key) showPicture({key, url, top}, alt); },
-                             () => { if (sceneKey === key) showPicture({key, url: f.plain, top}, alt); });
+  const keep = f.keep;
+  sceneReady = f.draw().then(url => { if (sceneKey === key) showPicture({key, url, top, keep}, alt); },
+                             () => { if (sceneKey === key) showPicture({key, url: f.plain, top, keep}, alt); });
 }
 // After a screen is shown, the izba's frames the next taps will need are drawn in idle time, one at a time, so they
 // are ready to fade in. The living scenes need none of this: the engine draws them at once.
@@ -2927,7 +2938,7 @@ function render(){
   }
 
   P.appendChild(actions);
-  fitLog();
+  aimAll(); fitLog();
   if (hadFocus){   // a keyboard or screen reader user stays on the buttons: the main one, or the first
     const b = P.querySelector('button.primary:not(:disabled)') || P.querySelector('button:not(:disabled)');
     if (b) b.focus({preventScroll: true});
@@ -3212,8 +3223,8 @@ function fitEvening(){
   const best = document.querySelector('.sum .best'), line = document.querySelector('.sum > span');
   $('wrap').style.setProperty('--eve-more', best ? `${Math.max(0, best.offsetHeight - 2*line.offsetHeight)}px` : '0px');
 }
-addEventListener('resize', () => { fitEvening(); fitLog(); });
-if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); fitLog(); });
+addEventListener('resize', () => { fitEvening(); aimAll(); fitLog(); });
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); aimAll(); fitLog(); });
 let askRestart = false;   // the evening's 'start again' waits for a second tap
 function nextDay(){
   askRestart = false; S.day++; startDay(); save(); render();
