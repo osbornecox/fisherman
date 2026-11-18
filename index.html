@@ -2946,7 +2946,7 @@ async function izbaPixels(open, weather, h, day, noPower = false){
     if (!isView[p] || (kero && keroGlass(y) >= 0 && Math.abs(x - KERO_X) <= keroGlass(y))) continue;
     cls[p] = skyAll[p] ? 3 : y >= RIVER && y < RIVER + RW ? 2 : 1;
   }
-  return {c: out.c, d: out.d, W, H, weather, day, cls, skyAll, L: V, river, lt};   // L: the view's light
+  return {c: out.c, d: out.d, W, H, weather, day, open, dusk: h >= LIT_FROM, cls, skyAll, L: V, river, lt};   // L: the view's light
 }
 // ---------- end daylight ----------
 
@@ -2956,7 +2956,8 @@ async function izbaPixels(open, weather, h, day, noPower = false){
 // (VIEW_V, the engine's speeds); drizzle and downpour fall in slanted streaks; on a calm river (overcast, sun, fog)
 // its two lighter strokes flow slowly along it, in the sun its glints twinkle, in rain rings come and go on it, in wind
 // whitecaps; in wind a gust combs the meadow now and then and leaves fly past (the ones izba.py drew still are taken
-// out); in fog a thicker patch creeps over the far bank and the meadow. The room stays as it is drawn. Everything is a function of the scene's time, no
+// out); in fog a thicker patch creeps over the far bank and the meadow. With the curtain drawn the light through it
+// comes and goes as clouds pass (VIEW_VEIL). The room stays as it is drawn. Everything is a function of the scene's time, no
 // Math.random: all but the rain moves on even ticks, and the rain's streaks fall every tick and hold each place two.
 // With reduced motion the window is still. At t = 0 with only its clouds (plain) the window is the still izba pixel for
 // pixel (izba_check.js).
@@ -2980,6 +2981,15 @@ const VIEW_PANES = [[41,37,63,51],[67,37,89,51],[41,55,63,87],[67,55,89,87],[41,
 const VIEW_STROKES = [[48,61,79],[74,83,82],[94,101,80],[114,124,83],[136,143,81],[8,14,80]];
 const VIEW_FLOW = -.5;   // px a second the calm river's strokes flow (to the left, against the clouds), each a little
                          // faster or slower than that, and each stepping at its own moment
+// The drawn curtain hides the view, but the daylight comes through it, and as clouds pass it comes and goes: now and
+// then a soft patch of a little more or a little less light (a cloud over the sun: less) crosses the cloth the way
+// the clouds drift, its edges ragged. amp: the change of light at most; v: px a second; per: s from one patch to the
+// next (some skipped, VEIL_SKIP); wide: the patch's width in px. Only the cloth over the glass (VEIL_X, the glass's
+// rows), the lamp's glass with it but not its soot and burner; by day only (not at LIT_FROM, when the room is lit).
+const VIEW_VEIL = {overcast: {amp: .07, v: 7, per: 16, wide: 26}, sun: {amp: -.1, v: 9, per: 15, wide: 22, dark: true},
+  rain: {amp: .05, v: 6, per: 18, wide: 28}, downpour: {amp: .05, v: -6, per: 18, wide: 28},
+  wind: {amp: .07, v: 16, per: 8, wide: 24}, fog: {amp: .04, v: 4, per: 26, wide: 34}};
+const VEIL_X = [43, 87], VEIL_SOFT = 8, VEIL_SKIP = .2;
 const pyRound = v => { const f = Math.floor(v), d = v - f; return d < .5 ? f : d > .5 ? f + 1 : f % 2 ? f + 1 : f; };
 const mixI = (a, b, t) => a.map((v, i) => Math.floor(v*(1 - t) + b[i]*t));   // izba.py's mix
 // izba.py's river in the calm weathers: pix's water and its lighter strokes (water2), as view_weather paints them
@@ -3079,6 +3089,21 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
   const caps = w === 'wind' ? pick(4, 5, p => { const y = (p / W) | 0; return y > RIVER && y < RIVER + RW - 1; }) : [];   // izba.py's rows
   const meadow = w === 'wind' ? live.filter(p => cls[p] === 1 && p >= 86*W) : [];
   const fogged = w === 'fog' ? live.filter(p => p >= 60*W && (p % W + ((p / W) | 0)) % 2 === 0) : [];
+  // the drawn curtain's cloth over the glass, where the light through it comes and goes (VIEW_VEIL)
+  const veil = !P.open && !P.dusk && VIEW_VEIL[w], cloth = [];
+  if (veil) for (let y = gy0; y <= gy1; y++) for (let x = VEIL_X[0]; x <= VEIL_X[1]; x++){
+    const soot = y >= 83 && y <= 84 && Math.abs(x - KERO_X) <= 1, burner = y >= 99 && y <= 100 && x >= KERO_X - 3 && x <= KERO_X + 4;
+    if (!cls[y*W + x] && !soot && !burner) cloth.push(y*W + x);
+  }
+  const span = VEIL_X[1] - VEIL_X[0] + 1, run = veil ? (span + veil.wide + 2*VEIL_SOFT)/Math.abs(veil.v) : 0;   // s a patch takes to cross
+  const smooth = u => u <= 0 ? 0 : u >= 1 ? 1 : u*u*(3 - 2*u);
+  const veilNow = t => {   // the patch on the cloth at time t: [its leading edge's column, its change of light, its episode], or null
+    const k = Math.floor(t / veil.per), t0 = k*veil.per + (veil.per - run)*viewNoise(s + 18, k, 1);
+    if (t < t0 || t >= t0 + run || viewNoise(s + 18, k, 2) < VEIL_SKIP) return null;
+    return [VEIL_X[0] - VEIL_SOFT + Math.abs(veil.v)*(t - t0), veil.dark || viewNoise(s + 18, k, 3) < .5 ? -Math.abs(veil.amp) : Math.abs(veil.amp), k];
+  };
+  const ragged = (y, k) => { const u = y/9, i = Math.floor(u), e = smooth(u - i);   // -3..3 px, smooth down the rows
+    return 6*(viewNoise(s + 19, i, k)*(1 - e) + viewNoise(s + 19, i + 1, k)*e - .5); };
   const rain = w === 'rain' ? [10, 3, .5, [204,210,214]] : w === 'downpour' ? [16, 4, .55, [188,196,202]] : null;   // streaks, px, mix, colour
   function draw(n){
     const t = 2*Math.floor(n/2)/VIEW_FPS;   // what moves, moves on even ticks
@@ -3086,6 +3111,19 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
     if (sky.length){ coverAt(plain ? 0 : t); for (const [p, src, tab, leaf] of sky) if (!(leaf && plain)) set(p, tab[cover[src] + 1]); }
     if (flow.length){ const tt = plain ? 0 : t; for (const [p, x, y, tab] of flow) set(p, tab[+strokeAt(x, y, tt)]); }
     if (!plain){
+      if (cloth.length){   // the light through the drawn curtain: a soft patch crossing it, or the cloth as drawn
+        const now = veilNow(t), off = [];
+        if (now) for (let y = gy0; y <= gy1; y++) off[y] = ragged(y, now[2]);
+        for (const p of cloth){
+          let f = 1;
+          if (now){
+            const x = p % W, y = (p / W) | 0, xx = (veil.v > 0 ? x : VEIL_X[0] + VEIL_X[1] - x) + off[y];   // the way the clouds drift
+            f = 1 + now[1]*smooth((now[0] - xx)/VEIL_SOFT)*smooth((xx - now[0] + veil.wide)/VEIL_SOFT);
+          }
+          const i = 4*p;
+          for (let j = 0; j < 3; j++) o[i+j] = f === 1 ? still[i+j] : Math.min(255, Math.floor(still[i+j]*f));
+        }
+      }
       for (const [p, q] of unleaf) set(p, get(still, q));
       for (const p of glints) if (blink(p, 6, 2.4, 2.2, t) > .7) set(p, water(p));   // off a while: the water under it
       for (const p of more) if (blink(p, 7, 2.4, 2.2, t) < .3) set(p, lit([250,246,222], p));
