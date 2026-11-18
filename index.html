@@ -52,6 +52,9 @@
   .hud { position:absolute; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:8px; z-index:3; }
   .chip { background: var(--paper); padding:6px 10px; font-size:16px; font-weight:600; box-shadow: 0 0 0 2px var(--ink); }
   .chip small { display:block; font-size:12px; font-weight:400; margin-top:2px; color:var(--sub); }
+  /* the hour: the font's digits are 9.56px wide but «1» only 6.72px, so «10:00» is the widest; the box holds it, and
+     the chip does not change its width as the hours pass */
+  .chip .clk { display:inline-block; min-width:2.46em; }
   #hudMoney { text-align:right; }
   .toast { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); background:var(--paper); box-shadow:0 0 0 2px var(--ink);
            padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; z-index:3; }
@@ -3288,8 +3291,9 @@ function warmUp(){
 }
 function hud(){
   const left = S.D ? Math.max(0, HOURS - S.t) : 0;   // hours of the day left
+  // the time in a box as wide as the widest hour (.clk), so the chip keeps its width as the hours pass
   $('hudTime').innerHTML = S.phase==='evening' ? `День ${S.day} · вечер`
-    : S.D ? `День ${S.day} · ${clock(Math.min(S.t, HOURS))}<small>до вечера ${left} ч</small>` : `День ${S.day}`;
+    : S.D ? `День ${S.day} · <span class="clk">${clock(Math.min(S.t, HOURS))}</span><small>до вечера ${left} ч</small>` : `День ${S.day}`;
   // below zero the piggy bank is in debt, with a true minus sign (the font has it)
   $('hudMoney').innerHTML = S.money < 0 ? `−${-S.money} ₽<small>в долгу</small>` : `${S.money} ₽<small>в копилке</small>`;
 }
@@ -3405,15 +3409,20 @@ function logAdd(t, text){ S.log.push({t: clock(t), text}); }
 // the journal's lines: the time is written only on the first line of each hour
 const logRows = () => S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('');
 function journal(){ return `<div class="log"><div class="rows" id="log">${logRows()}</div></div>`; }   // fitLog() sizes it
-// The journal shows whole lines. Its lines get the room from where they start down to the buttons, less the
-// frame's bottom and the panel's gap, and never fewer than its last LOG_MIN lines, even where a short screen has less
-// room; their top edge lies on the top of a line: an entry may show only its last lines, never a line cut in half. They are scrolled to the newest line. In a window too low for a day screen (LOW, the CSS's max-height:
-// 540px) the page scrolls and the journal keeps LOG_LINES lines. Measured, as the lines depend on the width and
-// the font: on every screen, and again when the window changes size and when the font has loaded.
+// The journal shows whole lines. Its frame takes the room from where its lines start down to the buttons, less the
+// frame's bottom and the panel's gap, and never less than LOG_MIN lines, even where a short screen has less room; it
+// keeps that height whatever lines it holds, so its edges stay put as the hours pass and only the lines move. The lines
+// that fit lie in it, their top edge on the top of a line: an entry may show only its last lines, never a line cut in
+// half. They are scrolled to the newest line, which then stands on the frame's bottom (what is left of the room, less
+// than a line, stays over the top line); while they all fit they start at the top. In a window too low for a day
+// screen (LOW, the CSS's max-height: 540px) the page scrolls and the frame holds LOG_LINES lines. Measured, as the
+// lines depend on the width and the font: on every screen, and again when the window changes size and when the font
+// has loaded.
 const LOG_MIN = 3, LOG_LINES = 5, LOW = window.matchMedia ? matchMedia('(max-height: 540px)') : {matches: false};
 function fitLog(){
   const el = $('log'); if (!el) return;
-  const cs = getComputedStyle(el.parentNode), acts = $('panel').querySelector('.actions');
+  const fr = el.parentNode, cs = getComputedStyle(fr), acts = $('panel').querySelector('.actions');
+  fr.style.height = ''; el.style.marginTop = '';
   el.style.maxHeight = 'none'; el.style.height = '0px';   // with no lines the buttons stand at the bottom of the screen
   const top = el.getBoundingClientRect().top, lh = parseFloat(getComputedStyle(el).lineHeight) || 19;
   const tops = []; let end = 0;   // the top of every line and the bottom of the last, from the top of the lines
@@ -3422,12 +3431,17 @@ function fitLog(){
     for (let k = 0; k < n; k++) tops.push(y + k * b.height / n);
     end = y + b.height;
   }
-  const below = parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth) + (parseFloat(getComputedStyle($('panel')).rowGap) || 0);
-  const room = LOW.matches ? end - (tops[tops.length - LOG_LINES] || 0) : acts.getBoundingClientRect().top - below - top;
+  const px = v => parseFloat(v) || 0, gap = px(getComputedStyle(el).rowGap);   // the gap between two entries
+  const lines = n => n * lh + (n - 1) * gap;   // n lines at most: each an entry of its own
+  const below = px(cs.paddingBottom) + px(cs.borderBottomWidth) + px(getComputedStyle($('panel')).rowGap);
+  const room = Math.max(lines(LOG_MIN), LOW.matches ? lines(LOG_LINES) : acts.getBoundingClientRect().top - below - top);
   let i = tops.findIndex(y => end - y <= room + .01);   // the first line from which all the rest fit
   if (i < 0) i = tops.length;
-  const from = tops[Math.max(0, Math.min(i, tops.length - LOG_MIN))] || 0;
-  el.style.height = `${end - from}px`; el.scrollTop = el.scrollHeight;
+  const from = tops[Math.max(0, Math.min(i, tops.length - LOG_MIN))] || 0, shown = end - from;
+  el.style.height = `${shown}px`;
+  if (from > 0) el.style.marginTop = `${room - shown}px`;   // scrolled: the newest line on the frame's bottom
+  fr.style.height = `${room + px(cs.paddingTop) + px(cs.borderTopWidth) + px(cs.paddingBottom) + px(cs.borderBottomWidth)}px`;
+  el.scrollTop = el.scrollHeight;
   const more = () => el.classList.toggle('more', el.scrollTop > .5);   // older lines above: the top edge fades
   more(); el.onscroll = more;
 }
