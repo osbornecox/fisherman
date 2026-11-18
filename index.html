@@ -57,11 +57,12 @@
      the chip does not change its width as the hours pass */
   .chip .clk { display:inline-block; min-width:2.46em; }
   #hudMoney { text-align:right; }
+  /* the narrowest phones: the sum with its «руб.» («−1765 руб.») would reach over the lampshade between the chips, so
+     the chips are a little tighter there */
+  @media (max-width: 340px) { .chip { padding:6px 7px; font-size:15px; } }
   .toast { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); background:var(--paper); box-shadow:0 0 0 2px var(--ink);
            padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; z-index:3; }
   .toast.show { opacity:1; }
-  .toast[data-side=left] { left:12px; transform:none; }   /* at a water: under the hud, away from the rod, see toast() */
-  .toast[data-side=right] { left:auto; right:12px; transform:none; }
   .panel { flex:1 1 auto; min-height:0; padding: 14px 16px 0; display:flex; flex-direction:column; gap:10px; border-top: 3px solid var(--line); }
   .panel.busy { pointer-events:none; }   /* while an hour passes: no taps, and nothing on screen changes */
   .meta { display:flex; justify-content:space-between; gap:8px; font-size:14px; color:var(--sub); }
@@ -146,10 +147,14 @@
   .story p { margin:0; }
   .secondary.next { font-size:18px; font-weight:600; }   /* the backstory's «Дальше»: an outline, quieter than «Начать день» */
   /* the backstory scrolls: its picture is shown whole (river, cliff and forest at its top), the text under it, and
-     the button after the text, not over it. The yard after it («Как тут живётся?») is laid out as the yard of a day:
+     the button after the text, not over it. The yard after it (how the days go here) is laid out as the yard of a day:
      on a short screen the scene gives up its sky, the button stays at the bottom, and only a text too long scrolls */
   .wrap.intro .scene { max-height: none; }
   .wrap.intro .actions { position: static; }
+  /* the yard's text and button take the room they need (--live, fitLiving()); the scene gives up its sky for them,
+     down to its last rows over the izba's chimney and the shed (the birches' crowns go first) */
+  .wrap.living .scene { max-height: max(calc(min(100vw, 430px) * .64), calc(100vh - var(--top) - var(--live, 300px)));
+                        max-height: max(calc(min(100vw, 430px) * .64), calc(100dvh - var(--top) - var(--live, 300px))); }
   /* too low for the scene and the panel together (a short window): the page scrolls; a phone on its side gets .turn */
   @media (max-height: 540px) { .wrap.fit { height: auto; } }
   /* a phone with the browser's bars: a little less air in the panel, so the scene keeps more of its picture */
@@ -165,7 +170,6 @@
      screen with the journal at its three lines still fits the screen */
   @media (max-height: 620px) {
     :root { --reserve: 266px; }
-    .wrap.living { --reserve: 290px; }   /* «Как тут живётся?»: its four sentences and the button fit a 320x568 screen */
     .actions { padding-bottom: calc(8px + var(--bot)); }   /* 4px less under the buttons: the izba fits a 548px screen too */
     .scene { max-height: max(calc(min(100vw, 430px) * .8), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
              max-height: max(calc(min(100vw, 430px) * .8), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
@@ -2741,7 +2745,7 @@ const WEATHER_HINT = ['В пасмурный день рыба смелая. Н�
 // should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
 // GOODS: what one purchase costs and how many days it lasts (`acc`: its name after «на» and «за»); the morning's words
 // when it is low, two days left (`low`), and on its last day (`out`); a good with no words is bought without a thought.
-// `unit`: what one purchase is, said with its price when the morning thinks of it and the day buys it («пачка 20»);
+// `unit`: what one purchase is, said with its price when the morning thinks of it and the day buys it («пачка 20 руб.»);
 // `asks`: which of its words ask for it already («Надо спичек.»), so the price follows them after a comma alone; `nom`:
 // its name on a morning that thinks of two goods («Кончаются хлеб и крупа»). The last four are tackle and tools that
 // wear.
@@ -2765,7 +2769,7 @@ const GOODS = {
 };
 // what breaks now and then (never in a new game's first BREAK_FROM days, never two close together): the morning's
 // words, and what that day buys for it. `cost`: how the words go on to its price, which takes the place of their
-// last full stop («Ведро дало течь. Новое — 35.»; a part of a big thing «Доска 50, пока 30.»)
+// last full stop («Ведро дало течь. Новое — 35 руб.»; a part of a big thing «Доска 50 руб., пока 30 руб.»)
 const BREAKS = {
   roof:   {acc:'доску', price:50, cost:'. Доска ', thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
   glass:  {acc:'стекло', price:70, cost:'. Новое — ', thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
@@ -3186,7 +3190,7 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
 
 // ---------- rng ----------
 let seed = Math.floor(Math.random()*1e9);
-const lcg = s => (s*1664525 + 1013904223) % 4294967296;   // the generator's step: rnd() takes it, introWeather() only looks
+const lcg = s => (s*1664525 + 1013904223) % 4294967296;   // the generator's step
 function rnd(){ seed = lcg(seed); return seed/4294967296; }
 function pickAt(p, r){ let a=0; for(let i=0;i<p.length;i++){ a+=p[i]; if(r<a) return i; } return p.length-1; }
 function pick(p){ return pickAt(p, rnd()); }
@@ -3200,10 +3204,11 @@ function newSeason(){
   S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {}, planned: 0 };
   newHouse();
 }
-function genDay(){
-  const weather = pick(WEATHER_P);   // the morning
+// fix: a weather the day keeps from morning to evening, with no step at 11:00 (a new game's first day, startDay())
+function genDay(fix = null){
+  const weather = fix === null ? pick(WEATHER_P) : fix;   // the morning
   let later = weather;
-  if (weather === 4 || rnd() < CHANGE_P){ const nx = NEXT[weather]; later = nx[pick(nx.map(x=>x[1]))][0]; }
+  if (fix === null && (weather === 4 || rnd() < CHANGE_P)){ const nx = NEXT[weather]; later = nx[pick(nx.map(x=>x[1]))][0]; }
   const weathers = Array.from({length:HOURS}, (_,h)=> h < CHANGE_HOUR ? weather : later);
   const level = {}, catchT = {}, ripple = {}, boil = {}, bubbles = {}, lost = {}, scare = {}, midge = {};
   for (const w of WATERS){
@@ -3248,15 +3253,15 @@ function genDay(){
   const rumor = Array.from({length:HOURS}, (_,h) => h < CHANGE_HOUR ? rumorA : rumorB);
   return { weather, weathers, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
 }
-// The weather of the screens before the first day: the morning's of the day about to be played. Nothing draws from
-// rnd() before startDay(), and genDay()'s first draw is pick(WEATHER_P), so it is what that draw will give: the
-// generator's next number, looked at without taking it. The days stay as they were; a reload shows the same weather.
-function introWeather(){
-  if (S.D) return S.D.weathers ? S.D.weathers[0] : S.D.weather;
-  return pickAt(WEATHER_P, lcg(seed)/4294967296);
-}
+// A new game opens overcast: the screens before the first day and the whole first day, with no step at 11:00 (the
+// author, 19 November 2026); from the second day the weather is drawn as ever. The first day still takes from rnd()
+// exactly the numbers it always took, so the days after it stay as they were: genDay() is drawn as ever and only
+// leaves the generator where it always left it, and the day itself is drawn from the same numbers with the weather
+// fixed (genDay(INTRO_WEATHER)), the generator put back after it.
+const INTRO_WEATHER = 0;   // overcast
 function startDay(){
-  S.D = genDay();
+  if (S.day === 1){ const from = seed; genDay(); const after = seed; seed = from; S.D = genDay(INTRO_WEATHER); seed = after; }
+  else S.D = genDay();
   S.noPower = S.day > 1 && rnd() < NO_POWER_P;   // rolled after genDay(), so the day's weather, fish and rumours stay as they were
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
   S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
@@ -3264,10 +3269,10 @@ function startDay(){
   S.life = {};    // the life around the water lookAround() chose, by water and hour
   S.trail = [];   // where the day went, for the evening's page
   S.phase = 'izba';
-  logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
+  logHome(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
   const thought = morningThought();   // what the first thought of the day is about, at 6:00
   spendDay();   // what the day buys, decided now: the evening takes exactly this
-  morningLines(thought).forEach(x => logAdd(0, x));   // the thought, with a price, and what the day will take
+  morningLines(thought).forEach(x => logHome(0, x));   // the thought, with a price, and what the day will take
 }
 
 // ---------- the household ----------
@@ -3341,31 +3346,31 @@ function morningThought(){
   return say('thought', i);
 }
 // The morning's words, once spendDay() has decided the day: the thought, and when the day buys what it thinks of, its
-// price on the same line, in the old man's words («Мука кончается — надо купить, пачка 20.»; two goods on their last
-// day by name and together, «Кончаются хлеб и крупа — надо купить на 45.»; a big thing paid in parts its price and
-// today's part, «Доска 50, пока 30.», after a comma «пока 20 из 30»); then what the whole day will take, which is
-// what the evening takes («Всего за день уйдёт 65.»). Short, so that the two fit the journal's three lines on a short
-// phone. What the thought does not name (milk, a treat, a later part of a big thing, what is bought ahead) is in that
-// sum alone.
+// price, in the old man's words («Мука кончается — надо купить, пачка 20 руб.»; two goods on their last day by name
+// and together, «Кончаются хлеб и крупа — надо купить на 45 руб.»; a big thing paid in parts its price and today's
+// part, «Доска 50 руб., пока 30 руб.», after a comma «пока 20 руб. из 30 руб.»); then what the whole day will take,
+// which is what the evening takes («Всего за день уйдёт 65 руб.»). The izba writes each sentence on a line of its own
+// (logHome()). What the thought does not name (milk, a treat, a later part of a big thing, what is bought ahead) is in
+// that sum alone.
 function morningLines(m){
   const bought = id => S.purchases.find(p => p.id === id && p.part !== 'more' && p.part !== 'last');
-  const priced = (words, join, what) => words.slice(0, -1) + join + what + '.';   // the price takes the full stop's place
+  const priced = (words, join, what) => words.slice(0, -1) + join + what;   // the price, «руб.», takes the full stop's place
   let line;
   if (m.kind === 'need' && m.goods.length > 1){   // both run out today, so the day buys both
     const [a, b] = m.goods.map(([g]) => g), sum = [a, b].reduce((s, g) => s + (bought(g) ? bought(g).price : 0), 0);
-    line = `Кончаются ${GOODS[a].nom} и ${GOODS[b].nom} — надо купить на ${sum}.`;
+    line = `Кончаются ${GOODS[a].nom} и ${GOODS[b].nom} — надо купить на ${rub(sum)}`;
   }
   else if (m.kind === 'need'){
     const [g, w] = m.goods[0], G = GOODS[g], p = bought(g);
-    line = p ? priced(G[w], G.asks === w ? ', ' : ' — надо купить, ', `${G.unit} ${p.price}`) : G[w];
+    line = p ? priced(G[w], G.asks === w ? ', ' : ' — надо купить, ', `${G.unit} ${rub(p.price)}`) : G[w];
   }
   else if (m.kind === 'thought') line = THOUGHTS[m.id];
   else {
     const T = m.kind === 'break' ? BREAKS[m.id] : SEASON[m.id], p = bought(m.id);
-    const part = p && p.part === 'first' && (T.cost === ', ' ? `пока ${p.price} из ${T.price}` : `${T.price}, пока ${p.price}`);
-    line = p ? priced(T.thought, T.cost, part || `${p.price}`) : T.thought;
+    const part = p && p.part === 'first' && (T.cost === ', ' ? `пока ${rub(p.price)} из ${rub(T.price)}` : `${rub(T.price)}, пока ${rub(p.price)}`);
+    line = p ? priced(T.thought, T.cost, part || rub(p.price)) : T.thought;
   }
-  return [line, `Всего за день уйдёт ${daySpend()}.`];
+  return [line, `Всего за день уйдёт ${rub(daySpend())}`];
 }
 const daySpend = () => S.purchases.reduce((s, p) => s + p.price, 0);   // what the day takes, all of it
 // The day's purchases, decided in the morning; sets S.purchases and S.planned. What runs out today is bought, then what
@@ -3422,6 +3427,10 @@ function fishWord(n){ return `${n} ${plural(n,'рыба','рыбы','рыб')}`;
 function plural(n,a,b,c){ const m=n%10, h=n%100; if(m===1&&h!==11) return a; if(m>=2&&m<=4&&(h<10||h>=20)) return b; return c; }
 function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function remaining(){ return HOURS - S.t; }
+// every sum the player reads is in «руб.», never «₽» (the sign over the picture came in 2013 and would name the era):
+// the hud, the buttons, the toast, the journal, the morning and the evening (the author, 19 November 2026). The sum
+// keeps its «руб.» on its line (a no-break space, in the font)
+const rub = n => `${n}\u00a0руб.`;
 const SAVE_KEY = 'wait-or-leave-v2';
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({S, seed})); }catch(e){} }
 function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v && v.S){
@@ -3477,18 +3486,12 @@ function onStorage(e){
 window.addEventListener('storage', onStorage);
 // The toast tells how an hour went, over the screen drawn right after it, and belongs to that screen alone: the next
 // screen (render) or the next hour (sit) takes it away at once, so a quick tap never carries it over to the evening.
-// It is told at a water, right under the hud on the side away from the old man (TOAST_SIDE): clear of his rod, also
-// when a strike raises it, and of the float on every phone; on a tall screen over the sky and the far bank, on the
-// shortest over the far side of the water. At 18:00 the village across the river lights up on the left, under the
-// river's toast: the toast of the river's last hour that comes with no rod raised (a quiet hour, a scare) goes to the
-// right there (EVENING_SIDE), over the hill; a strike's stays clear of the raised rod.
+// It stands in the middle of the picture, where the eye is: the fish or the lost one is the event of the hour (the
+// author, 19 November 2026; from 17 November it stood under the hud, away from the rod, and lost its weight there).
 // Its time runs only while the page is shown, as the scenes' clock does: a phone locked and unlocked finds it still there.
-const TOAST_SIDE = {river: 'left', omut: 'right', lake: 'left'}, EVENING_SIDE = {river: 'right'}, TOAST_GAP = 10;
-function toast(text, ms=1300, evening=false){
-  const el = $('toast'), side = (evening && EVENING_SIDE[S.loc]) || TOAST_SIDE[S.loc] || '';
-  el.textContent = text; el.dataset.side = side;
-  el.style.top = side ? `${Math.max($('hudTime').getBoundingClientRect().bottom, $('hudMoney').getBoundingClientRect().bottom)
-    - el.parentNode.getBoundingClientRect().top + TOAST_GAP}px` : '';
+function toast(text, ms=1300){
+  const el = $('toast');
+  el.textContent = text;
   el.classList.add('show'); toast.fresh = true;
   if (toast.stop) toast.stop();
   toast.stop = shownTimeout(() => el.classList.remove('show'), ms);
@@ -3531,12 +3534,12 @@ function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOU
 // is ready.
 const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600;
 const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba pictures: is the curtain pulled aside
-// The three screens before the first day are living scenes in one weather, the morning's of the day about to be played
-// (introWeather()), at its first hour: the title screen ('splash', over the game; showSplash()), the backstory's
-// village from the hill ('story', phase 'intro') and the yard («Как тут живётся?», 'home', phase 'living'). Nothing of
-// the fishing is in them: no signs, no life; the day without power never comes on the first day.
+// The three screens before the first day are living scenes in one weather, overcast as the whole first day is
+// (INTRO_WEATHER), at its first hour: the title screen ('splash', over the game; showSplash()), the backstory's
+// village from the hill ('story', phase 'intro') and the yard (how the days go here, 'home', phase 'living'). Nothing
+// of the fishing is in them: no signs, no life; the day without power never comes on the first day.
 const INTRO = new Set(['intro', 'living']), INTRO_HOUR = START;
-const introScene = place => ({place, weather: WEATHERS[introWeather()], hour: INTRO_HOUR, src: IMG[place], lit: true, seed: sceneSeed(place, 0)});
+const introScene = place => ({place, weather: WEATHERS[INTRO_WEATHER], hour: INTRO_HOUR, src: IMG[place], lit: true, seed: sceneSeed(place, 0)});
 const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true};
 const layer = i => $(i ? 'bg2' : 'bg');
 // A drawn picture that must keep its rows down to f.keep in sight (the evening's kerosene lamp on the sill) gives up
@@ -3643,7 +3646,7 @@ function warmUp(){
   else if (S.phase === 'yard'){ at(room, t); trips([...WATERS, 'shop']); }
   else if (S.phase === 'shop'){ trips(WATERS); at(room, t); }
   else if (S.phase === 'living')   // «Начать день» opens day 1 in the izba at 6:00, the curtain drawn, in the intro's weather
-    list.push({draw: () => izbaScene(false, WEATHERS[introWeather()], START, S.day, false)});
+    list.push({draw: () => izbaScene(false, WEATHERS[INTRO_WEATHER], START, S.day, false)});
   warmList = list;
   const step = () => { if (gen !== warmGen) return; const f = warmList.shift();
     if (f) f.draw().then(() => whenIdle(step), () => whenIdle(step)); };
@@ -3655,7 +3658,7 @@ function hud(){
   $('hudTime').innerHTML = S.phase==='evening' ? `День ${S.day} · вечер`
     : S.D ? `День ${S.day} · <span class="clk">${clock(Math.min(S.t, HOURS))}</span><small>до вечера ${left} ч</small>` : `День ${S.day}`;
   // below zero the piggy bank is in debt, with a true minus sign (the font has it)
-  $('hudMoney').innerHTML = S.money < 0 ? `−${-S.money} ₽<small>в долгу</small>` : `${S.money} ₽<small>в копилке</small>`;
+  $('hudMoney').innerHTML = S.money < 0 ? `−${rub(-S.money)}<small>в долгу</small>` : `${rub(S.money)}<small>в копилке</small>`;
 }
 
 function moveButtons(){
@@ -3671,6 +3674,25 @@ function moveButtons(){
 }
 
 // ---------- render ----------
+// The backstory and the third screen before the first day, in the author's words (19 November 2026), a paragraph
+// each; a one-letter word and a number stay with the word after them
+const STORY = ['Река, поля, лес. В этих глухих краях затерялась деревенька на полтора десятка домов.',
+  'Сколько вы уже живёте тут? 10\u00a0лет? Или все\u00a050? Никто не помнит уже, да и неважно.',
+  'А что важно? Вам предстоит найти ответ на этот вопрос самостоятельно.'];
+const LIVING = ['Каждый день вы будете просыпаться в своём доме и решать, чем заняться.',
+  'Иногда вам нужно будет прикупить в местном магазине продуктов и разных мелочей. Заработать на жизнь вы можете ловлей рыбы и сдачей в магазин на продажу.',
+  'Когда клёва нет, можно мастерить снасти на продажу заезжим охотникам, но денег они приносят меньше.'];
+const storyHTML = ps => `<div class="lines story">${ps.map(p => `<p>${tie(p)}</p>`).join('')}</div>`;
+// The third screen fits the screen as the yard of a day does: the scene gives its text and button the room they take
+// (--live, measured: on every screen, and again when the window changes size and when the font has loaded), down to a
+// floor where the yard keeps its izba, the chimney and the shed (.wrap.living .scene); a text longer than that scrolls
+function fitLiving(){
+  if (S.phase !== 'living' || bookOpen) return;
+  const P = $('panel'), cs = getComputedStyle(P), text = P.querySelector('.story'), acts = P.querySelector('.actions');
+  if (!text || !acts) return;
+  const need = parseFloat(cs.paddingTop) + parseFloat(cs.borderTopWidth) + text.offsetHeight + (parseFloat(cs.rowGap) || 0) + acts.offsetHeight;
+  $('wrap').style.setProperty('--live', `${Math.ceil(need)}px`);
+}
 // day screens and the evening fit the screen; the backstory and the book scroll
 const FIT = new Set(['izba', 'yard', 'shop', 'water', 'evening']);
 let shownPhase = null;
@@ -3699,19 +3721,13 @@ function render(){
 
   else if (S.phase==='intro'){   // the backstory, once, before the very first day
     setScene('story');
-    add(`<div class="lines story">
-      <p>Река, поля, лес. Среди этой сибирской природы затерялась деревенька.</p>
-      <p>Сколько вы живёте уже в ней? 10 лет? Или все 50? Никто уже не помнит, да и не важно.</p>
-      <p>А что важно? В этом и суть игры. Понять, что важно, а что нет.</p></div>`);
+    add(storyHTML(STORY));
     actions.appendChild(btn('Дальше', '', ()=>{ S.phase = 'living'; save(); render(); }, 'secondary next'));
   }
 
-  else if (S.phase==='living'){   // after the backstory: the yard, how one lives here; then the first day
+  else if (S.phase==='living'){   // after the backstory: the yard, how the days go here; then the first day
     setScene('home');
-    add(`<div class="lines story">
-      <p>Как тут живётся? Да ни плохо ни хорошо.</p>
-      <p>Чтобы купить продуктов да мелочей в местном магазине, вы сдаёте туда рыбу, которую ловите в округе.</p>
-      <p>А когда клёва нет, можете мастерить снасти на продажу заезжим охотникам.</p></div>`);
+    add(storyHTML(LIVING));
     actions.appendChild(btn('Начать день', '', ()=>{ startDay(); save(); render(); }, 'primary'));
   }
 
@@ -3722,10 +3738,10 @@ function render(){
     const g = document.createElement('div'); g.className='grid'; g.style.gridTemplateColumns='repeat(2, minmax(0,1fr))';
     g.appendChild(S.curtain ? btn('Задёрнуть занавеску', '', closeCurtain) : btn('Открыть занавеску', '', openCurtain));
     g.appendChild(btn('Выйти из дома', '', goOut));
-    g.appendChild(btn('Мастерить снасти', `1 ч · +${WAGE} ₽`, craft, 'secondary', left < 1));
+    g.appendChild(btn('Мастерить снасти', `1 ч · +${rub(WAGE)}`, craft, 'secondary', left < 1));
     g.appendChild(btn('Ничего не делать', '1 ч', idle, 'secondary', left < 1));
     actions.appendChild(g);
-    actions.appendChild(links(btn(`Мастерить до вечера · +${left*WAGE} ₽`, '', craftAll, 'link'), btn('Полистать дневник', '', openBook, 'link')));
+    actions.appendChild(links(btn(`Мастерить до вечера\u00a0· +${rub(left*WAGE)}`, '', craftAll, 'link'), btn('Полистать дневник', '', openBook, 'link')));
   }
 
   else if (S.phase==='yard'){   // outside the izba: where to go; back inside costs no time
@@ -3767,7 +3783,7 @@ function render(){
   }
 
   P.appendChild(actions);
-  fitEvening(); aimAll(); fitLog();
+  fitEvening(); fitLiving(); aimAll(); fitLog();
   if (hadFocus){   // a keyboard or screen reader user stays on the buttons: the main one, or the first
     const b = P.querySelector('button.primary:not(:disabled)') || P.querySelector('button:not(:disabled)');
     if (b) b.focus({preventScroll: true});
@@ -3776,6 +3792,12 @@ function render(){
   if (S.D || S.phase === 'living') warmUp();
 }
 function logAdd(t, text){ S.log.push({t: clock(t), text}); }
+// In the house, the izba and the yard, every sentence of an entry is a line of its own («Занавеска задёрнута.» /
+// «В избе полумрак, тикают ходики.»; the author, 19 November 2026): the morning there reads a thing at a time. At the
+// water and in the village an entry stays whole: its two sentences belong together, and on a short phone a line
+// more would push the hour's signs under the journal's top edge.
+const sentences = s => s.split(/(?<=[.!?…])\s+(?=[А-ЯЁA-Z«<])/);
+function logHome(t, text){ sentences(text).forEach(s => logAdd(t, s)); }
 // the journal's lines: the time is written only on the first line of each hour
 const logRows = () => S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('');
 function journal(){ return `<div class="log"><div class="rows" id="log">${logRows()}</div></div>`; }   // fitLog() sizes it
@@ -3822,7 +3844,7 @@ function hush(){ saidLog = S.log || null; saidN = saidLog ? saidLog.length : 0; 
 function announce(){
   if (!S.log) return;
   if (S.log !== saidLog){ saidLog = S.log; saidN = 0; }   // a new day
-  const said = $('toast').classList.contains('show') ? $('toast').textContent : null;
+  const said = $('toast').classList.contains('show') ? $('toast').textContent.replace(/\.$/, '') : null;   // «Рыба +20 руб.»
   const fresh = S.log.slice(saidN).map(e => e.text.replace(/<[^>]*>/g, '')).filter(s => s.replace(/\.$/, '') !== said);
   saidN = S.log.length;
   if (fresh.length) $('say').textContent = fresh.join(' ');
@@ -4053,19 +4075,20 @@ function writeLife(w, t){
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
 
 // ---------- actions ----------
-// time passes wherever the old man is; at 11:00 the weather may step, and he sees it
-function advance(n){
-  const from = S.t, D = S.D; S.t = Math.min(HOURS, S.t + n);
+// time passes wherever the old man is; at 11:00 the weather may step, and he sees it (home: the hours pass at home,
+// so its lines are the house's, a sentence a line)
+function advance(n, home = false){
+  const from = S.t, D = S.D, put = home ? logHome : logAdd; S.t = Math.min(HOURS, S.t + n);
   if (D.weathers && from < CHANGE_HOUR && S.t >= CHANGE_HOUR && D.weathers[CHANGE_HOUR] !== D.weathers[CHANGE_HOUR-1]){
     const w = D.weathers[CHANGE_HOUR];
-    logAdd(CHANGE_HOUR, CHANGE_TEXT[`${D.weathers[CHANGE_HOUR-1]}-${w}`]); logAdd(CHANGE_HOUR, WEATHER_HINT[w]); S.seen = w;
+    put(CHANGE_HOUR, CHANGE_TEXT[`${D.weathers[CHANGE_HOUR-1]}-${w}`]); put(CHANGE_HOUR, WEATHER_HINT[w]); S.seen = w;
   }
 }
 // the weather goes into the journal the first time the old man sees it: through the window or outside
 function seeWeather(){
   const w = nowWeather();
   if (S.seen === w) return;
-  S.seen = w; logAdd(S.t, `<b>${WEATHER_TEXT[w]}</b>`); logAdd(S.t, WEATHER_HINT[w]);
+  S.seen = w; logHome(S.t, `<b>${WEATHER_TEXT[w]}</b>`); logHome(S.t, WEATHER_HINT[w]);
 }
 function openCurtain(){ if (busy) return; S.curtain = true; logAdd(S.t, 'Открыл занавеску.'); seeWeather(); save(); render(); }
 function closeCurtain(){ if (busy) return; S.curtain = false; logAdd(S.t, 'Задёрнул занавеску.'); save(); render(); }
@@ -4084,9 +4107,9 @@ function homeHour(paid){
   // on a day without power the first hour of sitting finds it out, and there is no tea all day
   const kettle = !paid && S.noPower && !S.log.some(e => e.text === KETTLE);
   S.trail.push({k: paid ? 'craft' : 'idle', t: S.t});
-  logAdd(S.t + 1, paid ? `Мастерил снасти, +${WAGE} ₽.` : kettle ? KETTLE
+  logHome(S.t + 1, paid ? `Мастерил снасти, +${rub(WAGE)}` : kettle ? KETTLE
     : choice(S.curtain ? ['Посидел у окна.', ...(S.noPower ? [] : ['Попил чаю, посмотрел в окно.'])] : ['Посидел в полумраке, послушал ходики.', 'Посидел просто так.']));
-  advance(1);
+  advance(1, true);
   if (S.t >= HOURS) return endDay();
   save(); render();
 }
@@ -4096,8 +4119,8 @@ function craftAll(){
   if (busy) return;
   const r = remaining(), pay = r*WAGE;
   S.money += pay; S.earnWork += pay;
-  S.trail.push({k: 'craft', t: S.t, n: r}); logAdd(S.t, `Мастерил снасти до вечера, +${pay} ₽.`);   // today's page in the book
-  advance(r); endDay();
+  S.trail.push({k: 'craft', t: S.t, n: r}); logHome(S.t, `Мастерил снасти до вечера, +${rub(pay)}`);   // today's page in the book
+  advance(r, true); endDay();
 }
 // from a water or the village straight back to the izba; the day goes on there. A life the scene has drawn in this
 // hour has been seen: its line goes into the journal before he goes (one that is not drawn was not, and is not written)
@@ -4109,9 +4132,10 @@ function walkHome(){
   S.loc = 'home'; S.phase = 'izba'; S.dry = 0; S.hoursHere = 0;
   save(); render();
 }
-// a trip must leave time to fish: a water is reached before 18:00, and the village only while a water can still be
-// reached after it (until 15:00)
-function canGo(dest){ return S.t + TRAVEL[dest] + (dest === 'shop' ? Math.min(...WATERS.map(w=>TRAVEL[w])) : 0) < HOURS; }
+// a trip must leave an hour of the day there: a water and the village alike are reached by 17:00 (the river, the
+// omut and the village until 16:00, the lake until 15:00). Until 19 November 2026 the village closed at 16:00, when no
+// water could be reached after it; it is a place of its own now (the author)
+function canGo(dest){ return S.t + TRAVEL[dest] < HOURS; }
 function go(dest){
   if (busy || WATERS.includes(S.loc) || !canGo(dest)) return;
   advance(TRAVEL[dest]); S.loc = dest; S.dry = null; S.hoursHere = 0;
@@ -4163,7 +4187,7 @@ async function sit(){
     hideToast();   // the last hour's toast goes as the next hour starts
     const w = S.loc, h = S.t, D = S.D, nb = D.nb, n = D.catchT[w][h], t0 = performance.now();
     S.presence[w].push(h);
-    const what = n ? `${n > 1 ? fishWord(n) : 'Рыба'} +${n*PRICE} ₽` : D.lost[w][h] ? 'Сорвалась' : D.scare[w][h] ? 'Пусто' : 'Тихо';
+    const what = n ? `${n > 1 ? fishWord(n) : 'Рыба'} +${rub(n*PRICE)}` : D.lost[w][h] ? 'Сорвалась' : D.scare[w][h] ? 'Пусто' : 'Тихо';
     let told = false;
     if (n || D.lost[w][h]){
       // the strike starts on the scene's next even tick, up to two ticks (half its second frame) after the call: the
@@ -4181,12 +4205,12 @@ async function sit(){
       await wait(HOUR_MS);
       writeLife(w, h);   // the hour's life comes before what it gave
       logAdd(h, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
-      told = true; toast(what, LiveScenes.EVENTS.scare.ms + TOAST_MS, h + 1 >= HOURS);
-      if (!await oneShot('scare')) toast(what, TOAST_MS, h + 1 >= HOURS);
+      told = true; toast(what, LiveScenes.EVENTS.scare.ms + TOAST_MS);
+      if (!await oneShot('scare')) toast(what, TOAST_MS);
     }
     else await wait(HOUR_MS);
     writeLife(w, h);   // the hour is sat out: its life, under its time, before its result (written once)
-    if (!told) toast(what, TOAST_MS, h + 1 >= HOURS);
+    if (!told) toast(what, TOAST_MS);
     // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
     // a scare says nothing about the place (S.dry is null until the first hour that counts)
     if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
@@ -4208,7 +4232,7 @@ async function sit(){
   save(); render();
 }
 function endDay(){
-  if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
+  if (S.noPower) logHome(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
   if (S.planned !== S.day) spendDay();   // a day the morning did not decide (never, but for a save that missed it): by the same rules
   S.money -= daySpend();   // what the morning said the day would take (S.purchases): the remainder is the next morning's money
   closePage();   // the evening's page goes into the book, the day into the flyleaf's counts
@@ -4374,9 +4398,9 @@ const known = p => !!p && !!(GOODS[p.id] || BREAKS[p.id] || SEASON[p.id] || TREA
 function spendLine(){
   const all = (S.purchases || []).filter(known), later = p => p.part === 'more' || p.part === 'last', now = all.filter(p => !later(p));
   const names = now.map(p => nameOf(p.id)), out = [];
-  if (names.length) out.push(`На ${names.length > 1 ? names.slice(0, -1).join(', ') + ' и ' + names[names.length - 1] : names[0]} ушло ${now.reduce((s, p) => s + p.price, 0)}.`);
-  all.filter(later).forEach(p => out.push(`За ${nameOf(p.id)} отдал ${p.part === 'last' ? 'последние' : 'ещё'} ${p.price}.`));
-  out.push(S.money > 0 ? `В копилке осталось ${S.money}.` : S.money < 0 ? `В долгу ${-S.money}.` : 'В копилке пусто.');
+  if (names.length) out.push(`На ${names.length > 1 ? names.slice(0, -1).join(', ') + ' и ' + names[names.length - 1] : names[0]} ушло ${rub(now.reduce((s, p) => s + p.price, 0))}`);
+  all.filter(later).forEach(p => out.push(`За ${nameOf(p.id)} отдал ${p.part === 'last' ? 'последние' : 'ещё'} ${rub(p.price)}`));
+  out.push(S.money > 0 ? `В копилке осталось ${rub(S.money)}` : S.money < 0 ? `В долгу ${rub(-S.money)}` : 'В копилке пусто.');
   return out.join(' ');
 }
 // the evening's page, as the book keeps it
@@ -4428,7 +4452,7 @@ function flyleaf(){
     + (T.home ? `Дома ${T.home}, за снастями ${T.craft || 'ни часу'}. ` : 'Дома ни часу. ')
     + (T.village ? `В деревне ${n(T.village, 'раз', 'раза', 'раз')}. ` : 'В деревне ни разу. ')
     + `Михалыч — ${T.nb ? n(T.nb, 'день', 'дня', 'дней') : 'ни разу'}. Погод перевидено ${T.weathers.length}.`,
-    `Заработано ${T.earned}. Снасти дома дали бы ${T.crafted}.`];
+    `Заработано ${rub(T.earned)} Снасти дома дали бы ${rub(T.crafted)}`];
 }
 function bookHTML(){
   const pages = S.book.slice(), last = pages[pages.length - 1], today = S.phase === 'evening' && last && last.d === S.day ? pages.pop() : null;
@@ -4447,7 +4471,8 @@ function closeBook(){ bookOpen = false; render(); }
 // a day saved before S.trail: its way so far from the journal's lines (a trip by its arrival, an hour at home by the
 // line written when it was over); at the evening, the hours «Мастерить до вечера» took, which wrote no line then: from
 // the hour he was back home to the evening, if the day earned more at the tackle than its hour lines say. Counted in
-// hours, not in money: a day saved before the tackle paid 5 an hour paid 10
+// hours, not in money: a day saved before the tackle paid 5 an hour paid 10. Its hour line says «+N руб.», and «+N ₽»
+// in a day saved before 19 November 2026
 const IDLE_LINES = ['Посидел у окна.', 'Попил чаю, посмотрел в окно.', 'Посидел в полумраке, послушал ходики.', 'Посидел просто так.', KETTLE];
 function trailFromLog(){
   const trail = [], at = e => parseInt(e.t, 10) - START, arrived = {'Деревня. Бабки на лавке у магазина.': 'shop'};
@@ -4455,7 +4480,7 @@ function trailFromLog(){
   let paid = 0;   // what the hour lines at the tackle say they earned
   for (const e of S.log){
     if (!e || typeof e.text !== 'string' || !Number.isFinite(at(e))) continue;
-    const m = /^Мастерил снасти, \+(\d+) ₽\.$/.exec(e.text);
+    const m = /^Мастерил снасти, \+(\d+)[ \u00a0](?:₽|руб)\.$/.exec(e.text);
     if (arrived[e.text]) trail.push({k: arrived[e.text], t: at(e)});
     else if (m){ trail.push({k: 'craft', t: at(e) - 1}); paid += +m[1]; }
     else if (IDLE_LINES.includes(e.text)) trail.push({k: 'idle', t: at(e) - 1});
@@ -4467,8 +4492,8 @@ function trailFromLog(){
   if (S.phase === 'evening' && (S.earnWork || 0) > paid && home < HOURS) trail.push({k: 'craft', t: home, n: HOURS - home});
   return trail;
 }
-addEventListener('resize', () => { fitEvening(); aimAll(); fitLog(); });
-if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); aimAll(); fitLog(); });
+addEventListener('resize', () => { fitEvening(); fitLiving(); aimAll(); fitLog(); });
+if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); fitLiving(); aimAll(); fitLog(); });
 let askRestart = false;   // the evening's 'start again' waits for a second tap
 function nextDay(){
   askRestart = false; S.day++; startDay(); save(); render();
