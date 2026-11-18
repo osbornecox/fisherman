@@ -328,7 +328,7 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0, splash: .8,
 // with rows [y0, y1], each run of c down a column that starts on those rows), whose feet tremble on calm water. crowns
 // are boxes of birch crowns that lean in the wind (crownC: of other trees, in these colours); trees, [x, y, w, h, k],
 // boxes of a whole birch, crown and trunk down to its foot, that sway: the crown and the trunk down to row k lean, the
-// foot stays. smoke is a chimney (or a list of them): puffs rise from (x + 1, y); n is how many pixels of baked smoke
+// foot stays (and in still air the top of the crown stirs now and then, STIR). smoke is a chimney (or a list of them): puffs rise from (x + 1, y); n is how many pixels of baked smoke
 // the picture has over it (the engine takes them out and draws its own); k, if less than 1, shortens the puffs' life
 // for a far chimney. expect: [x, y, colour] pixels the anchors count on (a chimney's top), checked once.
 // Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; drift, the
@@ -566,6 +566,11 @@ const GUST_HALF = 22, GUST_DHALF = 12;    // px from the middle of a gust to its
 const GUST_RAGGED = 10;                   // px the front wanders either way, row by row
 const GUST_SLOTS = 4;                     // gusts on the scene at once, at most
 const LEAN_SKIP = .25;       // a crown or a fern leans once a cycle of its own, at a varied moment, and skips this share of cycles
+// In still air (STIR) the yard's birches are not dead still: now and then a breath stirs the top of a crown a pixel
+// downwind for about STIR_S s, each birch once a cycle of its own (STIR_PER s and up to STIR_DPER more), at a varied
+// moment, skipping STIR_SKIP of its cycles; the trunk and the rest of the crown stay. None in the first cycle, so a
+// scene starts as its still layer.
+const STIR = new Set(['overcast', 'sun']), STIR_TOP = .76, STIR_S = 1.2, STIR_PER = 4.5, STIR_DPER = 2, STIR_SKIP = .25;
 const PAW = {river: .9, omut: .6, lake: 1, splash: .8, story: .5};   // how strong a gust's patch of ripple is on the water
                                                                        // (the omut is sheltered, the village's river far)
 const COMB_HALF = 18, COMB_DHALF = 14;    // rows from the middle of the patch a gust combs on the meadow or the sedge to its
@@ -971,7 +976,8 @@ function windSites(P, keys, A, warn) {
   // foot stays. A whole birch gives its row k instead of lo: at level 1 the crown and the trunk down to row k move, so
   // the 1 px trunk bends there and the tree sways; at level 2 the crown moves two and the bend goes lower. Each level is
   // a list of moves [to, from] in the frame, right to left along a row, so a pixel is copied before it moves; where the
-  // thing has gone the frame shows what is on the left of it on that row.
+  // thing has gone the frame shows what is on the left of it on that row. A whole birch also has its stir: the rows
+  // of the top of its crown (STIR_TOP of the tree's height and up) a pixel downwind, for still air.
   P.benders = [];
   const bender = (box, set, levels, own, lo, what, k) => {
     const [bx, by, bw, bh] = box, inside = (x, y) => x >= bx && x < bx + bw && y >= by && y < by + bh && set.has(keys[y * W + x]);
@@ -980,11 +986,10 @@ function windSites(P, keys, A, warn) {
     if (n < 4 || (k != null && !(k > yt && k < yb))) { warn(what); return; }
     if (k != null) lo = (yb - k) / Math.max(1, yb - yt);
     const behind = (x, y) => { while (x > 0 && inside(x, y)) x--; return y * W + x; };
-    const lv = [];
-    for (let L = 1; L <= levels; L++) {
+    const movesBy = offOf => {   // the moves of the rows, each row moved offOf(s) px, s its height in the thing, 0 to 1
       const moves = [];
       for (let y = yt; y <= yb; y++) {
-        const s = (yb - y) / Math.max(1, yb - yt), off = L === 1 ? +(s >= lo) : s >= (1 + lo) / 2 ? 2 : s >= lo / 2 ? 1 : 0;
+        const off = offOf((yb - y) / Math.max(1, yb - yt));
         if (off) for (let x = Math.min(W - 1, bx + bw - 1 + off); x >= bx; x--) {
           const to = y * W + x;
           if (P.quiet[to]) continue;
@@ -992,9 +997,12 @@ function windSites(P, keys, A, warn) {
           else if (inside(x, y)) moves.push(to, behind(x, y));
         }
       }
-      lv.push(moves);
-    }
-    P.benders.push({x: bx + (bw >> 1), y: yt, lv, own, th: .28 + .2 * noise(19, P.benders.length, 1)});
+      return moves;
+    };
+    const lv = [];
+    for (let L = 1; L <= levels; L++) lv.push(movesBy(s => L === 1 ? +(s >= lo) : s >= (1 + lo) / 2 ? 2 : s >= lo / 2 ? 1 : 0));
+    const stir = k != null ? movesBy(s => +(s >= STIR_TOP)) : null;
+    P.benders.push({x: bx + (bw >> 1), y: yt, lv, own, stir, th: .28 + .2 * noise(19, P.benders.length, 1)});
   };
   const crownC = A.crownC ? keySet(A.crownC) : CROWN_C;
   (A.crowns || []).forEach(b => bender(b, crownC, b[2] > 10 ? 2 : 1, true, .3, A.crownC ? 'a crown' : 'a birch crown'));
@@ -1984,7 +1992,8 @@ function gusts() {   // wind: as a gust passes, the treetops on a forest's skyli
 function bend() {   // wind: birch crowns, reeds and ferns bend as a gust passes, their tops further, and settle back; a
   // crown or a fern also leans on its own, for about a second once a cycle, at a varied moment and not every cycle, so
   // it does not keep time. Grass tufts, the meadow's dots and the sedge lean a pixel as the gust reaches them.
-  if (!F.windy || F.baked) return;
+  if (F.baked) return;
+  if (!F.windy) { if (STIR.has(F.w)) stir(); return; }
   const o = out, B = F.P.benders;
   for (let i = 0; i < B.length; i++) {
     const b = B[i], v = G.n ? gustAt(b.x, b.y) : 0;
@@ -2003,6 +2012,17 @@ function bend() {   // wind: birch crowns, reeds and ferns bend as a gust passes
     const t = T[i];
     if (gustAt(t.x, t.y) <= t.th) continue;
     const c = o[t.p]; o[t.p] = o[t.p + 1]; o[t.p + 1] = c;
+  }
+}
+function stir() {   // still air: now and then the top of a yard birch's crown stirs a pixel downwind and settles back
+  const o = out, B = F.P.benders;
+  for (let i = 0; i < B.length; i++) {
+    const b = B[i];
+    if (!b.stir) continue;
+    const per = STIR_PER + STIR_DPER * noise(41, i, 1), u = F.t / per + noise(41, i, 2), k = Math.floor(u);
+    const at = .05 + (.95 - STIR_S / per) * noise(43, i, k);
+    if (k < 1 || u - k < at || u - k >= at + STIR_S / per || noise(45, i, k) < STIR_SKIP) continue;
+    for (let j = 0, m = b.stir; j < m.length; j += 2) o[m[j]] = o[m[j + 1]];
   }
 }
 function shimmer() {   // calm water: each lighter stroke drifts a pixel one way, then the other
@@ -2247,7 +2267,7 @@ const EFFECTS = [
   {draw: smokeBaked, names: () => []},
   {draw: rain, names: () => F.S.streaks.length ? [F.w === 'rain' ? 'морось' : 'ливень'] : []},
   {draw: gusts, lit: true, names: () => F.windy ? F.P.windNames : []},
-  {draw: bend, lit: true, names: () => []},
+  {draw: bend, lit: true, names: () => STIR.has(F.w) && F.P.benders.some(b => b.stir) ? ['берёза'] : []},
   {draw: smoke, lit: true, names: () => F.P.smokes.length && SMOKE_PUFFS[F.w] ? [F.P.smokes.length > 1 ? 'дым из труб' : 'дым из трубы'] : []},
   {draw: float, lit: true, names: () => F.P.float && FLOAT_PERIOD[F.w] ? ['поплавок'] : []},
   {draw: leaves, lit: true, names: () => F.windy ? ['листья'] : []},
