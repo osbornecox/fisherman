@@ -2769,6 +2769,10 @@ function pixels(src){
 const IZ_LIGHT = {overcast:[1,1,1], sun:[1.06,1.03,.95], rain:[.95,.95,.97], downpour:[.84,.85,.88], wind:[1,1,1.01], fog:[.98,.98,.99]};
 const ROOM_GAIN = {sun:[.18,.14,.04]}, CURTAIN_GAIN = {sun:.08};   // a sunny midday fills the room, the curtain glows
 const GLASS = [41,37,89,105], RIVER = 78, RW = 6;                  // the window glass x0 y0 x1 y1, the river rows in it
+// the room's share of the daylight, always darker than the view in its window: far from the window and by it, and the
+// px from the glass over which the window's light fades, each [dawn and dusk, noon]; less with the curtain drawn (far
+// from the window) and in rain (daytime.py's ROOM_*); once the bulb is on it lights the room, brighter than the dusk outside
+const ROOM_SHARE = [.55,.78], ROOM_NEAR = [.88,.95], ROOM_REACH = [12,26], ROOM_CLOSED = .85, ROOM_WEATHER = {rain:.95, downpour:.88};
 const BULB_LIT = [255,238,190], BULB_WARM = [1.10,.98,.80], SHADE_GLOW = [236,172,104];
 const LAMP_X = 77, LAMP_HW = 12;   // izba.py's lampshade: its cord and bulb at x 77, the fabric x 65..89 (between the chips)
 // a day without power: izba.py's kerosene lamp on the sill burns instead of the bulb: a flame of two pixels over the
@@ -2833,6 +2837,8 @@ async function drawIzba(open, weather, h, day, noPower = false){
   const lightK = Math.max(0, Math.min(1, ((L.land[0] + L.land[1] + L.land[2])/3 - .55)/.45));   // 0 at dawn and dusk, 1 at noon
   const gain = ROOM_GAIN[weather] || [0,0,0], room = L.land.map((k,i) => k*(1 + gain[i]*lightK));
   const glass = room.map(k => k*(1 + (CURTAIN_GAIN[weather] || 0)*lightK)), [gx0, gy0, gx1, gy1] = GLASS;
+  const span = ([a, b]) => a + (b - a)*lightK, near = span(ROOM_NEAR), reach = span(ROOM_REACH), wk = ROOM_WEATHER[weather] || 1;
+  const share = span(ROOM_SHARE)*(open ? 1 : ROOM_CLOSED), bulb = h >= LIT_FROM && !noPower;   // the bulb lights the room itself
   const isView = new Uint8Array(W*H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){
     const p = y*W + x, i = p*4, view = m[i + (open ? 0 : 1)] > 127, sky = view && m[i+2] > 127;
@@ -2841,7 +2847,11 @@ async function drawIzba(open, weather, h, day, noPower = false){
     if (sky) c = mix3(tint3(c, L.sky), L.glow, Math.min(1, Math.max(0, (y-40)/52) * L.g));
     else if (view && y >= RIVER && y < RIVER + RW) c = mix3(tint3(c, river), L.glow, L.g*.35);
     else if (view) c = tint3(c, L.land);
-    else c = tint3(c, x >= gx0 && x <= gx1 && y >= gy0 && y <= gy1 ? glass : room);
+    else {   // the room: its share of the daylight, more by the window
+      const dx = Math.max(gx0 - x, 0, x - gx1), dy = Math.max(gy0 - y, 0, y - gy1);
+      const k = bulb ? 1 : wk*(share + (near - share)*Math.exp(-(dx*dx + dy*dy)/(reach*reach)));
+      c = tint3(c, (x >= gx0 && x <= gx1 && y >= gy0 && y <= gy1 ? glass : room).map(v => v*k));
+    }
     d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2];
   }
   if (h >= LIT_FROM && noPower){   // no power: the kerosene lamp burns; its glass glows over the view too, its pool lights the room
