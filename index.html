@@ -3583,6 +3583,8 @@ function warmUp(){
   else if (S.phase === 'izba'){ at(S.curtain ? 'izbaClosed' : 'izba', t); at('home', t); at(t + 1 < HOURS ? room : 'izbaEvening', t + 1); }
   else if (S.phase === 'yard'){ at(room, t); trips([...WATERS, 'shop']); }
   else if (S.phase === 'shop'){ trips(WATERS); at(room, t); }
+  else if (S.phase === 'living')   // «Начать день» opens day 1 in the izba at 6:00, the curtain drawn, in the intro's weather
+    list.push({draw: () => izbaScene(false, WEATHERS[introWeather()], START, S.day, false)});
   warmList = list;
   const step = () => { if (gen !== warmGen) return; const f = warmList.shift();
     if (f) f.draw().then(() => whenIdle(step), () => whenIdle(step)); };
@@ -3712,7 +3714,7 @@ function render(){
     if (b) b.focus({preventScroll: true});
   }
   announce();
-  if (S.D) warmUp();
+  if (S.D || S.phase === 'living') warmUp();
 }
 function logAdd(t, text){ S.log.push({t: clock(t), text}); }
 // the journal's lines: the time is written only on the first line of each hour
@@ -4418,7 +4420,9 @@ function restart(){
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   newSeason(); save(); render(); showSplash();
 }
-if (!load()) newSeason();
+// a new game is saved at once, so a reload before the first day keeps it: its seed, so the same weather on the screens
+// before the first day and the same first day
+if (!load()){ newSeason(); save(); }
 hush();
 // the title screen opens a new game, then the backstory, the yard and the first morning; later launches go straight to
 // the saved game (one saved before the first day comes back to the title screen, then to the screen it was on). The
