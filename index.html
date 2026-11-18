@@ -2700,49 +2700,54 @@ const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1
 const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Разве что омут под лесом.', 'В туман на реке обычно берёт ровно.', 'В ливень поплавок колотит каплями, рыба почти не берёт. В омуте под лесом потише.'];
 
 // ---------- household numbers ----------
-// What life takes from the piggy bank, every evening (the household block below): food, kerosene and soap run out,
-// tackle and tools wear, now and then something breaks, the summer asks for its things, now and then a treat. It
-// never touches the fish or the decisions. A purchase never waits: what is needed is bought that evening, and the
-// piggy bank may go below zero, into debt, with no other effect. A day never costs less than a day of tackle
-// (LIFE_MIN), about 65 on average, and no day much more: what runs out soon is bought ahead on a light day, and a big
-// thing is paid in parts. Keep these numbers and should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
+// What life takes from the piggy bank (the household block below): food, kerosene and soap run out, tackle and tools
+// wear, now and then something breaks, the summer asks for its things, now and then a treat. Each morning decides
+// what the day buys and says what it comes to; the evening takes exactly that. It never touches the fish or the
+// decisions. A purchase never waits: what is needed is bought that day, and the piggy bank may go below zero, into
+// debt, with no other effect. A day never costs less than a day of tackle (LIFE_MIN), about 65 on average, and no day
+// much more: what runs out soon is bought ahead on a light day, and a big thing is paid in parts. Keep these numbers and
+// should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
 // GOODS: what one purchase costs and how many days it lasts (`acc`: its name after «на» and «за»); the morning's words
 // when it is low, two days left (`low`), and on its last day (`out`); a good with no words is bought without a thought.
-// The last four are tackle and tools that wear.
+// `unit`: what one purchase is, said with its price when the morning thinks of it and the day buys it («пачка 20»);
+// `asks`: which of its words ask for it already («Надо спичек.»), so the price follows them after a comma alone; `nom`:
+// its name on a morning that thinks of two goods («Кончаются хлеб и крупа»). The last four are tackle and tools that
+// wear.
 const GOODS = {
   milk:     {acc:'молоко', price:20, days:1},
-  bread:    {acc:'хлеб', price:30, days:5, low:'Хлеб почти весь.', out:'Хлеба нет.'},
-  sugar:    {acc:'сахар', price:30, days:5, low:'Сахару на пару дней.', out:'Сахар кончается.'},
-  flour:    {acc:'муку', price:20, days:8, out:'Мука кончается.'},
-  pasta:    {acc:'макароны', price:15, days:5, out:'Макарон почти нет.'},
-  groats:   {acc:'крупу', price:15, days:5, out:'Крупы осталось немного.'},
-  tea:      {acc:'чай', price:30, days:8, out:'Чай на донышке.'},
-  oil:      {acc:'масло', price:30, days:10, out:'Масло кончается.'},
-  kerosene: {acc:'керосин', price:15, days:8, low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит — керосин нужен.'},
+  bread:    {acc:'хлеб', price:30, days:5, nom:'хлеб', unit:'буханка', low:'Хлеб почти весь.', out:'Хлеба нет.'},
+  sugar:    {acc:'сахар', price:30, days:5, nom:'сахар', unit:'пачка', low:'Сахару на пару дней.', out:'Сахар кончается.'},
+  flour:    {acc:'муку', price:20, days:8, nom:'мука', unit:'пачка', out:'Мука кончается.'},
+  pasta:    {acc:'макароны', price:15, days:5, nom:'макароны', unit:'пачка', out:'Макарон почти нет.'},
+  groats:   {acc:'крупу', price:15, days:5, nom:'крупа', unit:'пачка', out:'Крупы осталось немного.'},
+  tea:      {acc:'чай', price:30, days:8, nom:'чай', unit:'пачка', out:'Чай на донышке.'},
+  oil:      {acc:'масло', price:30, days:10, nom:'масло', unit:'бутылка', out:'Масло кончается.'},
+  kerosene: {acc:'керосин', price:15, days:8, nom:'керосин', unit:'литр', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит — керосин нужен.', asks:'out'},
   soap:     {acc:'мыло', price:10, days:8},
-  salt:     {acc:'соль', price:5, days:15, out:'Соль на донышке.'},
-  matches:  {acc:'спички', price:5, days:10, low:'Спичек осталось немного.', out:'Надо спичек.'},
+  salt:     {acc:'соль', price:5, days:15, nom:'соль', unit:'пачка', out:'Соль на донышке.'},
+  matches:  {acc:'спички', price:5, days:10, nom:'спички', unit:'коробок', low:'Спичек осталось немного.', out:'Надо спичек.', asks:'out'},
   line:     {acc:'леску', price:25, days:12},
   hooks:    {acc:'крючки', price:10, days:5},
   nails:    {acc:'гвозди', price:15, days:8},
   tar:      {acc:'смолу', price:30, days:20},
 };
 // what breaks now and then (never in a new game's first BREAK_FROM days, never two close together): the morning's
-// words, and what is bought for it that evening
+// words, and what that day buys for it. `cost`: how the words go on to its price, which takes the place of their
+// last full stop («Ведро дало течь. Новое — 35.»; a part of a big thing «Доска 50, пока 30.»)
 const BREAKS = {
-  roof:   {acc:'доску', price:50, thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
-  glass:  {acc:'стекло', price:70, thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
-  bucket: {acc:'ведро', price:35, thought:'Ведро дало течь.'},
-  shovel: {acc:'лопату', price:35, thought:'Лопата треснула по черенку.'},
-  saw:    {acc:'точильный камень', price:25, thought:'Пила тупая — камень нужен.'},
+  roof:   {acc:'доску', price:50, cost:'. Доска ', thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
+  glass:  {acc:'стекло', price:70, cost:'. Новое — ', thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
+  bucket: {acc:'ведро', price:35, cost:'. Новое — ', thought:'Ведро дало течь.'},
+  shovel: {acc:'лопату', price:35, cost:'. Новая — ', thought:'Лопата треснула по черенку.'},
+  saw:    {acc:'точильный камень', price:25, cost:', ', thought:'Пила тупая — камень нужен.'},
 };
 // once a summer (SUMMER days, then it comes round again), on a morning between days `from` and `to` of it: the thought,
-// and that evening the thing
+// and that day the thing (`cost` as in BREAKS)
 const SEASON = {
-  net:   {acc:'накомарник', price:30, from:3, to:10, thought:'Комары замучили — накомарник нужен.'},
-  seeds: {acc:'семена', price:30, from:10, to:20, thought:'Огород бы посадить, срок подходит.'},
-  socks: {acc:'носки', price:40, from:35, to:45, thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
-  boots: {acc:'сапоги', price:150, from:70, to:85, thought:'К осени сапоги бы новые.'},
+  net:   {acc:'накомарник', price:30, from:3, to:10, cost:', ', thought:'Комары замучили — накомарник нужен.'},
+  seeds: {acc:'семена', price:30, from:10, to:20, cost:'. Семена — ', thought:'Огород бы посадить, срок подходит.'},
+  socks: {acc:'носки', price:40, from:35, to:45, cost:'. Пара — ', thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
+  boots: {acc:'сапоги', price:150, from:70, to:85, cost:' — ', thought:'К осени сапоги бы новые.'},
 };
 const TREATS = {gingerbread: {acc:'пряники', price:15}, condensed: {acc:'сгущёнку', price:20}};   // every TREAT_GAP days, no thought
 // the morning when nothing in the house asks for a thought
@@ -3113,7 +3118,7 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
-  S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {} };
+  S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {}, planned: 0 };
   newHouse();
 }
 function genDay(){
@@ -3179,18 +3184,24 @@ function startDay(){
   S.signs = {};   // the signs lookAround() wrote, by water and hour
   S.life = {};    // the life around the water lookAround() chose, by water and hour
   S.trail = [];   // where the day went, for the evening's page
-  S.phase = 'izba'; S.purchases = [];   // nothing bought yet today
+  S.phase = 'izba';
   logAdd(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
-  logAdd(0, morningThought());   // the first thought of the day, at 6:00
+  const thought = morningThought();   // what the first thought of the day is about, at 6:00
+  spendDay();   // what the day buys, decided now: the evening takes exactly this
+  morningLines(thought).forEach(x => logAdd(0, x));   // the thought, with a price, and what the day will take
 }
 
 // ---------- the household ----------
-// What life takes, by the household numbers at the top. Its draws come from hashOf() (the game's number for its
-// scenes, the day and a tag), never from rnd(): the fishing days stay as they were, and a reload gives the same thoughts
-// and purchases. State, all saved: S.stock, the days each good still lasts counting today (bought on the evening it
-// comes to 0); S.house, what is owed for big things, this morning's breakdown and thought, the summer's purchases, the
-// next treat and the last background thought; S.purchases, what the evening bought, [{id, price, part}], `part` 'first',
-// 'more' or 'last' for a big thing paid in parts (nameOf(id) is its name after «на» or «за»).
+// What life takes, by the household numbers at the top. The morning decides what the day buys (spendDay() from
+// startDay(), from the morning's state alone, so nothing done in the day changes it) and says what it comes to; the
+// evening takes exactly that (endDay()). Its draws come from hashOf() (the game's number for its scenes, the day and a
+// tag), never from rnd(): the fishing days stay as they were, and a reload gives the same thoughts and purchases.
+// State, all saved: S.stock, the days each good still lasts counting the day it is reckoned for (a good is bought on
+// the day it comes to 0): this morning's until spendDay() has decided the day, the next morning's from then on;
+// S.house, what is owed for big things, this morning's breakdown and thought, the summer's purchases, the next treat
+// and the last background thought; S.purchases, what the day buys, [{id, price, part, gone}], `part` 'first', 'more'
+// or 'last' for a big thing paid in parts, `gone` for a good bought because it ran out today (nameOf(id) is its name
+// after «на» or «за»); S.planned, the day S.purchases was decided for.
 const HOUSE_TAG = 0x484f5553;
 function hashOf(...vals){   // a number in [0, 1) from the game's number and vals
   let x = S.sceneSeed | 0;
@@ -3222,38 +3233,68 @@ function newHouse(from = S.day){
 // The morning's thought, by priority: the season's thing on the last day of its time; what runs low, NEED_DAYS or
 // fewer days left (the good with the fewest, and a second one when both are on their last day); what broke, only on a
 // morning when nothing runs low and the evening has room, so it is told and never piles on; the season's thing in its
-// time; else a background thought, never the last one again. Never about the fish.
+// time; else a background thought, never the last one again. Never about the fish. Returns what it is about,
+// {kind, id}, and for what runs low its goods and which of their words, [[good, 'low' or 'out']]: morningLines() words
+// it once the day is decided.
 function morningThought(){
   const H = S.house, cyc = (S.day - 1) % SUMMER + 1, yr = Math.floor((S.day - 1)/SUMMER);
   const season = ids => ids.find(s => H.season[s] !== yr && cyc >= SEASON[s].from && cyc <= SEASON[s].to);
-  const say = (kind, id, text) => { H.said = {kind, id}; return text; };
+  const say = (kind, id, goods) => { H.said = {kind, id}; return {kind, id, goods}; };
   H.broke = null; H.said = null;
   const last = season(Object.keys(SEASON).filter(s => cyc === SEASON[s].to));
-  if (last) return say('season', last, SEASON[last].thought);
+  if (last) return say('season', last);
   const low = GOOD_IDS.filter(g => GOODS[g].out && S.stock[g] <= NEED_DAYS).sort((a, b) => S.stock[a] - S.stock[b] || GOODS[b].days - GOODS[a].days);
   if (low.length){
-    const words = g => S.stock[g] > 1 && GOODS[g].low || GOODS[g].out;
-    const two = low.length > 1 && S.stock[low[1]] <= 1, w2 = two ? words(low[1]) : '';
-    return say('need', low[0], words(low[0]) + (two ? ' И ' + w2.charAt(0).toLowerCase() + w2.slice(1) : ''));
+    const words = g => [g, S.stock[g] > 1 && GOODS[g].low ? 'low' : 'out'];
+    const two = low.length > 1 && S.stock[low[1]] <= 1;
+    return say('need', low[0], two ? [words(low[0]), words(low[1])] : [words(low[0])]);
   }
   const tonight = GOOD_IDS.reduce((s, g) => s + (S.stock[g] <= 1 ? GOODS[g].price : 0), 0);
   if (S.day > BREAK_FROM && S.day - H.lastBreak >= BREAK_GAP && tonight <= BREAK_ROOM && hh(1) < BREAK_P){
     const ids = Object.keys(BREAKS).filter(b => b !== H.lastBroke), b = ids[Math.floor(hh(2)*ids.length)];
     H.broke = H.lastBroke = b; H.lastBreak = S.day;
-    return say('break', b, BREAKS[b].thought);
+    return say('break', b);
   }
   const due = season(Object.keys(SEASON));
-  if (due) return say('season', due, SEASON[due].thought);
+  if (due) return say('season', due);
   const pool = THOUGHTS.map((_, i) => i).filter(i => i !== H.thought), i = pool[Math.floor(hh(4)*pool.length)];
   H.thought = i;
-  return say('thought', i, THOUGHTS[i]);
+  return say('thought', i);
 }
-// The evening: what is bought and paid today; sets S.purchases and returns the sum. What ran out is bought, then what
+// The morning's words, once spendDay() has decided the day: the thought, and when the day buys what it thinks of, its
+// price on the same line, in the old man's words («Мука кончается — надо купить, пачка 20.»; two goods on their last
+// day by name and together, «Кончаются хлеб и крупа — надо купить на 45.»; a big thing paid in parts its price and
+// today's part, «Доска 50, пока 30.», after a comma «пока 20 из 30»); then what the whole day will take, which is
+// what the evening takes («Всего за день уйдёт 65.»). Short, so that the two fit the journal's three lines on a short
+// phone. What the thought does not name (milk, a treat, a later part of a big thing, what is bought ahead) is in that
+// sum alone.
+function morningLines(m){
+  const bought = id => S.purchases.find(p => p.id === id && p.part !== 'more' && p.part !== 'last');
+  const priced = (words, join, what) => words.slice(0, -1) + join + what + '.';   // the price takes the full stop's place
+  let line;
+  if (m.kind === 'need' && m.goods.length > 1){   // both run out today, so the day buys both
+    const [a, b] = m.goods.map(([g]) => g), sum = [a, b].reduce((s, g) => s + (bought(g) ? bought(g).price : 0), 0);
+    line = `Кончаются ${GOODS[a].nom} и ${GOODS[b].nom} — надо купить на ${sum}.`;
+  }
+  else if (m.kind === 'need'){
+    const [g, w] = m.goods[0], G = GOODS[g], p = bought(g);
+    line = p ? priced(G[w], G.asks === w ? ', ' : ' — надо купить, ', `${G.unit} ${p.price}`) : G[w];
+  }
+  else if (m.kind === 'thought') line = THOUGHTS[m.id];
+  else {
+    const T = m.kind === 'break' ? BREAKS[m.id] : SEASON[m.id], p = bought(m.id);
+    const part = p && p.part === 'first' && (T.cost === ', ' ? `пока ${p.price} из ${T.price}` : `${T.price}, пока ${p.price}`);
+    line = p ? priced(T.thought, T.cost, part || `${p.price}`) : T.thought;
+  }
+  return [line, `Всего за день уйдёт ${daySpend()}.`];
+}
+const daySpend = () => S.purchases.reduce((s, p) => s + p.price, 0);   // what the day takes, all of it
+// The day's purchases, decided in the morning; sets S.purchases and S.planned. What runs out today is bought, then what
 // broke this morning and the season's thing thought of, and a treat when one is due and the day has room. When the next
 // two days would see much run out at once, some of it is bought today. Then, while the day is under LIFE_MIN, what
 // would be thought of tomorrow; while it is under PART_TOP, a part of what is owed for a big thing; while it is under
 // LIFE_MIN again, what runs out within AHEAD days (each bought ahead only up to LIFE_TOP); and at last, if the day is
-// still under LIFE_MIN, the cheapest good not yet full.
+// still under LIFE_MIN, the cheapest good not yet full. These rules were the evening's once, and buy the same.
 function spendDay(){
   const H = S.house, buy = [];
   let sum = 0;
@@ -3263,7 +3304,7 @@ function spendDay(){
     const first = Math.max(PART_MIN, Math.min(price >= BIG ? PART : price, Math.floor((LIFE_MAX - sum)/10)*10));
     if (first < price){ add(id, first, 'first'); H.owe.push({id, left: price - first}); } else add(id, price);
   };
-  for (const g of GOOD_IDS) if (--S.stock[g] <= 0){ S.stock[g] += GOODS[g].days; add(g, GOODS[g].price); }
+  for (const g of GOOD_IDS) if (--S.stock[g] <= 0){ S.stock[g] += GOODS[g].days; add(g, GOODS[g].price); buy[buy.length - 1].gone = true; }
   if (H.broke) take(H.broke, BREAKS[H.broke].price);
   if (H.said && H.said.kind === 'season'){ H.season[H.said.id] = Math.floor((S.day - 1)/SUMMER); take(H.said.id, SEASON[H.said.id].price); }
   if (S.day >= H.treat){
@@ -3291,7 +3332,7 @@ function spendDay(){
   H.owe = H.owe.filter(o => o.left > 0);
   fill(false);
   while (sum < LIFE_MIN){ const f = free(false), h = f.length ? f : free(true); ahead(h.reduce((m, g) => GOODS[g].price < GOODS[m].price ? g : m)); }
-  S.purchases = buy;
+  S.purchases = buy; S.planned = S.day;
   return sum;
 }
 
@@ -3335,6 +3376,9 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
     }
   }
   if (S.phase === 'morning'){ S.phase = 'izba'; S.curtain = false; }  // saved before the izba had a curtain and a yard
+  // saved before the morning decided the day's purchases: a day under way decides them now, by the rules its evening
+  // would have used, from the same state (its morning said no price); an evening saved then has already spent
+  if (!Number.isInteger(S.planned)){ S.planned = 0; if (S.D && S.phase !== 'evening' && !INTRO.has(S.phase)) spendDay(); }
   // saved before the evening was a page of the diary: the day's way so far from its journal, and an empty book; an
   // evening saved then gets its page now (and a page that cannot be written leaves the game as it was)
   if (!Array.isArray(S.trail)) S.trail = S.D && Array.isArray(S.log) ? trailFromLog() : [];
@@ -3862,9 +3906,10 @@ const LIFE_LINES = [
   {at: 'all', id: 'gossamer', f: 'some', w: '1', h: '11-17', m: '9', s: 'На леске блестит паутинка.'},
   {at: 'all', id: 'raven', f: 'some', w: '01234', s: 'Над головой пролетел ворон, гулко крикнул.'},
   // the old man himself: tea in the morning and a bite at noon. No tea on a day without power (the kettle is electric,
-  // the thermos was not filled), and no bread on its last day, when the morning finds «Хлеба нет.»
+  // the thermos was not filled), and no bread on its last day, when the morning finds «Хлеба нет» (the day buys it
+  // because it ran out: `gone`)
   {at: 'all', id: 'tea', f: 'clock', w: '01234', h: '7-9', s: 'Налил чаю из термоса.', need: () => !S.noPower},
-  {at: 'all', id: 'lunch', f: 'clock', w: '01234', h: '12-13', s: 'Перекусил: хлеб, варёное яйцо, луковица.', need: () => !(S.stock && S.stock.bread <= 1)},
+  {at: 'all', id: 'lunch', f: 'clock', w: '01234', h: '12-13', s: 'Перекусил: хлеб, варёное яйцо, луковица.', need: () => !(S.purchases || []).some(p => p.id === 'bread' && p.gone)},
 ];
 const CUCKOO = ['два раза', 'три раза', 'четыре раза', 'пять раз', 'шесть раз', 'семь раз'];
 const LIFE_RARE = {season: .008, rare: .02};    // a rarer line's own chance in an hour it fits (times its q)
@@ -4083,7 +4128,8 @@ async function sit(){
 }
 function endDay(){
   if (S.noPower) logAdd(S.t, 'Света так и нет. Зажёг керосинку.');   // the evening at home, the kerosene lamp on the sill
-  S.money -= spendDay();   // what life took today (S.purchases): the evening's remainder is the next morning's money
+  if (S.planned !== S.day) spendDay();   // a day the morning did not decide (never, but for a save that missed it): by the same rules
+  S.money -= daySpend();   // what the morning said the day would take (S.purchases): the remainder is the next morning's money
   closePage();   // the evening's page goes into the book, the day into the flyleaf's counts
   S.phase = 'evening'; save(); render();
 }
