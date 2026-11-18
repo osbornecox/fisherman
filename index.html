@@ -2938,14 +2938,17 @@ const VIEW_SKY = {   // izba.py's clear sky of the view by row, per weather (fog
 // izba.py's clouds in the view, (x, y, w), in the order it draws them: outside_view's pix.sky (by random.Random(11))
 // and its LOW_CLOUDS, view_weather's strips and torn clouds (by random.Random(12)); the sun's are fixed. Change izba.py,
 // change these (izba_check.js catches it).
-const VIEW_CLOUDS = {overcast: [[47,39,28],[47,36,32],[14,15,30],[50,44,33],[91,15,17],[47,23,18],[1,38,36],[4,55,24],[48,60,22],[88,64,18]],
+const VIEW_CLOUDS = {overcast: [[47,39,28],[47,36,32],[14,15,30],[50,44,33],[91,15,17],[47,23,18],[1,38,36],[4,55,24],[48,60,22],[88,64,18],[-30,58,20],[122,62,20],[150,56,14]],
   sun: [[44,41,12],[66,48,9],[74,57,10]], rain: [[101,55,41],[69,47,32],[-18,61,35],[50,67,42]],
   downpour: [[101,55,41],[69,47,32],[-18,61,35],[50,67,42],[38,38,41],[17,66,31],[21,59,48]],
   wind: [[91,54,59],[59,46,50],[-28,60,56],[40,66,40],[-30,46,54],[64,47,47],[23,40,38],[-11,58,51]]};
 const VIEW_PANES = [[41,37,63,51],[67,37,89,51],[41,55,63,87],[67,55,89,87],[41,90,63,105],[67,90,89,105]];   // izba.py's
 // panes: the glass shows the view at 1.04, but each pane's top row is its corner's colour at .82 (the sash's shadow)
-const VIEW_STROKES = [[48,61,79],[74,83,82]];   // the lighter strokes on the river, x0 x1 y (outside_view)
-const VIEW_FLOW = -.5;   // px a second the calm river's strokes flow (to the left, against the clouds)
+// the lighter strokes on the river, x0 x1 y: outside_view's two, and four more that lie beyond the glass at first (no
+// picture shows them) and flow in, so two or so are in sight at any time, on a ring 160 wide
+const VIEW_STROKES = [[48,61,79],[74,83,82],[94,101,80],[114,124,83],[136,143,81],[8,14,80]];
+const VIEW_FLOW = -.5;   // px a second the calm river's strokes flow (to the left, against the clouds), each a little
+                         // faster or slower than that, and each stepping at its own moment
 const pyRound = v => { const f = Math.floor(v), d = v - f; return d < .5 ? f : d > .5 ? f + 1 : f % 2 ? f + 1 : f; };
 const mixI = (a, b, t) => a.map((v, i) => Math.floor(v*(1 - t) + b[i]*t));   // izba.py's mix
 // izba.py's river in the calm weathers: pix's water and its lighter strokes (water2), as view_weather paints them
@@ -2991,7 +2994,7 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
     else if (w === 'sun') for (let xx = x; xx < x+n; xx++){ l.push(xx, y+1, ci([236,240,238])); if (xx >= x+2 && xx < x+n-2) l.push(xx, y, ci([236,240,238])); }
     else if (w === 'wind') for (let i = 0; i < n; i++) l.push(x+i, y + Math.floor(i/22), ci([214,220,222]));
     else for (let r = 0; r < (w === 'downpour' ? 2 : 1); r++) for (let xx = x; xx < x+n; xx++) l.push(xx, y+r, ci(w === 'downpour' ? [82,90,96] : [122,130,136]));
-    const px = []; for (let j = 0; j < l.length; j += 3) if (l[j] >= 0 && l[j] < W) px.push(l[j], l[j+1], l[j+2]);
+    const px = l;   // whole, though izba.py cuts a cloud at the picture's edge: only the glass ever shows
     clouds.push({px, ph: viewNoise(s, clouds.length, 1)});
   }
   let lo = 0, hi = W, wide = 0;   // the ring the clouds drift on: one leaves on one side before it comes back on the other
@@ -3019,8 +3022,9 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
     }
   }
   // the calm river: each pixel's colour from the strokes flowing over it or the plain water, lit beforehand, as the sky
-  const flow = [], WATER = VIEW_WATER[w], strokes = VIEW_STROKES.map(([a, b, y]) => [a, b - a + 1, y]);
-  const strokeAt = (x, y, off) => strokes.some(([a, n, sy]) => sy === y && mod(x - a - off, 160) < n);   // on a ring 160 wide
+  const flow = [], WATER = VIEW_WATER[w];
+  const strokes = VIEW_STROKES.map(([a, b, y], i) => [a, b - a + 1, y, VIEW_FLOW*(.8 + .4*viewNoise(s + 17, i, 1)), viewNoise(s + 17, i, 2)]);
+  const strokeAt = (x, y, t) => strokes.some(([a, n, sy, v, ph]) => sy === y && mod(x - a - Math.floor(v*t + ph), 160) < n);   // at t = 0 where izba.py has them
   if (WATER) for (const p of live){
     if (cls[p] !== 2) continue;
     const x = p % W, y = (p / W) | 0, tab = [[116,131,138], [142,156,161]].map(c => viewLit(P, shadeI(WATER(c), 1.04), x, y, 2));
@@ -3049,7 +3053,7 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
     const t = 2*Math.floor(n/2)/VIEW_FPS;   // what moves, moves on even ticks
     for (const p of live) set(p, get(still, p));
     if (sky.length){ coverAt(plain ? 0 : t); for (const [p, src, tab, leaf] of sky) if (!(leaf && plain)) set(p, tab[cover[src] + 1]); }
-    if (flow.length){ const off = plain ? 0 : Math.floor(VIEW_FLOW*t); for (const [p, x, y, tab] of flow) set(p, tab[+strokeAt(x, y, off)]); }
+    if (flow.length){ const tt = plain ? 0 : t; for (const [p, x, y, tab] of flow) set(p, tab[+strokeAt(x, y, tt)]); }
     if (!plain){
       for (const [p, q] of unleaf) set(p, get(still, q));
       for (const p of glints) if (blink(p, 6, 2.4, 2.2, t) > .7) set(p, water(p));   // off a while: the water under it
