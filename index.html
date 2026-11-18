@@ -209,14 +209,19 @@
 //   LiveScenes.create(canvas, {place, weather, hour, src, autoplay = true, baked = false, t = 0, lit = true, seed = 0,
 //     signs = [], life = null, lilies = false}) -> scene
 //     place one of LiveScenes.PLACES, weather one of LiveScenes.WEATHERS ('rain' is the drizzle), hour 6..18 (rounded
-//     and clamped, 12 when missing). src is the URL of the place's clean picture, 130x180, a data: URI or a
-//     same-origin URL: it is loaded with an Image, analysed once and cached by place and src. baked is the demo's
-//     ?baked=1 check: weather.py's picture, unlit, nothing moving. t is the time the scene starts at, in seconds: a
-//     scene that takes over from another (a new hour, a new place) starts at that one's `time`, so nothing in it
-//     jumps. The canvas is made 130x180 and only ever gets putImageData; until the picture is analysed it is left as
-//     it is (transparent), so an <img> under it shows. With autoplay the scene plays at 12 ticks a second, unless the
-//     system asks for reduced motion; otherwise it draws one still frame. lit: false is a day without power: at 18:00
-//     no window and no street lamp lights up (daytime.py's no_power); left out, or any other value, they light up.
+//     and clamped, 12 when missing). The places are the five outdoor places of the day (pix.py's) and the two screens
+//     before the first day: 'splash', the title screen (splash.py), and 'story', the backstory's village from the hill
+//     (village.py); those two have no signs, no life and no rod, only their weather, their light and what moves of
+//     itself. src is the URL of the place's clean picture, 130 wide and as tall as LiveScenes.SIZE[place] says (180,
+//     the title screen 281, the whole phone screen), a data: URI or a same-origin URL: it is loaded with an Image,
+//     analysed once and cached by place and src. baked is the demo's ?baked=1 check: weather.py's picture, unlit,
+//     nothing moving. t is the time the scene starts at, in seconds: a scene that takes over from another (a new hour,
+//     a new place) starts at that one's `time`, so nothing in it jumps. The canvas is made 130 wide and as tall as the
+//     place's picture (again whenever the scene's place changes to one of another size) and only ever gets
+//     putImageData; until the picture is analysed it is left as it is (transparent), so an <img> under it shows. With
+//     autoplay the scene plays at 12 ticks a second, unless the system asks for reduced motion; otherwise it draws one
+//     still frame. lit: false is a day without power: at 18:00 no window and no street lamp lights up (daytime.py's
+//     no_power); left out, or any other value, they light up.
 //     signs are the signs on the water of the hour, as the journal wrote them: a list of {kind: 'splash', variant:
 //     'shore' | 'under' | 'calm'}, {kind: 'boil'}, {kind: 'bubbles'}, {kind: 'midge'} (LiveScenes.SIGNS lists them).
 //     Each shows at three sites on the water that the seed picks (an integer; the game's number for the day, the hour
@@ -263,6 +268,7 @@
 //   LiveScenes.LIFE: {river: [id, ...], omut: [...], lake: [...]}, the life each water draws, and LIFE_NAME: {id: a
 //     short Russian label} (the demo's). The journal line each id draws is by it in LIFE below.
 //   LiveScenes.EVENTS: {strike: {frames: [ms, ms, ms], ms}, scare: {ms}}, how long the one-shots take.
+//   LiveScenes.SIZE: {place: [width, height]}, the size of each place's picture.
 //   LiveScenes.PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version.
 // Bad input (an unknown place or weather, a picture that does not load) gets one console.warn and a scene that draws
 // nothing until set() gives it something it can draw.
@@ -285,22 +291,31 @@
 'use strict';
 if (window.LiveScenes) return;   // loaded twice: one engine, one ticker
 
-const W = 130, H = 180, N = W * H, FPS = 12;
-const PLACES = ['home', 'shop', 'river', 'omut', 'lake'];                 // weather.py's SCENES order: its seeds depend on it
+const W = 130, FPS = 12;   // every picture is 130 wide; how tall it is, is its place's (GEO below)
+const PLACES = ['home', 'shop', 'river', 'omut', 'lake', 'splash', 'story'];   // weather.py's SCENES order: its seeds
+                                                                              // depend on it, so a new place goes last
 const WEATHERS = ['overcast', 'sun', 'rain', 'wind', 'fog', 'downpour'];   // weather.py's WEATHERS order; 'rain' is the drizzle
-const PLACE_NAME = {home: 'Двор', shop: 'Деревня', river: 'Река', omut: 'Омут', lake: 'Озеро'};
+const PLACE_NAME = {home: 'Двор', shop: 'Деревня', river: 'Река', omut: 'Омут', lake: 'Озеро', splash: 'Заставка', story: 'Предыстория'};
 const WEATHER_NAME = {overcast: 'пасмурно', sun: 'солнце', rain: 'морось', wind: 'ветер', fog: 'туман', downpour: 'ливень'};
-const SCENE_SEED = {home: 1, shop: 2, river: 3, omut: 4, lake: 5};        // pix.py: random.Random(n) in scene_<place>
-const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0};     // weather.py: how open the water is to the wind
+const SCENE_SEED = {home: 1, shop: 2, river: 3, omut: 4, lake: 5,   // pix.py: random.Random(n) in scene_<place>; splash.py's
+  splash: 31, story: 53};                                           // scene_splash and village.py's scene_village
+const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0, splash: .8, story: .5};   // weather.py: how open the
+                                                                                             // water is to the wind
 
 // What the palette cannot find, from the pix.py calls that drew it (x, y in the 130x180 picture). Boxes are [x, y, w, h];
 // reeds is where «у камыша» is (the clump, or the lake's sedge at the water), for the sign of fry jumping by the reeds.
 // rod is pix.rod(x0, y0, x1, y1): the butt in the old man's hands and the tip, from which the line hangs float_dy px to
 // the float (its top pixel is `float`); a strike hides that rod, line and float and raises a new rod from the butt.
-// tufts is where grass tufts, the meadow's grass dots or the sedge lean in a gust; skyline: a near forest against the
-// sky, whose treetops a gust leans; reflection: the bars of a reflection hanging from row y in colour c, whose feet
-// tremble on calm water. crowns are boxes of birch crowns that lean in the wind; trees, [x, y, w, h, k], boxes of a
-// whole birch, crown and trunk down to its foot, that sway: the crown and the trunk down to row k lean, the foot stays.
+// tufts is where grass tufts, the meadow's grass dots or the sedge lean in a gust; field, in a picture whose grass is
+// painted in gradients of its own (the title screen's, the village's), the box where any grass-green colour is grass:
+// there a gust combs it, and in the tufts' box the tips of its blades lean, but only over grass. skyline: a near forest
+// against the sky, whose treetops a gust leans; reflection: the bars of a reflection hanging from row y in colour c (or,
+// with rows [y0, y1], each run of c down a column that starts on those rows), whose feet tremble on calm water. crowns
+// are boxes of birch crowns that lean in the wind (crownC: of other trees, in these colours); trees, [x, y, w, h, k],
+// boxes of a whole birch, crown and trunk down to its foot, that sway: the crown and the trunk down to row k lean, the
+// foot stays. smoke is a chimney (or a list of them): puffs rise from (x + 1, y); n is how many pixels of baked smoke
+// the picture has over it (the engine takes them out and draws its own); k, if less than 1, shortens the puffs' life
+// for a far chimney. expect: [x, y, colour] pixels the anchors count on (a chimney's top), checked once.
 // Where the life around the water shows (see LIFE): lanes, the rows a drifting log's waterline may take; drift, the
 // columns its left end starts from; circle, [cx, cy, rx, ry], where a bird of prey circles; dodge, [x0, x1]: in the sun
 // the circle's centre goes to the end of these farther from the sun of the hour; sky, [y0, y1]: the row a flock's lead
@@ -381,6 +396,31 @@ const ANCHORS = {
                                         // px(tx + 1, 112 - th + 10); the trunk's top (row 94) is under the money chip on
                                         // the 375x548 screen (down to row 96), the stub and the raven on it (101..103) not
   },
+  // The title screen and the backstory: no float, no rod, no signs, no life; only what moves of itself.
+  splash: {
+    smoke: {x: 101, y: 156, n: 0},      // splash.py's chimney, rect(100, 158, 4, 9), no smoke in the picture: the puffs
+                                        // rise from two rows over its dark top row
+    tufts: [0, 142, 130, 139],          // the meadow's blades, rect(x, y - h + 1, 1, h) for y from MEADOW0 (145), the
+                                        // reeds and willow at the left bank, the grass over the izba's bottom logs
+    field: [0, 142, 130, 139],          // the meadow from the near bank down: any green there is grass
+    skyline: true,                      // the taiga hill across the river, its spruce tops jagged against the sky
+    reflection: {c: [64, 80, 72], rows: [122, 130]},   // the spruces' dark reflections near the far bank, rect(x, y, 1,
+                                        // randint(2, 5)) for y in RIVER0..RIVER0 + 8
+    expect: [[100, 158, [96, 56, 44]], [103, 158, [96, 56, 44]]],   // the chimney's top row
+  },
+  story: {
+    smoke: [{x: 65, y: 114, n: 0, k: .6}, {x: 31, y: 129, n: 0, k: .6}, {x: 62, y: 77, n: 0, k: .5}],   // village.py's
+                                        // chimneys: rect(66, 116, 2, 4) and rect(32, 131, 2, 4) of the two near houses
+                                        // (the big grey one and the rust one), rect(63, 79, 2, 3) of the dark one in the
+                                        // middle row: short puffs, the village seen from the hill
+    tufts: [0, 64, 130, 116],           // the blades on our slope, rect(x, y - h + 1, 1, h), longer down it
+    field: [0, 64, 130, 116],           // our slope under the river, its gardens too: any green there is grass
+    skyline: true,                      // the taiga ridge against the narrow sky
+    crowns: [[47, 98, 11, 12], [6, 101, 9, 10], [115, 104, 11, 12], [95, 128, 15, 16]],   // tree(d, rng, x, y, r) at
+                                        // (52, 104, 5), (10, 106, 4), (120, 110, 5) and (102, 136, 7): x - r.., y - r - 1..
+    crownC: [[84, 106, 62], [96, 118, 70], [76, 96, 56], [66, 86, 52]],   // tree()'s leaves; its trunk stays
+    expect: [[66, 116, [128, 76, 58]], [32, 131, [128, 76, 58]], [63, 79, [128, 76, 58]]],   // the chimneys' tops
+  },
 };
 
 // ---------- colours ----------
@@ -394,21 +434,26 @@ const C = {   // pix.C, the colours the effects look for
   mid: [95, 112, 98], hill: [66, 84, 68], spruce: [44, 60, 48], spruce2: [56, 74, 58], leaf: [160, 184, 98], leaf2: [110, 146, 68],
   meadow: [122, 138, 92], meadow2: [108, 124, 80], grass: [89, 101, 79], grass2: [79, 90, 66],
   win: [125, 116, 104], lamp: [97, 95, 89], water: [116, 131, 138], water2: [142, 156, 161], red: [181, 69, 47], paper: [230, 224, 210],
+  boat: [54, 47, 41], boatin: [92, 80, 68], rim: [118, 106, 92],
 };
 const SKY_C = keySet([C.sky1, C.sky2, C.sky3, C.cloud, C.cloud2]);
 const WATER_C = keySet([C.water, C.water2, [95, 109, 115], [195, 204, 206], [62, 74, 78], [52, 63, 67], [78, 92, 96], [44, 54, 50],
   [128, 142, 146], [154, 166, 168], [104, 118, 122]]);
-const STREAK_C = keySet([C.water2, [154, 166, 168], [78, 92, 96]]);   // the lighter strokes on the water: river and puddle, lake, omut
-const FOREST_C = keySet([C.mid, C.hill, C.spruce, C.spruce2]);         // forest hills and walls
+const STREAK_C = keySet([C.water2, [154, 166, 168], [78, 92, 96],     // the lighter strokes on the water: river and puddle,
+  [166, 178, 182]]);                                                   // lake, omut, the village's river
+const FOREST_C = keySet([C.mid, C.hill, C.spruce, C.spruce2,           // forest hills and walls; the last two are the title
+  [70, 92, 70], [64, 84, 62]]);                                        // screen's hill and the village's ridge and cape
 const MEADOW_C = keySet([C.meadow, C.meadow2, C.grass, C.grass2]);
 const SEDGE_C = keySet([[104, 108, 74], [140, 132, 86], [120, 120, 80], [96, 104, 70]]);   // the lake's shore and its sedge
 const CROWN_C = keySet([C.leaf, C.leaf2]), FERN_C = keySet([[98, 118, 70]]);
 const TREE_C = keySet([C.leaf, C.leaf2, [216, 214, 204], [43, 41, 37]]);   // a whole birch: its crown, pix.C's birch and ink
-// pix.py's REED and REED_DARK: glints, whitecaps and rain rings keep off the water within REED_NEAR px of a reed, as in
-// weather.py (near_reeds), so none lands between the stems or on a cattail head
+// pix.py's REED and REED_DARK, and the title screen's reeds and willow (splash.py): glints, whitecaps and rain rings keep
+// off the water within REED_NEAR px of a reed, as in weather.py (near_reeds), so none lands between the stems or on a
+// cattail head
+const SPLASH_REED = [[104, 120, 76], [122, 136, 88], [90, 104, 66]];
 const REED_C = keySet([[150, 158, 76], [108, 120, 58], [104, 70, 46], [142, 98, 60], [122, 130, 64], [90, 100, 50], [90, 60, 42],
-  [120, 84, 54]]), REED_NEAR = 2;
-const CLOUD_KEY = keyOf(...C.cloud), CLOUD2_KEY = keyOf(...C.cloud2), SMOKE_KEY = keyOf(178, 180, 178);
+  [120, 84, 54], ...SPLASH_REED]), REED_NEAR = 2;
+const SMOKE_KEY = keyOf(178, 180, 178);
 const SMOKE = pack(178, 180, 178), RED = pk(C.red), PAPER = pk(C.paper);
 const BAND = [pk(C.sky1), pk(C.sky2), pk(C.sky3)];
 // weather.py's colours
@@ -419,7 +464,62 @@ const DOWN_SKY = [pack(92, 100, 106), pack(104, 112, 117), pack(116, 122, 125)],
 const DOWN_RING = pack(176, 186, 190), DOWN_DROP = pack(188, 196, 202);
 const WIND_SKY = [pack(150, 164, 174), pack(166, 178, 186), pack(184, 192, 196)], WIND_WATER = pack(70, 88, 100), WIND_CLOUD = pack(214, 220, 222);
 const CAP = pack(224, 230, 230), TROUGH = pack(36, 48, 56), LEAF_C = [pack(176, 150, 70), pack(150, 140, 70), pack(190, 120, 60)];
-const FOG = pack(206, 210, 206), FOG_BANDS = [[66, 80], [96, 104], [128, 134]], GLINT = pack(250, 246, 222);
+const FOG = pack(206, 210, 206), GLINT = pack(250, 246, 222);
+
+// ---------- the pictures: how tall each is, and where its sky, its water and its weather lie ----------
+// weather.py's GEO, point for point: change both, then check with ?baked=1. pix.py's five places share PIX: 130x180, the
+// sky in pix.C's sky colours above row 92, the water in its water colours from row 84. The title screen (splash.py) and
+// the backstory's village from the hill (village.py) are painted in gradients of their own, so they tell their sky and
+// their river by rows and edges: everything above a row that is not the forest in front of it, everything between two
+// rows or two edges that is not what stands in the river.
+//   h: the height. sky: {rows, c} (the colours c above row `rows`) or {rows, not} (all but those). water: {rows: [y0, y1],
+//   c} or {rows, not} (rows y0..y1 - 1), or {edges: [far, near], x0, not}: from column x0 on, between the far and the near
+//   edge's rows (village.py's FAR_EDGE and NEAR_EDGE with its lerp_pts and round). bands, rain: the rows where the sun's
+//   and the wind's sky (bands), and the drizzle's and the downpour's (rain), turn to the next band. glow: [y0, n], the
+//   hour's glow grows from row y0 over n rows towards the horizon (daytime.py). fog: [y0, banks], the fog thins from row
+//   y0 down to the bottom; banks, its three dithered banks of rows [a, b). sun: where weather.py's own sun stands
+//   (?baked=1); arc: the sun's path by the hour, [x0, dx, y0, dy]: from x0 at 6:00 to x0 + dx at 18:00, low at row y0
+//   and dy rows higher at noon (daytime.py's sun_path). caps: [y0, n], the whitecaps grow denser from row y0 over n rows
+//   towards the near bank.
+//   The engine's own: clouds(seed), the overcast clouds the picture was drawn with, replayed with its random numbers
+//   (they drift); cloudC, their colours; clear(y), the sky under them on row y.
+const gradient = (a, b, t) => pack(Math.trunc(a[0] * (1 - t) + b[0] * t), Math.trunc(a[1] * (1 - t) + b[1] * t),
+                                   Math.trunc(a[2] * (1 - t) + b[2] * t));   // splash.py's and village.py's mix()
+function lerpPts(pts, x) {   // village.py's lerp_pts: the row of a polyline at column x
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+    if (x0 <= x && x <= x1) return y0 + (y1 - y0) * (x - x0) / Math.max(1, x1 - x0);
+  }
+  return x > pts[pts.length - 1][0] ? pts[pts.length - 1][1] : pts[0][1];
+}
+const PIX = {h: 180, sky: {rows: 92, c: SKY_C}, water: {rows: [84, 180], c: WATER_C}, bands: [26, 52], rain: [30, 58], glow: [40, 52],
+  fog: [70, [[66, 80], [96, 104], [128, 134]]], sun: [104, 16], arc: [8, 114, 76, 64], caps: [84, 96],
+  clouds: pixSkyClouds, cloudC: keySet([C.cloud, C.cloud2]), clear: y => BAND[y < 26 ? 0 : y < 52 ? 1 : 2]};
+const GEO = {home: PIX, shop: PIX, river: PIX, omut: {...PIX, clouds: null}, lake: PIX,   // the omut's sky has no clouds
+  // splash.py: the sky above row 96 behind the hill's spruce, a gradient pale toward the hill with six clouds; the river
+  // from SHORE (122) to RIVER1 (142) with the reeds and the boat in it; the fog as on pix.py's places (a bank on the
+  // hill's top, one down its slope, one on the river); the whitecaps denser towards our bank (row 141)
+  splash: {...PIX, h: 281, sky: {rows: 96, not: FOREST_C}, water: {rows: [122, 142], not: keySet([...SPLASH_REED, C.boat, C.boatin, C.rim])},
+    caps: [122, 40], clouds: splashClouds, cloudC: keySet([[190, 194, 192], [176, 182, 182]]),
+    clear: y => gradient([148, 160, 168], [206, 208, 200], y / 96)},
+  // village.py: the narrow sky above row 22 behind the ridge, low over the far horizon, so it starts with the middle band
+  // and turns pale at once, no clouds in it; the river between its edges, the wooded cape over its left end; the glow
+  // down the whole of that sky; a low sun over the ridge; the fog's banks on the cliff's top, on the river and on the
+  // village
+  story: {...PIX, sky: {rows: 22, not: FOREST_C}, bands: [0, 9], rain: [0, 10], glow: [-4, 26],
+    water: {edges: [[[10, 52], [22, 54], [36, 56], [46, 58], [114, 58], [122, 59], [130, 59]],    // FAR_EDGE
+                    [[10, 54], [22, 56], [36, 60], [46, 62], [80, 63], [104, 64], [130, 67]]],    // NEAR_EDGE
+            x0: 10, not: FOREST_C},
+    fog: [70, [[38, 46], [54, 62], [86, 92]]], sun: [104, 6], arc: [8, 114, 17, 13], caps: [52, 30], clouds: null},
+};
+const SIZE = Object.fromEntries(PLACES.map(p => [p, [W, GEO[p].h]]));
+const HMAX = Math.max(...PLACES.map(p => GEO[p].h)), NMAX = W * HMAX;   // the scratch of a frame fits the tallest
+function isSky(g, x, y, k) { const s = g.sky; return y < s.rows && (s.c ? s.c.has(k) : !s.not.has(k)); }
+function isWater(g, x, y, k) {
+  const s = g.water, inside = s.edges ? x >= s.x0 && pyRound(lerpPts(s.edges[0], x)) <= y && y <= pyRound(lerpPts(s.edges[1], x))
+    : s.rows[0] <= y && y < s.rows[1];
+  return inside && (s.c ? s.c.has(k) : !s.not.has(k));
+}
 
 // ---------- motion: how fast and how often (tuned by eye at x3 on a phone) ----------
 const CLOUD_V = {overcast: .4, sun: .6, rain: .45, wind: 2.5, fog: 0, downpour: -.45};   // px a second; + drifts right
@@ -448,7 +548,8 @@ const GUST_HALF = 22, GUST_DHALF = 12;    // px from the middle of a gust to its
 const GUST_RAGGED = 10;                   // px the front wanders either way, row by row
 const GUST_SLOTS = 4;                     // gusts on the scene at once, at most
 const LEAN_SKIP = .25;       // a crown or a fern leans once a cycle of its own, at a varied moment, and skips this share of cycles
-const PAW = {river: .9, omut: .6, lake: 1};   // how strong a gust's patch of ripple is on the water (the omut is sheltered)
+const PAW = {river: .9, omut: .6, lake: 1, splash: .8, story: .5};   // how strong a gust's patch of ripple is on the water
+                                                                       // (the omut is sheltered, the village's river far)
 const COMB_HALF = 18, COMB_DHALF = 14;    // rows from the middle of the patch a gust combs on the meadow or the sedge to its
                                           // top and bottom: the lowest, and how much taller one may be
 const CALM_NEAR = 12;                     // px from the float's quiet box over which glints and a gust's ripple thin out
@@ -490,11 +591,11 @@ const TONE = {   // weather.py's retones of everything that is not sky
   downpour: c => { const r = c & 255, g = (c >>> 8) & 255, b = (c >>> 16) & 255, y = .3 * r + .59 * g + .11 * b;
     return pack(clampPy((r * .6 + y * .4) * .78 + 0), clampPy((g * .6 + y * .4) * .78 + 2), clampPy((b * .6 + y * .4) * .78 + 8)); },
 };
-function fogT(y, sky, bank) {   // weather.py's fog: how far a pixel goes to the fog colour
-  const t = sky ? .88 : y < 70 ? .78 : .78 - .58 * (y - 70) / (H - 70);
+function fogT(P, y, sky, bank) {   // weather.py's fog: how far a pixel of picture P goes to the fog colour
+  const y0 = P.g.fog[0], t = sky ? .88 : y < y0 ? .78 : .78 - .58 * (y - y0) / (P.H - y0);
   return bank ? Math.min(.95, t + .25) : t;
 }
-const restBank = (x, y) => ((x + y) & 1) === 0 && FOG_BANDS.some(b => b[0] <= y && y < b[1]);
+const restBank = (P, x, y) => ((x + y) & 1) === 0 && P.g.fog[1].some(b => b[0] <= y && y < b[1]);
 
 // ---------- Python's random (MT19937), to replay pix.py and weather.py with their own seeds ----------
 function PyRandom(seed) {
@@ -552,6 +653,8 @@ const LIT = {   // what lights up in the evening, per place; skip boxes [x, y, w
   home: {c: keySet([[60, 58, 56], C.lamp]), skip: []},               // the izba's two windows and the lamp on the pole
   shop: {c: keySet([C.win, C.lamp]), skip: []},
   river: {c: keySet([C.win]), skip: [[37, 72, 3, 3]]},               // not the izba with the hole in its roof
+  splash: {c: keySet([[56, 60, 64]]), skip: []},                     // the title screen's izba: its two windows, not the attic's
+  story: {c: keySet([[56, 60, 64]]), skip: []},                      // the village's windows (village.py's GLASS)
 };
 const LIT_DEFAULT = {c: keySet([C.win]), skip: []}, LAMP_KEY = keyOf(...C.lamp);
 const lerp3 = (x, y, t) => x.map((v, i) => v * (1 - t) + y[i] * t);
@@ -562,7 +665,10 @@ function dayLight(h) {
   const t = (h - lo) / (hi - lo), a = DAY_KEYS[lo], b = DAY_KEYS[hi];
   return {sky: lerp3(a.sky, b.sky, t), land: lerp3(a.land, b.land, t), glow: lerp3(a.glow, b.glow, t), g: a.g * (1 - t) + b.g * t};
 }
-function sunPath(h) { const t = (h - DAY_FIRST) / (DAY_LAST - DAY_FIRST); return [8 + 114 * t, 76 - 64 * Math.sin(Math.PI * t)]; }
+function sunPath(h, a) {   // the sun of hour h on the picture's arc a (GEO), as daytime.py's sun_path
+  const t = (h - DAY_FIRST) / (DAY_LAST - DAY_FIRST);
+  return [a[0] + a[1] * t, a[2] - a[3] * Math.sin(Math.PI * t)];
+}
 function sunColour(h) {
   const mid = (DAY_FIRST + DAY_LAST) / 2;
   return h <= mid ? lerp3([246, 238, 214], [252, 240, 180], (h - DAY_FIRST) / (mid - DAY_FIRST))
@@ -576,8 +682,8 @@ const LAND = 0, SKY = 1, WATER = 2, LIT_PX = 3;
 function lighter(P, w, hour, power) {
   if (hour == null) return c => c;   // ?baked=1: weather.py's picture, no hour
   const L = dayLight(hour), wt = lerp3(L.land, L.sky, .6), gw = L.g * .35, haze = w === 'fog' ? .4 : 0, on = power && hour >= LIT_FROM;
-  const sk = new Float64Array(H);
-  for (let y = 0; y < H; y++) sk[y] = Math.min(1, Math.max(0, (y - 40) / 52) * L.g);
+  const [g0, gn] = P.g.glow, sk = new Float64Array(P.H);   // the glow grows towards the picture's horizon
+  for (let y = 0; y < P.H; y++) sk[y] = Math.min(1, Math.max(0, (y - g0) / gn) * L.g);
   const [sr, sg, sb] = L.sky, [lr, lg, lb] = L.land, [wr, wg, wb] = wt, [gr, gg, gb] = L.glow, lamp = on ? P.lampK : null;
   return (c, p, k) => {
     let r = c & 255, g = (c >>> 8) & 255, b = (c >>> 16) & 255;
@@ -603,7 +709,7 @@ function sunOf(P, sx, sy, core, halo, mix) {
   sx = Math.round(sx); sy = Math.round(sy);
   const ps = [], inCore = [];
   for (let x = sx - 9; x <= sx + 9; x++) for (let y = sy - 9; y <= sy + 9; y++) {
-    if (x < 0 || y < 0 || x >= W || y >= H || P.cls[y * W + x] !== SKY) continue;
+    if (x < 0 || y < 0 || x >= W || y >= P.H || P.cls[y * W + x] !== SKY) continue;
     const r2 = (x - sx) ** 2 + (y - sy) ** 2;
     if (r2 <= 52) { ps.push(y * W + x); inCore.push(r2 <= 20); }
   }
@@ -621,21 +727,29 @@ function paintSun(buf, s, touchedOnly) {   // touchedOnly: just the pixels an ef
 
 // ---------- the places: what the clean picture tells, found once ----------
 let placeIds = 0;   // P.id: a picture analysed, for the still layers' keys
+// A picture's grass where it is painted in gradients (ANCHORS' field): any grass-green colour, not a tree's crown.
+const greenish = k => ((k >> 8) & 255) >= (k >> 16) + 10 && ((k >> 8) & 255) >= (k & 255) + 14;
 function makePlace(name, rgba) {
-  const P = {id: ++placeIds, name, sites: {}, clean: new Uint32Array(N), cls: new Uint8Array(N), litCol: new Uint32Array(N), mat: new Uint8Array(N)};
+  const g = GEO[name], H = g.h, N = W * H;
+  const P = {id: ++placeIds, name, g, H, N, sites: {}, clean: new Uint32Array(N), cls: new Uint8Array(N), litCol: new Uint32Array(N),
+             mat: new Uint8Array(N)};
   const spec = LIT[name] || LIT_DEFAULT, A = ANCHORS[name], keys = new Int32Array(N), lamps = [];
   const warn = what => console.warn(`${name}: ${what} is not where ANCHORS says; the picture has changed`);
+  const crownC = A.crownC ? keySet(A.crownC) : CROWN_C, fb = A.field;
+  P.grass = fb ? k => greenish(k) && !crownC.has(k) : null;
   for (let p = 0; p < N; p++) {
-    const r = rgba[4 * p], g = rgba[4 * p + 1], b = rgba[4 * p + 2], k = keys[p] = keyOf(r, g, b), x = p % W, y = (p / W) | 0;
-    P.clean[p] = pack(r, g, b);
-    if (y < 92 && SKY_C.has(k)) P.cls[p] = SKY;
-    else if (y >= 84 && WATER_C.has(k)) P.cls[p] = WATER;
+    const r = rgba[4 * p], gr = rgba[4 * p + 1], b = rgba[4 * p + 2], k = keys[p] = keyOf(r, gr, b), x = p % W, y = (p / W) | 0;
+    P.clean[p] = pack(r, gr, b);
+    if (isSky(g, x, y, k)) P.cls[p] = SKY;
+    else if (isWater(g, x, y, k)) P.cls[p] = WATER;
     else if (spec.c.has(k) && !spec.skip.some(s => x >= s[0] && x < s[0] + s[2] && y >= s[1] && y < s[1] + s[3])) {
       P.cls[p] = LIT_PX; P.litCol[p] = pk(k === LAMP_KEY ? LAMP_LIT : WINLIT);
       if (k === LAMP_KEY) lamps.push([x, y]);
     }
-    P.mat[p] = FOREST_C.has(k) ? 1 : MEADOW_C.has(k) ? 2 : name === 'lake' && y >= 140 && SEDGE_C.has(k) ? 3 : 0;
+    const field = fb && x >= fb[0] && x < fb[0] + fb[2] && y >= fb[1] && y < fb[1] + fb[3] && P.grass(k);
+    P.mat[p] = FOREST_C.has(k) ? 1 : MEADOW_C.has(k) || field ? 2 : name === 'lake' && y >= 140 && SEDGE_C.has(k) ? 3 : 0;
   }
+  for (const [x, y, c] of A.expect || []) if (keys[y * W + x] !== keyOf(...c)) warn(`the pixel (${x}, ${y})`);
   P.reedNear = new Uint8Array(N);
   for (let p = 0; p < N; p++) if (REED_C.has(keys[p])) {
     const x = p % W, y = (p / W) | 0;
@@ -643,18 +757,18 @@ function makePlace(name, rgba) {
       for (let xx = Math.max(0, x - REED_NEAR); xx <= Math.min(W - 1, x + REED_NEAR); xx++) P.reedNear[yy * W + xx] = 1;
   }
   // The base: the clean scene without what an effect draws instead. The yard's smoke goes (its pixels take the colour
-  // on their left); under the overcast clouds of pix.sky lies the plain band of the sky.
+  // on their left); under the overcast clouds the picture was drawn with lies its clear sky (pix.sky's plain band, the
+  // title screen's gradient).
   P.base = P.clean.slice();
-  if (A.smoke) for (let i = 0; i < A.smoke.n; i++) {
-    const p = (A.smoke.y - 2 * i) * W + A.smoke.x + i % 3;
+  P.smokes = [].concat(A.smoke || []);
+  for (const s of P.smokes) for (let i = 0; i < s.n; i++) {
+    const p = (s.y - 2 * i) * W + s.x + i % 3;
     if (keys[p] !== SMOKE_KEY) warn('the smoke');
     P.base[p] = P.clean[p - 1];
   }
-  P.skyClouds = name === 'omut' ? [] : pixSkyClouds(SCENE_SEED[name]);   // omut's sky has no clouds
+  P.skyClouds = g.clouds ? g.clouds(SCENE_SEED[name]) : [];
   P.baseClear = P.base.slice();
-  for (let p = 0; p < N; p++) if (P.cls[p] === SKY && (keys[p] === CLOUD_KEY || keys[p] === CLOUD2_KEY)) {
-    const y = (p / W) | 0; P.baseClear[p] = BAND[y < 26 ? 0 : y < 52 ? 1 : 2];
-  }
+  for (let p = 0; p < N; p++) if (P.cls[p] === SKY && g.cloudC.has(keys[p])) P.baseClear[p] = g.clear((p / W) | 0);
   // The lamp's pool of light (the game's lit block), for the hours the lamp is on.
   P.lampK = null;
   if (lamps.length) {
@@ -668,7 +782,7 @@ function makePlace(name, rgba) {
   }
   // Water strokes that shimmer: runs of a lighter water colour with plain water on both sides.
   P.runs = [];
-  for (let y = 84; y < H; y++) for (let x = 1; x < W - 1;) {
+  for (let y = 0; y < H; y++) for (let x = 1; x < W - 1;) {
     const p = y * W + x, k = keys[p];
     if (P.cls[p] !== WATER || !STREAK_C.has(k)) { x++; continue; }
     let e = x; while (e + 1 < W && keys[y * W + e + 1] === k && P.cls[y * W + e + 1] === WATER) e++;
@@ -704,7 +818,20 @@ function makePlace(name, rgba) {
   // A reflection's bars, side by side columns of its colour hanging from its row to the same foot: on calm water the
   // foot of each grows or shrinks by a pixel now and then, at its own slow pace, as if the water breathed.
   P.bars = [];
-  if (A.reflection) {
+  if (A.reflection && A.reflection.rows) {   // the title screen's: a bar is a run of the colour down a column that starts
+    // on these rows, its foot on plain water
+    const k = keyOf(...A.reflection.c), [r0, r1] = A.reflection.rows;
+    const ok = q => P.cls[q] === WATER && keys[q] !== k && !STREAK_C.has(keys[q]) && !P.quiet[q] && !P.reedNear[q] && P.calm[q] >= 1;
+    for (let x = 0; x < W; x++) for (let y = r0; y <= r1; y++) {
+      const p = y * W + x;
+      if (keys[p] !== k || P.cls[p] !== WATER || keys[p - W] === k) continue;
+      let e = y; while (e + 1 < H && keys[(e + 1) * W + x] === k) e++;
+      if (e > y && ok((e + 1) * W + x)) P.bars.push({x0: x, x1: x, e, c: P.clean[p],
+        per: 6 + 4 * noise(SCENE_SEED[name], P.bars.length, 8), ph: noise(SCENE_SEED[name], P.bars.length, 9)});
+      y = e;
+    }
+    if (P.bars.length < 4) warn('the reflection');
+  } else if (A.reflection) {
     const k = keyOf(...A.reflection.c), y0 = A.reflection.y, foot = x => {
       if (keys[y0 * W + x] !== k || P.cls[y0 * W + x] !== WATER) return -1;
       let y = y0; while (y + 1 < H && keys[(y + 1) * W + x] === k) y++;
@@ -722,7 +849,6 @@ function makePlace(name, rgba) {
     }
     if (P.bars.length < 4) warn('the reflection');
   }
-  P.smoke = A.smoke || null;
   P.rod = A.rod && P.float ? strikeRod(P, A, warn) : null;
   windSites(P, keys, A, warn);
   return P;
@@ -749,7 +875,7 @@ function strikeRod(P, A, warn) {
   let off = 0;
   for (const [p, c] of hide) off += P.clean[p] !== c;
   if (off) warn('the rod');
-  const R = {hide: Int32Array.from(hide.keys()), c: new Uint32Array(hide.size), k: new Uint8Array(hide.size), kx: new Uint8Array(N),
+  const R = {hide: Int32Array.from(hide.keys()), c: new Uint32Array(hide.size), k: new Uint8Array(hide.size), kx: new Uint8Array(P.N),
              ring: [x1, y1 + fd + 2], frames: []};
   R.hide.forEach((p, i) => {   // the nearest pixel along the row that is not hidden; on a tie the one on the left
     const x = p % W, row = p - x;
@@ -779,7 +905,7 @@ function strikeRod(P, A, warn) {
 const TUFT_C = keySet([C.grass, [140, 132, 86], [120, 120, 80], [96, 104, 70]]);   // grass tufts and dots, the lake's sedge tufts
 const FAR_KEY = keyOf(122, 136, 128), MEADOW2_KEY = keyOf(...C.meadow2);            // pix.C's far ridge, the yard's meadow
 function windSites(P, keys, A, warn) {
-  const mat = P.mat, cls = P.cls;
+  const mat = P.mat, cls = P.cls, H = P.H, N = P.N;
   // The meadow and the sedge where they make a field (not a lone tuft among the pebbles): a gust combs paler streaks
   // into it.
   P.field = new Uint8Array(N); P.fy0 = H; P.fy1 = -1;
@@ -801,7 +927,7 @@ function windSites(P, keys, A, warn) {
   P.tops = [];
   if (A.skyline) {
     const top = new Int16Array(W).fill(-1);
-    for (let x = 0; x < W; x++) for (let y = 1; y < 92; y++) {
+    for (let x = 0; x < W; x++) for (let y = 1; y < P.g.sky.rows; y++) {
       const p = y * W + x;
       if (mat[p] === 1 && (cls[p - W] === SKY || keys[p - W] === FAR_KEY)) { top[x] = y; break; }
     }
@@ -838,7 +964,8 @@ function windSites(P, keys, A, warn) {
     }
     P.benders.push({x: bx + (bw >> 1), y: yt, lv, own, th: .28 + .2 * noise(19, P.benders.length, 1)});
   };
-  (A.crowns || []).forEach(b => bender(b, CROWN_C, b[2] > 10 ? 2 : 1, true, .3, 'a birch crown'));
+  const crownC = A.crownC ? keySet(A.crownC) : CROWN_C;
+  (A.crowns || []).forEach(b => bender(b, crownC, b[2] > 10 ? 2 : 1, true, .3, A.crownC ? 'a crown' : 'a birch crown'));
   (A.trees || []).forEach(b => bender(b, TREE_C, 2, true, 0, 'a birch', b[4]));
   (A.ferns || []).forEach(b => bender(b, FERN_C, 1, true, .5, 'a fern'));
   if (A.reeds) {   // the reed clumps (the lake's sedge has none: it leans as tufts)
@@ -848,14 +975,15 @@ function windSites(P, keys, A, warn) {
     if (n >= 20) bender(A.reeds, REED_C, 2, false, .45, 'the reeds');
   }
   // Tufts: the tip of a tuft (a run of one colour upwards, or a lone grass dot in the meadow) swaps places with the
-  // pixel downwind of it, so the tuft leans a pixel.
+  // pixel downwind of it, so the tuft leans a pixel. Where the grass is painted in gradients (P.grass) a tuft is the tip
+  // of any blade of grass-green, and it leans only over grass, never into a wall or a path.
   P.tufts = [];
   if (A.tufts) {
-    const [bx, by, bw, bh] = A.tufts;
+    const [bx, by, bw, bh] = A.tufts, gr = P.grass;
     for (let y = Math.max(1, by); y < Math.min(H - 1, by + bh); y++) for (let x = Math.max(1, bx); x < Math.min(W - 1, bx + bw); x++) {
       const p = y * W + x, k = keys[p];
-      if (!TUFT_C.has(k) || keys[p - W] === k || keys[p + 1] === k || P.quiet[p] || P.quiet[p + 1]) continue;
-      const tuft = keys[p + W] === k, dot = keys[p - 1] === MEADOW2_KEY && keys[p + 1] === MEADOW2_KEY && keys[p + W] === MEADOW2_KEY;
+      if (!(gr ? gr(k) && gr(keys[p + 1]) : TUFT_C.has(k)) || keys[p - W] === k || keys[p + 1] === k || P.quiet[p] || P.quiet[p + 1]) continue;
+      const tuft = keys[p + W] === k, dot = !gr && keys[p - 1] === MEADOW2_KEY && keys[p + 1] === MEADOW2_KEY && keys[p + W] === MEADOW2_KEY;
       if (tuft || dot) P.tufts.push({p, x, y, th: .18 + .4 * noise(19, x, y)});
     }
   }
@@ -863,8 +991,19 @@ function windSites(P, keys, A, warn) {
   P.streaks = strokesOn(P, 47, 9, [3, 5], 1, 2, p => P.field[p] === 1, () => 1, 1);
   P.dashes = PAW[P.name] ? strokesOn(P, 43, 6, [2, 4], 0, 1, p => cls[p] === WATER && !P.reedNear[p] && !P.quiet[p], p => P.calm[p], 2)
     : Array.from({length: H}, () => []);
-  P.windNames = [P.tops.length && 'верхушки леса', (P.fy1 >= 0 || P.tufts.length) && 'трава', (A.crowns || A.trees) && 'берёза',
+  P.windNames = [P.tops.length && 'верхушки леса', (P.fy1 >= 0 || P.tufts.length) && 'трава',
+    (A.crowns || A.trees) && (A.crownC ? 'деревья' : 'берёза'),
     A.ferns && 'папоротник', P.benders.some(b => !b.own) && 'камыш', PAW[P.name] && P.wy1 >= 0 && 'рябь от порывов'].filter(Boolean);
+}
+function splashClouds(seed) {   // splash.py's sky: six clouds, the first thing scene_splash draws with its random.Random(31)
+  const rng = PyRandom(seed), out = [], c1 = pack(190, 194, 192), c2 = pack(176, 182, 182);
+  for (let i = 0; i < 6; i++) {
+    const x = rng.randint(-20, 110), y = rng.randint(8, 58), w = rng.randint(20, 46), px = [];
+    for (let xx = x; xx < x + w; xx++) px.push(xx, y, c1);
+    for (let xx = x + 5; xx < x + w - 5; xx++) px.push(xx, y + 1, c2);
+    out.push({px, w});
+  }
+  return out;
 }
 function pixSkyClouds(seed) {   // pix.sky(): seven clouds, the first thing scene_<place> draws with its random.Random(seed)
   const rng = PyRandom(seed), out = [], c1 = pk(C.cloud), c2 = pk(C.cloud2);
@@ -880,7 +1019,7 @@ function pixSkyClouds(seed) {   // pix.sky(): seven clouds, the first thing scen
 // ---------- what a weather puts where: weather.py replayed with its seed (100 * place + weather) ----------
 function sitesFor(P, w) {
   if (P.sites[w]) return P.sites[w];
-  const seed = 100 * PLACES.indexOf(P.name) + WEATHERS.indexOf(w), rng = PyRandom(seed);
+  const H = P.H, seed = 100 * PLACES.indexOf(P.name) + WEATHERS.indexOf(w), rng = PyRandom(seed);
   const S = {seed, clouds: [], rings: [], streaks: [], caps: [], leaves: [], glintsBaked: []};
   const water = (x, y) => P.cls[y * W + x] === WATER, open = (x, y) => !P.reedNear[y * W + x];   // open: not by the reeds
   const strip = (rows, colour) => {   // the cloud strips of drizzle and downpour
@@ -915,9 +1054,9 @@ function sitesFor(P, w) {
       for (let j = 0; j < tw; j++) px.push(x0 + j, y0 + Math.floor(j / 22), WIND_CLOUD);
       S.clouds.push({px, w: tw});
     }
-    const ex = EXPOSURE[P.name];
+    const ex = EXPOSURE[P.name], [c0, cn] = P.g.caps;
     for (let x = 0; x < W - 6; x++) for (let y = 0; y < H - 1; y++)
-      if (water(x, y) && rng.random() < ex * (.002 + .012 * (y - 84) / 96)) { const n = rng.randint(3, 6); if (open(x, y)) S.caps.push({x, y, n}); }
+      if (water(x, y) && rng.random() < ex * (.002 + .012 * (y - c0) / cn)) { const n = rng.randint(3, 6); if (open(x, y)) S.caps.push({x, y, n}); }
     for (let i = 0; i < 14; i++) S.leaves.push({x: rng.randint(0, W - 2), y: rng.randint(20, H - 10), c: rng.choice(LEAF_C)});
     S.caps.forEach((c, i) => { c.per = 3.2 + 2.4 * noise(seed, i, 4); c.ph = noise(seed, i, 5); });
   }
@@ -932,8 +1071,8 @@ function sitesFor(P, w) {
 }
 function glintSites(P, hour) {   // the game's glints: a fixed number per water pixel against a chance that peaks under the sun,
   // none in the float's quiet box and fewer towards it (P.calm), as in weather.py
-  const sx = sunPath(hour)[0], s = [...P.name].reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7), g = {p: [], ph: [], per: [], n: 0};
-  for (let y = 84; y < H; y++) for (let x = 0; x < W; x++) {
+  const sx = sunPath(hour, P.g.arc)[0], s = [...P.name].reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7), g = {p: [], ph: [], per: [], n: 0};
+  for (let y = 0; y < P.H; y++) for (let x = 0; x < W; x++) {
     const p = y * W + x;
     if (P.cls[p] !== WATER || P.reedNear[p] || noise(s, x, y) >= (.002 + .03 * Math.exp(-(((x - sx) / 14) ** 2))) * P.calm[p]) continue;
     g.p.push(y * W + x); g.ph.push(noise(s + 1, x, y)); g.per.push(2.4 + 2.2 * noise(s + 2, x, y)); g.n++;
@@ -942,14 +1081,15 @@ function glintSites(P, hour) {   // the game's glints: a fixed number per water 
 }
 
 // ---------- the still layer of a place, a weather and an hour ----------
+const bandOf = (y, b) => y < b[0] ? 0 : y < b[1] ? 1 : 2;   // weather.py's band(): which of a sky's three bands row y is in
 function stillPaint(P, w, c, p) {   // weather.py's paint of one pixel, without anything that moves
-  const k = P.cls[p], y = (p / W) | 0;
+  const k = P.cls[p], y = (p / W) | 0, g = P.g;
   switch (w) {
-    case 'sun': if (k === SKY) return SUN_SKY[y < 26 ? 0 : y < 52 ? 1 : 2]; c = TONE.sun(c); return k === WATER ? mixPy(c, SUN_WATER, .45) : c;
-    case 'wind': if (k === SKY) return WIND_SKY[y < 26 ? 0 : y < 52 ? 1 : 2]; c = TONE.wind(c); return k === WATER ? mixPy(c, WIND_WATER, .35) : c;
-    case 'rain': return k === SKY ? RAIN_SKY[y < 30 ? 0 : y < 58 ? 1 : 2] : TONE.rain(c);
-    case 'downpour': return k === SKY ? DOWN_SKY[y < 30 ? 0 : y < 58 ? 1 : 2] : TONE.downpour(c);
-    case 'fog': return mixPy(c, FOG, fogT(y, k === SKY, restBank(p % W, y)));
+    case 'sun': if (k === SKY) return SUN_SKY[bandOf(y, g.bands)]; c = TONE.sun(c); return k === WATER ? mixPy(c, SUN_WATER, .45) : c;
+    case 'wind': if (k === SKY) return WIND_SKY[bandOf(y, g.bands)]; c = TONE.wind(c); return k === WATER ? mixPy(c, WIND_WATER, .35) : c;
+    case 'rain': return k === SKY ? RAIN_SKY[bandOf(y, g.rain)] : TONE.rain(c);
+    case 'downpour': return k === SKY ? DOWN_SKY[bandOf(y, g.rain)] : TONE.downpour(c);
+    case 'fog': return mixPy(c, FOG, fogT(P, y, k === SKY, restBank(P, p % W, y)));
   }
   return c;
 }
@@ -964,7 +1104,7 @@ function stillWater(buf, P, S, w) {   // weather.py's whitecaps and rings where 
 }
 // hour null: weather.py's picture, unlit. baked (?baked=1): what moves is drawn where weather.py baked it.
 function buildLayer(P, w, hour, baked, power) {
-  const S = sitesFor(P, w), src = w === 'overcast' ? P.baseClear : P.base, unlit = new Uint32Array(N), lit = new Uint32Array(N);
+  const N = P.N, S = sitesFor(P, w), src = w === 'overcast' ? P.baseClear : P.base, unlit = new Uint32Array(N), lit = new Uint32Array(N);
   for (let p = 0; p < N; p++) unlit[p] = stillPaint(P, w, src[p], p);
   if ((S.caps.length || S.rings.length) && (baked || P.float)) {   // weather.py's whitecaps and rings: all for the check,
     // else only in the quiet box by the float
@@ -976,9 +1116,9 @@ function buildLayer(P, w, hour, baked, power) {
   for (let p = 0; p < N; p++) lit[p] = light(unlit[p], p, P.cls[p]);
   let sun = null;
   if (w === 'sun') {
-    if (hour == null) sun = sunOf(P, 104, 16, pack(252, 238, 176), pack(240, 236, 200), mixPy);   // weather.py's own sun
+    if (hour == null) sun = sunOf(P, P.g.sun[0], P.g.sun[1], pack(252, 238, 176), pack(240, 236, 200), mixPy);   // weather.py's own sun
     else {   // the game's sun on its arc, drawn after the light so it stays bright
-      const core = sunColour(hour).map(Math.round), halo = lerp3(core, [255, 255, 255], .3).map(Math.round), [sx, sy] = sunPath(hour);
+      const core = sunColour(hour).map(Math.round), halo = lerp3(core, [255, 255, 255], .3).map(Math.round), [sx, sy] = sunPath(hour, P.g.arc);
       sun = sunOf(P, sx, sy, pk(core), pk(halo), mix8);
     }
     paintSun(lit, sun, false);
@@ -989,8 +1129,8 @@ function buildLayer(P, w, hour, baked, power) {
 }
 // What a gust draws, lit: on the meadow and the sedge its paler streaks, on the water its darker ripple dashes.
 function gustLayer(P, unlit, light) {
-  const g = new Uint32Array(N);
-  for (let p = 0; p < N; p++) {
+  const g = new Uint32Array(P.N);
+  for (let p = 0; p < P.N; p++) {
     if (P.marks[p] === 1) g[p] = light(mixPy(unlit[p], SHEEN, STREAK_A), p, P.cls[p]);
     else if (P.marks[p] === 2) g[p] = light(mixPy(unlit[p], TROUGH, DASH_A), p, WATER);
   }
@@ -1018,7 +1158,7 @@ function layerFor(P, w, hour, bk, power) {
 // signs, the life and the one-shot events count their steps of two ticks from an even tick. So where two of them meet
 // on a pixel (a ring over a glint, a bird over a cloud), the pixel still holds two ticks or more. The rain's streaks fall
 // on every tick, each position held two ticks.
-const U = new Uint32Array(N), stamp = new Uint32Array(N), dirty = new Int32Array(N);
+const U = new Uint32Array(NMAX), stamp = new Uint32Array(NMAX), dirty = new Int32Array(NMAX);
 let nd = 0, fid = 0, out = null;
 // A frame with no signs, life or event (open: the water lilies that stand open, see life()).
 const NO_X = {plan: null, n0: 0, still: false, ev: null, e: 0, life: null, l0: 0, open: null};
@@ -1049,7 +1189,7 @@ function wx(c, p, k) {   // a clean colour c drawn at p in this frame's weather 
     case 'wind': c = TONE.wind(c); return k === WATER ? mixPy(c, WIND_WATER, .35) : c;
     case 'rain': return TONE.rain(c);
     case 'downpour': return TONE.downpour(c);
-    case 'fog': { const x = p % W, y = (p / W) | 0; return mixPy(c, FOG, fogT(y, k === SKY, bankNow(x, y))); }
+    case 'fog': { const x = p % W, y = (p / W) | 0; return mixPy(c, FOG, fogT(F.P, y, k === SKY, bankNow(x, y))); }
   }
   return c;
 }
@@ -1069,8 +1209,8 @@ function gustOf(k) {   // gust k, or null if its chance is missed
   if (noise(16, k, 1) >= GUST_SKIP) {
     g = {t0: (k + .8 * noise(16, k, 2)) * GUST_EVERY, v: GUST_V + GUST_DV * noise(16, k, 3), hw: GUST_HALF + GUST_DHALF * noise(16, k, 4),
          a: .45 + .55 * noise(16, k, 5), wy: noise(16, k, 6), wh: noise(16, k, 7), leaf: noise(16, k, 8) < .6, ly: noise(16, k, 9),
-         fy: noise(16, k, 10), fh: noise(16, k, 11), off: new Float64Array(H), str: new Float64Array(H)};
-    for (let y = 0; y < H; y++) {
+         fy: noise(16, k, 10), fh: noise(16, k, 11), off: new Float64Array(HMAX), str: new Float64Array(HMAX)};
+    for (let y = 0; y < HMAX; y++) {   // a gust is the same on every picture: its rows down to the tallest one's
       g.off[y] = -g.hw - GUST_RAGGED - 24 + GUST_RAGGED * (2 * wave(17, k, y / 18) - 1) - .1 * (y - 120);
       g.str[y] = g.a * (.35 + .65 * wave(18, k, y / 26));
     }
@@ -1143,8 +1283,8 @@ function gustBlown(x, y, t0, t1) {   // the gusts' strength at (x, y) summed ove
 // rougher ripple. Per row, a flat list [x0, x1, cx, th, ...]: a stroke is cut to the pixels where `ok` holds, and its
 // threshold is divided by `k` at its middle (a stroke where k is 0 is left out). `mark` tells the pixels in P.marks.
 function strokesOn(P, seed, cell, len, y0, step, ok, k, mark) {
-  const rows = Array.from({length: H}, () => []);
-  for (let y = y0; y < H; y += step) {
+  const rows = Array.from({length: P.H}, () => []);
+  for (let y = y0; y < P.H; y += step) {
     const off = Math.floor(cell * noise(seed, y, 0));
     for (let c = Math.floor(off / cell), c1 = Math.floor((W - 1 + off) / cell); c <= c1; c++) {
       const n = len[0] + Math.floor((len[1] - len[0] + 1) * noise(seed + 1, c, y)), xs = c * cell - off;
@@ -1307,6 +1447,7 @@ const ZONES = {
 // or 3, found the first time that sign is asked for (G.cands(id)).
 function signGround(P) {
   if (P.sg) return P.sg;
+  const H = P.H, N = P.N;
   const free = new Uint8Array(N), wet = new Int32Array((W + 1) * (H + 1)), top = new Int16Array(W).fill(H), bot = new Int16Array(W).fill(-1);
   const busy = new Int32Array((W + 1) * (H + 1));   // sums of the pixels that are not free water, for a box at a glance
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -1383,7 +1524,7 @@ const seedOf = (seed, i, P) => (Math.imul(seed, 7919) + 104729 * (i + 1) + 12997
 function signPlan(P, seed, ids, glints) {
   const G = signGround(P), taken = [], plan = [];
   for (const id of ids) {
-    const c = glints && GLARE_SHY.has(id) ? clearOfGlints(G.cands(id), footprints(id), glints) : G.cands(id);
+    const c = glints && GLARE_SHY.has(id) ? clearOfGlints(P, G.cands(id), footprints(id), glints) : G.cands(id);
     const sd = seedOf(seed, SIGN_IDS.indexOf(id), P), sites = pickSites(c, sd, taken);
     if (!sites.length) continue;
     taken.push(...sites);
@@ -1391,10 +1532,11 @@ function signPlan(P, seed, ids, glints) {
   }
   return plan;
 }
-function clearOfGlints(c, prints, g) {   // the candidates c whose ways keep GLARE_NEAR px clear of the glints g, or all
-  // of them if fewer than three do
+function clearOfGlints(P, c, prints, g) {   // the candidates c whose ways keep GLARE_NEAR px clear of the glints g, or
+  // all of them if fewer than three do
+  const H = P.H;
   if (!g.near) {   // the pixels within GLARE_NEAR px of a glint, found once per still layer
-    g.near = new Uint8Array(N);
+    g.near = new Uint8Array(P.N);
     for (let i = 0; i < g.n; i++) {
       const x = g.p[i] % W, y = (g.p[i] / W) | 0;
       for (let yy = Math.max(0, y - GLARE_NEAR); yy <= Math.min(H - 1, y + GLARE_NEAR); yy++)
@@ -1579,13 +1721,13 @@ function lifePlan(P, seed, id, signs) {
 }
 // The water lilies' buds that open: all but the one in the float's quiet box (null where there are none).
 const lilyBuds = P => ANCHORS[P.name].lilies ? ANCHORS[P.name].lilies.filter(([x, y]) => !P.quiet[y * W + x]) : null;
-const lk = new Uint32Array(N);   // lk[p] === fid: a pixel of life in this frame, lit as land; the sun's core paints over it, the halo does not
+const lk = new Uint32Array(NMAX);   // lk[p] === fid: a pixel of life in this frame, lit as land; the sun's core paints over it, the halo does not
 function lifeDot(x, y, c, a, veil) {   // a pixel of life: colour c toned by the weather, at alpha a; never in the quiet box.
   // veil: how much of the fog it takes, 1 as the land and the sky, SIGN_FOG on the water's face
-  if (x < 0 || x >= W || y < 0 || y >= H || a <= 0) return;
+  if (x < 0 || x >= W || y < 0 || y >= F.P.H || a <= 0) return;
   const p = y * W + x;
   if (F.P.quiet[p]) return;
-  const col = F.w === 'fog' && veil !== 1 ? mixPy(c, FOG, veil * fogT(y, false, bankNow(x, y))) : wx(c, p, LAND);
+  const col = F.w === 'fog' && veil !== 1 ? mixPy(c, FOG, veil * fogT(F.P, y, false, bankNow(x, y))) : wx(c, p, LAND);
   put(p, a >= 1 ? col : mixPy(U[p], col, a));
   if (a >= .5) lk[p] = fid;
 }
@@ -1642,7 +1784,7 @@ const LIVES = {
     const hang = L.hover || F.windy;
     let [cx, cy, rx, ry] = L.hover ? [...A.hover, 0, 0] : A.circle, side = L.side || (noise(sd, k, 5) < .5 ? -1 : 1);
     if (!L.hover && A.dodge && F.L.sun) {   // in the sun: at the end of the gap away from it, and off away from it too
-      const sx = sunPath(F.L.hour)[0], [d0, d1] = A.dodge;
+      const sx = sunPath(F.L.hour, F.P.g.arc)[0], [d0, d1] = A.dodge;
       cx = Math.abs(sx - d0) > Math.abs(sx - d1) ? d0 : d1; side = cx < sx ? -1 : 1;
     }
     let x = cx + side * 100 * f, y = cy - 8 * f;
@@ -1736,13 +1878,14 @@ const LIFE_IDS = Object.fromEntries(Object.entries(LIFE).map(([p, o]) => [p, Obj
 // With F.baked (?baked=1) each draws what weather.py baked into its picture, which checks the port; weather.py's
 // whitecaps and rings are then in the still layer already.
 function fogBanks() {   // the dithered banks keep their rows, their edges wander and drift slowly downwind
+  const banks = F.P.g.fog[1];
   for (let b = 0; b < 3; b++) for (let x = 0; x < W; x++) {
-    F.top[b * W + x] = FOG_BANDS[b][0] + (F.w === 'fog' && !F.baked ? fogEdge(x, F.t, 2 * b) : 0);
-    F.bot[b * W + x] = FOG_BANDS[b][1] + (F.w === 'fog' && !F.baked ? fogEdge(x, F.t, 2 * b + 1) : 0);
+    F.top[b * W + x] = banks[b][0] + (F.w === 'fog' && !F.baked ? fogEdge(x, F.t, 2 * b) : 0);
+    F.bot[b * W + x] = banks[b][1] + (F.w === 'fog' && !F.baked ? fogEdge(x, F.t, 2 * b + 1) : 0);
   }
   if (F.w !== 'fog' || F.baked) return;
   for (let b = 0; b < 3; b++) for (let x = 0; x < W; x++) {   // repaint only the rows whose bank is not where the still layer has it
-    const t = F.top[b * W + x], e = F.bot[b * W + x], a0 = FOG_BANDS[b][0], b0 = FOG_BANDS[b][1];
+    const t = F.top[b * W + x], e = F.bot[b * W + x], a0 = banks[b][0], b0 = banks[b][1];
     refog(x, Math.min(a0, t), Math.max(a0, t)); refog(x, Math.min(b0, e), Math.max(b0, e));
   }
 }
@@ -1750,7 +1893,7 @@ function refog(x, y0, y1) {   // by the float the banks stay where the still lay
   for (let y = y0; y < y1; y++) {
     const p = y * W + x;
     if (((x + y) & 1) || F.P.quiet[p]) continue;
-    put(p, mixPy(F.P.base[p], FOG, fogT(y, F.P.cls[p] === SKY, bankNow(x, y))));
+    put(p, mixPy(F.P.base[p], FOG, fogT(F.P, y, F.P.cls[p] === SKY, bankNow(x, y))));
   }
 }
 function fogEdge(x, t, s) {   // -2..2 rows: smooth value noise moving right
@@ -1861,7 +2004,7 @@ function whitecaps() {   // wind: a whitecap fades in, slides downwind a few pix
 }
 function cap(x, y, n, a) {   // weather.py's whitecap: a white run over a darker trough, on the water only; none by the float
   // or by the reeds
-  if (y < 0 || y + 1 >= H) return;
+  if (y < 0 || y + 1 >= F.P.H) return;
   const cls = F.P.cls, quiet = F.P.quiet, near = F.P.reedNear;
   for (let i = 0; i < n; i++) {
     const xx = x + i, p = y * W + xx;
@@ -1882,7 +2025,7 @@ function rings() {   // drizzle, downpour: a ring opens on the water, widens and
     if (tau >= .72) continue;
     const d = tau < .5 ? 1 : 2, a = tau < .2 || tau >= .5 ? a0 * .5 : a0;
     const x = r.x + Math.floor(noise(F.S.seed + k, i, 3) * 7) - 3, y = r.y + Math.floor(noise(F.S.seed + k, i, 4) * 3) - 1;
-    if (x - d < 0 || x + d >= W || y < 0 || y >= H) continue;
+    if (x - d < 0 || x + d >= W || y < 0 || y >= F.P.H) continue;
     const p = y * W + x;
     if (cls[p] !== WATER || cls[p - d] !== WATER || cls[p + d] !== WATER || F.P.quiet[p - d] || F.P.quiet[p + d] ||
         F.P.reedNear[p - d] || F.P.reedNear[p + d]) continue;
@@ -1892,7 +2035,7 @@ function rings() {   // drizzle, downpour: a ring opens on the water, widens and
 function rain() {   // drizzle and downpour: slanted streaks falling along their slant. A downpour streak (4 px) falls
   // DOWNPOUR_STEP px every tick, half its length; a drizzle streak (3 px) steps every DRIZZLE_EVERY ticks, the streaks
   // taking turns so that some move on every tick, and its lowest pixel is where the next step puts its top one
-  const R = F.S.streaks;
+  const R = F.S.streaks, H = F.P.H;
   if (F.w === 'rain') {
     for (let i = 0, n = F.baked ? R.length : Math.min(R.length, DRIZZLE_N); i < n; i++) {
       let x = R[i].x, y = R[i].y;
@@ -1948,12 +2091,12 @@ function showAt(g, k, s, at) {   // step s of show k of sign g at its site `at`,
 function signDot(dx, dy, c, a) {   // a pixel of a sign: on free water only, colour c toned by the weather, at alpha a (times
   // the layer's gain on dim water)
   const x = dotX + dx, y = dotY + dy;
-  if (x < 0 || x >= W || y < 0 || y >= H) return;
+  if (x < 0 || x >= W || y < 0 || y >= F.P.H) return;
   const p = y * W + x;
   if (!F.P.sg.free[p]) return;
   a = Math.min(1, a * F.L.gain);
   const u = U[p], pale = c === RING_C && F.w === 'fog' && .3 * (u & 255) + .59 * ((u >>> 8) & 255) + .11 * ((u >>> 16) & 255) > FOG_PALE;
-  const col = F.w !== 'fog' ? wx(c, p, LAND) : mixPy(pale ? RING_FOG : c, FOG, SIGN_FOG * fogT(y, false, bankNow(x, y)));
+  const col = F.w !== 'fog' ? wx(c, p, LAND) : mixPy(pale ? RING_FOG : c, FOG, SIGN_FOG * fogT(F.P, y, false, bankNow(x, y)));
   put(p, a >= 1 ? col : mixPy(U[p], col, a));
   lk[p] = 0;   // over a pixel of life: lit as the water again
 }
@@ -1991,24 +2134,27 @@ function scare() {   // the shadow and the fry at the site the event took (still
   SHOWS.scare.draw(X.still ? SHOWS.scare.still : Math.floor(X.e / SIGN_STEP), ev.d, signDot);
 }
 function smokeBaked() {   // ?baked=1: the smoke column scene_home draws by day, part of every weather's picture
-  const s = F.P.smoke;
-  if (!F.baked || !s) return;
-  for (let i = 0; i < s.n; i++) { const p = (s.y - 2 * i) * W + s.x + i % 3; put(p, wx(SMOKE, p, LAND)); }
+  if (!F.baked) return;
+  for (const s of F.P.smokes) for (let i = 0; i < s.n; i++) { const p = (s.y - 2 * i) * W + s.x + i % 3; put(p, wx(SMOKE, p, LAND)); }
 }
 function smoke() {   // the chimney: faint one-pixel puffs rise and fade; the wind bends them along, the downpour beats them low.
-  // A gust blows each puff further along by how much of it has passed the chimney in the puff's life.
-  const s = F.P.smoke, m = SMOKE_PUFFS[F.w];
-  if (!s || !m || F.baked) return;
-  for (let k = Math.floor((F.t - m.life) / m.every) + 1, k1 = Math.floor(F.t / m.every); k <= k1; k++) {
-    const age = F.t - k * m.every;
-    if (age < 0 || age >= m.life) continue;
-    const blown = F.windy ? SMOKE_GUST * gustBlown(s.x + 1, s.y, F.t - age, F.t) : 0;
-    const x = Math.round(s.x + 1 + m.drift * age + blown + .6 * Math.sin(1.9 * age + 6.28 * noise(3, k, 1)));
-    const y = Math.round(s.y - m.rise * (.85 + .3 * noise(3, k, 2)) * age);
-    const a = Math.round(m.a * (1 - (age / m.life) ** 2) * 6) / 6;   // fades late, in a few steps, so a puff changes rarely
-    if (a <= 0 || y < 0 || x < 0 || x >= W) continue;
-    const p = y * W + x;
-    over(p, wx(SMOKE, p, LAND), a, LAND);
+  // A gust blows each puff further along by how much of it has passed the chimney in the puff's life. A second chimney
+  // puffs out of step with the first, and a far one (k) lets its puffs go sooner, so its column is shorter.
+  const ss = F.P.smokes, m = SMOKE_PUFFS[F.w];
+  if (!ss.length || !m || F.baked) return;
+  for (let j = 0; j < ss.length; j++) {
+    const s = ss[j], life = m.life * (s.k || 1), t = F.t + (j ? m.every * noise(3, j, 9) : 0), sd = 3 + 7 * j;
+    for (let k = Math.floor((t - life) / m.every) + 1, k1 = Math.floor(t / m.every); k <= k1; k++) {
+      const age = t - k * m.every;
+      if (age < 0 || age >= life) continue;
+      const blown = F.windy ? SMOKE_GUST * gustBlown(s.x + 1, s.y, F.t - age, F.t) : 0;
+      const x = Math.round(s.x + 1 + m.drift * age + blown + .6 * Math.sin(1.9 * age + 6.28 * noise(sd, k, 1)));
+      const y = Math.round(s.y - m.rise * (.85 + .3 * noise(sd, k, 2)) * age);
+      const a = Math.round(m.a * (1 - (age / life) ** 2) * 6) / 6;   // fades late, in a few steps, so a puff changes rarely
+      if (a <= 0 || y < 0 || x < 0 || x >= W) continue;
+      const p = y * W + x;
+      over(p, wx(SMOKE, p, LAND), a, LAND);
+    }
   }
 }
 function float() {   // wind, downpour: the float lifts a pixel once a period, the same every time; on still water it stands
@@ -2024,17 +2170,18 @@ function leaves() {   // wind: now and then a leaf crosses the scene with the wi
   // a little behind its middle (stepping with the gusts, every other tick); none crosses the float's quiet box
   if (F.baked && F.w === 'wind') { F.S.leaves.forEach(l => { const p = l.y * W + l.x; over(p, l.c, 1, F.P.cls[p]); over(p + 1, l.c, 1, F.P.cls[p + 1]); }); return; }
   if (!F.windy || F.baked) return;
+  const H = F.P.H;   // the leaves cross the picture's rows from 30 down to 50 above its foot
   for (let i = 0; i < 2; i++) {   // two leaves, one every 17 s and one every 23 s: about one crossing in 10 s
     const per = 17 + 6 * i, u = F.t / per + .3 * i, k = Math.floor(u), age = (u - k) * per;
     if (age > 8) continue;   // 8 s to cross, then a rest
-    const x = Math.round(-2 + age * (W + 4) / 8), y = Math.round(30 + 100 * noise(5, i, k) + 1.2 * age + 3 * Math.sin(2.1 * age + i));
+    const x = Math.round(-2 + age * (W + 4) / 8), y = Math.round(30 + (H - 80) * noise(5, i, k) + 1.2 * age + 3 * Math.sin(2.1 * age + i));
     const c = LEAF_C[Math.floor(3 * noise(6, i, k))];
     for (let j = 0; j < 2; j++) if (x + j >= 0 && x + j < W && y >= 0 && y < H && !F.P.quiet[y * W + x + j]) over(y * W + x + j, c, 1, LAND);
   }
   for (let i = 0; i < G.n; i++) {
     const g = G.g[i], age = F.t - g.t0;
     if (!g.leaf) continue;
-    const y0 = Math.round(40 + 90 * g.ly), x = Math.round(g.off[y0] + G.s[i] - .3 * g.hw);
+    const y0 = Math.round(40 + (H - 90) * g.ly), x = Math.round(g.off[y0] + G.s[i] - .3 * g.hw);
     const y = Math.round(y0 + .9 * age + 3 * Math.sin(2.1 * age + g.ly * 6)), c = LEAF_C[Math.floor(3 * g.wh)];
     for (let j = 0; j < 2; j++) if (x + j >= 0 && x + j < W && y >= 0 && y < H && !F.P.quiet[y * W + x + j]) over(y * W + x + j, c, 1, LAND);
   }
@@ -2061,7 +2208,7 @@ const EFFECTS = [
   {draw: rain, names: () => F.S.streaks.length ? [F.w === 'rain' ? 'морось' : 'ливень'] : []},
   {draw: gusts, lit: true, names: () => F.windy ? F.P.windNames : []},
   {draw: bend, lit: true, names: () => []},
-  {draw: smoke, lit: true, names: () => F.P.smoke && SMOKE_PUFFS[F.w] ? ['дым из трубы'] : []},
+  {draw: smoke, lit: true, names: () => F.P.smokes.length && SMOKE_PUFFS[F.w] ? [F.P.smokes.length > 1 ? 'дым из труб' : 'дым из трубы'] : []},
   {draw: float, lit: true, names: () => F.P.float && FLOAT_PERIOD[F.w] ? ['поплавок'] : []},
   {draw: leaves, lit: true, names: () => F.windy ? ['листья'] : []},
   {draw: strike, lit: true, names: () => []},
@@ -2074,7 +2221,7 @@ const EFFECTS = [
 const PICTURE_SPARE = 5, LAYER_SPARE = 8;
 const pictures = new Map();   // `${place} ${src}` -> {P, failed, wait}: P once analysed, failed (why) if it was not
 const latest = {};            // place -> the P analysed last, for names()
-function decode(src) {   // the RGBA pixels of a W x H picture
+function decode(src, H) {   // the RGBA pixels of a W x H picture
   return new Promise((ok, fail) => {
     const im = new Image();
     im.onload = () => {
@@ -2094,7 +2241,7 @@ function pictureFor(place, src) {   // the clean picture, analysed once; `wait` 
   if (e) pictures.delete(key);
   else {
     e = {P: null, failed: '', wait: null};
-    e.wait = decode(src).then(rgba => { e.P = latest[place] = makePlace(place, rgba); if (e.P.float) warmSigns(e.P); })
+    e.wait = decode(src, GEO[place].h).then(rgba => { e.P = latest[place] = makePlace(place, rgba); if (e.P.float) warmSigns(e.P); })
       .catch(err => { e.failed = (err && err.message) || 'did not load'; if (pictures.get(key) === e) pictures.delete(key); });
   }
   pictures.set(key, e);
@@ -2197,12 +2344,17 @@ function ready(s) {   // the picture is analysed: the still layer, the signs' si
   if (show(s)) run(s);
 }
 function show(s) {   // the frame of the scene's tick, after the tick before it, so stats() compares like with like
-  if (!s.ctx) {      // the first frame: the canvas's context and the scene's two frames
+  if (!s.ctx) {      // the first frame: the canvas's context
     s.ctx = s.cv.getContext('2d', {alpha: false});
     if (!s.ctx) { complain(s, 'the canvas has no 2d context; the scene draws nothing'); s.layer = null; return false; }
-    s.out = [new Uint32Array(N), new Uint32Array(N)];
-    s.img = s.out.map(b => new ImageData(new Uint8ClampedArray(b.buffer), W, H));
   }
+  const P = s.layer.P;
+  if (!s.out || s.out[0].length !== P.N) {   // the scene's two frames, the size of its place's picture
+    s.out = [new Uint32Array(P.N), new Uint32Array(P.N)];
+    s.img = s.out.map(b => new ImageData(new Uint8ClampedArray(b.buffer), W, P.H));
+  }
+  if (s.cv.width !== W) s.cv.width = W;
+  if (s.cv.height !== P.H) s.cv.height = P.H;   // a place of another size: the canvas takes it (and is cleared)
   if (inPage(s.cv)) s.seen = true;
   const n = s.running ? ticks() + s.k : s.tick;
   render(s, n - 1); s.hist.i = s.hist.n = 0;
@@ -2227,7 +2379,7 @@ function stats(s) {   // the readout: the mean ms of the last drawn frames (a se
   const k = Math.min(h.n, FPS), a = s.out[s.shown], b = s.out[1 - s.shown];
   let ms = 0, px = 0;
   for (let i = 0; i < k; i++) ms += h.ms[i];
-  for (let p = 0; p < N; p++) if (a[p] !== b[p]) px++;
+  for (let p = 0; p < a.length; p++) if (a[p] !== b[p]) px++;
   return {ms: ms / k, px};
 }
 function kill(s) {   // destroy(), or the canvas has gone: stop and let go, the scene's picture and still layer too
@@ -2421,11 +2573,12 @@ function create(canvas, opts) {
     stats: () => stats(s),
   });
   if (!canvas || typeof canvas.getContext !== 'function') { warn('create() needs a canvas; the scene draws nothing'); kill(s); return scene; }
-  if (canvas.width !== W) canvas.width = W;
-  if (canvas.height !== H) canvas.height = H;
+  const o = opts && typeof opts === 'object' ? opts : {};
+  if (canvas.width !== W) canvas.width = W;   // the size of the place's picture, so a page can lay it out at once
+  const h = (PLACES.includes(o.place) ? GEO[o.place] : PIX).h;
+  if (canvas.height !== h) canvas.height = h;
   s.seen = inPage(canvas);
   live.add(s);
-  const o = opts && typeof opts === 'object' ? opts : {};
   if (isFinite(o.t) && o.t > 0) s.tick = Math.floor(o.t * FPS + 1e-9);   // takes over from a scene at its time
   change(s, o);
   if ((o.autoplay === undefined || o.autoplay) && !reducedMotion()) scene.play();
@@ -2460,7 +2613,8 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
   LIFE_NAME: Object.freeze({...LIFE_NAME}),
   EVENTS: Object.freeze({strike: Object.freeze({frames: STRIKE.map(k => Math.round(k * 1000 / FPS)), ms: Math.round(EVENT_TICKS.strike * 1000 / FPS)}),
                          scare: Object.freeze({ms: Math.round(EVENT_TICKS.scare * 1000 / FPS)})}),
-  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '4'});
+  SIZE: Object.freeze(Object.fromEntries(Object.entries(SIZE).map(([p, wh]) => [p, Object.freeze(wh)]))),
+  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '5'});
 })();
 // ---------- end of scenes.js ----------
 </script>
