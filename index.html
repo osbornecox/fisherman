@@ -249,7 +249,8 @@
 //     cut short (another event, a set() that changes the scene, destroy()), and then nothing of it stays drawn.
 //     'strike', a fish or a lost fish alike: the rod comes out of the water in three frames (LiveScenes.EVENTS.strike
 //     .frames, in ms): as it lies; steeply up, the float pulled out and a small ring where it was; nearly upright, the
-//     float hanging under the tip. Then it lies in the water again. No fish is drawn.
+//     float hanging under the tip. In both raised frames the line goes on under the float to the hook. Then it lies in
+//     the water again. No fish is drawn.
 //     'scare': a big dark shadow glides under the water by the near bank and the fry splash away (EVENTS.scare.ms);
 //     the rod stays. A scene that does not play (paused, reduced motion, autoplay off) shows the event over its still
 //     frame by the wall clock (with reduced motion the scare as one still frame); at() steps it with the scene's ticks.
@@ -858,8 +859,11 @@ function makePlace(name, rgba) {
 // along the rows), with that pixel's class for the light; a new rod rises from the same butt with its line and float.
 // Frame 2: the rod steeply up (60°, or 16° above where it lay if that is more), the float pulled out of the water on a
 // taut line, a small ring where it was. Frame 3: the rod nearly upright (82°), the float hanging under the tip as in
-// pix.rod, the ring wider and fainter.
+// pix.rod, the ring wider and fainter. In both the line goes on under the float to the hook, HOOK_DY rows down, a dot
+// every other pixel as pix.rod dots its line: on the taut line straight on from the tip through the float, back into
+// the water by the ring; hanging, straight down. No hook and no fish are drawn, only the line.
 const ROD_C = pack(58, 51, 44), LINE_C = pack(208, 212, 208);   // pix.C's rod and pix.rod's line
+const HOOK_DY = 7;   // rows of line under the float's white foot: on the taut line, down to the row of the ring
 function rodLine(x0, y0, x1, y1) {   // pix.rod's pixels of a rod from (x0, y0) to (x1, y1): [x, y, ...]
   const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)), q = [];
   for (let i = 0; i <= n; i++) q.push(pyRound(x0 + (x1 - x0) * i / n), pyRound(y0 + (y1 - y0) * i / n));
@@ -895,7 +899,15 @@ function strikeRod(P, A, warn) {
       fx = pyRound(x1 + (tx - x1) * .45); fy = y1 + fd - 7;
       const l = rodLine(tx, ty, fx, fy - 1);
       for (let i = 4; i < l.length; i += 4) px.push(l[i + 1] * W + l[i], LINE_C);
-    } else for (let y = ty + 1; y < fy; y++) if (y % 2 === 0) px.push(y * W + tx, LINE_C);
+      // under the float the taut line runs on the same way, every other pixel from the second under the float's foot
+      const h = rodLine(fx, fy + 2, pyRound(fx + (fx - tx) * HOOK_DY / (fy - 1 - ty)), fy + 2 + HOOK_DY);
+      for (let i = 4; i < h.length; i += 4) px.push(h[i + 1] * W + h[i], LINE_C);
+    } else {
+      for (let y = ty + 1; y < fy; y++) if (y % 2 === 0) px.push(y * W + tx, LINE_C);
+      // on under it, every other row from the second under the float's white foot (one pixel clear of it, whatever
+      // the row, so the float keeps its shape)
+      for (let y = fy + 4; y <= fy + 2 + HOOK_DY; y += 2) px.push(y * W + tx, LINE_C);
+    }
     px.push(fy * W + fx, RED, (fy + 1) * W + fx, RED, (fy + 2) * W + fx, PAPER);
     R.frames.push(px);
   });
