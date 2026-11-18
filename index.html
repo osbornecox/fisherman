@@ -126,8 +126,14 @@
      the bottom (the meadow): on the shortest phones the forested hill stays under the title, not the river, and the
      izba stays clear of the button */
   .splash img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 80%; image-rendering:pixelated; }
-  /* the title is light like the tag, with a dark pixel outline: it lies on the forest on a short screen and on the
-     sky on a tall one (or half on each), and reads on both */
+  /* the living title screen lies over the picture, placed by fitSplash() the way the picture is (cover, centre 80%);
+     the still picture stays under it unseen and shows only if the scene cannot be drawn */
+  .splash canvas { position:absolute; left:0; top:0; display:block; image-rendering:pixelated; }
+  .splash canvas[hidden] { display:none; }
+  .splash.live img { opacity:0; }
+  /* the title, in two lines («Уйти» / «или остаться»), is light like the tag, with a dark pixel outline: it lies on the
+     forest on a short screen and on the sky on a tall one (or half on each), and reads on both */
+  .splash .name span { display:block; }
   .splash .name { position:absolute; top:calc(env(safe-area-inset-top) + 7.5%); left:16px; right:16px; text-align:center; font-size:38px; font-weight:600; line-height:1.1;
                   color:#f3efe4; --o:rgba(43,41,37,.85);
                   text-shadow: 2px 0 0 var(--o), -2px 0 0 var(--o), 0 2px 0 var(--o), 0 -2px 0 var(--o),
@@ -138,8 +144,10 @@
                  font-size:18px; font-weight:500; text-shadow:0 2px 0 rgba(0,0,0,.35); }
   .story { gap:8px; }
   .story p { margin:0; }
+  .secondary.next { font-size:18px; font-weight:600; }   /* the backstory's «Дальше»: an outline, quieter than «Начать день» */
   /* the backstory scrolls: its picture is shown whole (river, cliff and forest at its top), the text under it, and
-     the button after the text, not over it */
+     the button after the text, not over it. The yard after it («Как тут живётся?») is laid out as the yard of a day:
+     on a short screen the scene gives up its sky, the button stays at the bottom, and only a text too long scrolls */
   .wrap.intro .scene { max-height: none; }
   .wrap.intro .actions { position: static; }
   /* too low for the scene and the panel together (a short window): the page scrolls; a phone on its side gets .turn */
@@ -157,6 +165,7 @@
      screen with the journal at its three lines still fits the screen */
   @media (max-height: 620px) {
     :root { --reserve: 266px; }
+    .wrap.living { --reserve: 290px; }   /* «Как тут живётся?»: its four sentences and the button fit a 320x568 screen */
     .actions { padding-bottom: calc(8px + var(--bot)); }   /* 4px less under the buttons: the izba fits a 548px screen too */
     .scene { max-height: max(calc(min(100vw, 430px) * .8), calc(100vh - var(--top) - var(--bot) - var(--reserve)));
              max-height: max(calc(min(100vw, 430px) * .8), calc(100dvh - var(--top) - var(--bot) - var(--reserve))); }
@@ -190,7 +199,8 @@
 <div class="splash" id="splash" hidden>
   <div class="frame">
     <img id="splashImg" alt="Старая изба на зелёном склоне над рекой, за рекой гора в тайге">
-    <div class="name">Уйти или остаться</div>
+    <canvas id="splashCanvas" width="130" height="281" aria-hidden="true" hidden></canvas>
+    <div class="name"><span>Уйти</span> <span>или остаться</span></div>
     <button type="button" class="start" id="splashGo">Начать</button>
     <div class="tag">Игра про рыбалку и жизнь</div>
   </div>
@@ -3092,8 +3102,10 @@ function izbaLive(cv, P, t0 = 0, opt = {}){
 
 // ---------- rng ----------
 let seed = Math.floor(Math.random()*1e9);
-function rnd(){ seed = (seed*1664525 + 1013904223) % 4294967296; return seed/4294967296; }
-function pick(p){ let r=rnd(), a=0; for(let i=0;i<p.length;i++){ a+=p[i]; if(r<a) return i; } return p.length-1; }
+const lcg = s => (s*1664525 + 1013904223) % 4294967296;   // the generator's step: rnd() takes it, introWeather() only looks
+function rnd(){ seed = lcg(seed); return seed/4294967296; }
+function pickAt(p, r){ let a=0; for(let i=0;i<p.length;i++){ a+=p[i]; if(r<a) return i; } return p.length-1; }
+function pick(p){ return pickAt(p, rnd()); }
 function poisson(l){ if(l<=0) return 0; const L=Math.exp(-l); let k=0,p=1; while(true){ p*=rnd(); if(p<=L) return k; k++; } }
 function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 
@@ -3151,6 +3163,13 @@ function genDay(){
   const rumorA = rumorAt(0), rumorB = later === weather ? rumorA : rumorAt(CHANGE_HOUR);
   const rumor = Array.from({length:HOURS}, (_,h) => h < CHANGE_HOUR ? rumorA : rumorB);
   return { weather, weathers, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
+}
+// The weather of the screens before the first day: the morning's of the day about to be played. Nothing draws from
+// rnd() before startDay(), and genDay()'s first draw is pick(WEATHER_P), so it is what that draw will give: the
+// generator's next number, looked at without taking it. The days stay as they were; a reload shows the same weather.
+function introWeather(){
+  if (S.D) return S.D.weathers ? S.D.weathers[0] : S.D.weather;
+  return pickAt(WEATHER_P, lcg(seed)/4294967296);
 }
 function startDay(){
   S.D = genDay();
@@ -3382,12 +3401,19 @@ function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOU
 
 // ---------- the scene picture ----------
 // Two layers lie one on the other, each with a still picture (<img>) and a living scene (<canvas>): a new frame fades
-// in over the one shown, then its layer is the one shown. The outdoor places are living scenes, and so is the izba,
-// whose window lives (izbaLive); a new hour or a new place is a new scene that starts at the time of the one shown, so
-// its clouds and smoke go on from where they were, and the scene that has faded out stops. A drawn frame (the izba)
-// leaves the last picture on screen until it is ready.
+// in over the one shown, then its layer is the one shown. The outdoor places are living scenes, and so are the
+// backstory and the yard before the first day (INTRO) and the izba, whose window lives (izbaLive); a new hour or a
+// new place is a new scene that starts at the time of the one shown, so its clouds and smoke go on from where they
+// were, and the scene that has faded out stops. A drawn frame (the izba) leaves the last picture on screen until it
+// is ready.
 const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600;
 const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba pictures: is the curtain pulled aside
+// The three screens before the first day are living scenes in one weather, the morning's of the day about to be played
+// (introWeather()), at its first hour: the title screen ('splash', over the game; showSplash()), the backstory's
+// village from the hill ('story', phase 'intro') and the yard («Как тут живётся?», 'home', phase 'living'). Nothing of
+// the fishing is in them: no signs, no life; the day without power never comes on the first day.
+const INTRO = new Set(['intro', 'living']), INTRO_HOUR = START;
+const introScene = place => ({place, weather: WEATHERS[introWeather()], hour: INTRO_HOUR, src: IMG[place], lit: true, seed: sceneSeed(place, 0)});
 const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true};
 const layer = i => $(i ? 'bg2' : 'bg');
 // A drawn picture that must keep its rows down to f.keep in sight (the evening's kerosene lamp on the sill) gives up
@@ -3445,6 +3471,7 @@ function endFade(){
 // the scene at hour t, in the weather of that hour: its key and how it is shown; outdoors a living scene, the izba a
 // drawn picture with a living window (and its plain picture if drawing fails)
 function frame(img, t){
+  if (INTRO.has(S.phase)){ const live = introScene(img); return {key: `intro/${img}/${live.weather}/${live.hour}`, live}; }
   const w = WEATHERS[S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
   const np = S.noPower === true;   // a day without power: no lights outdoors at 18:00, the kerosene lamp in the izba
   if (img in IZBA){   // the izba at this hour of this day, the evening at 18:00 with the lamp (or the kerosene lamp) on
@@ -3470,7 +3497,7 @@ function sceneSeed(place, t){
 }
 let sceneKey = null, sceneReady = Promise.resolve();
 function setScene(img){
-  const alt = NAME[img] || '', top = img in IZBA, f = S.D ? frame(img, S.t) : null;
+  const alt = NAME[img] || '', top = img in IZBA, f = S.D || INTRO.has(S.phase) ? frame(img, S.t) : null;
   sceneReady = Promise.resolve();
   if (!f){ const v = IMG[img], url = typeof v === 'string' ? v : v[WEATHERS[S.D ? nowWeather() : 0]];
     sceneKey = null; showPicture({key: url, url, top}, alt); return; }
@@ -3531,10 +3558,11 @@ function render(){
   const book = bookOpen, shown = book ? 'book' : S.phase;
   $('wrap').classList.toggle('fit', !book && FIT.has(S.phase));
   $('wrap').classList.toggle('intro', S.phase === 'intro');
+  $('wrap').classList.toggle('living', S.phase === 'living');
   $('wrap').classList.toggle('eve', !book && S.phase === 'evening');
   $('wrap').classList.toggle('book', book);
   if (shown !== shownPhase){ shownPhase = shown; if (window.scrollTo) scrollTo(0, 0); }   // a new screen starts at the top
-  document.querySelector('.hud').style.visibility = S.phase === 'intro' ? 'hidden' : '';
+  document.querySelector('.hud').style.visibility = INTRO.has(S.phase) ? 'hidden' : '';
   const add = html => { const d=document.createElement('div'); d.innerHTML=html; while(d.firstChild) P.appendChild(d.firstChild); };
   const actions = document.createElement('div'); actions.className='actions';
   const links = (...bs) => { const l = document.createElement('div'); l.className = 'links'; bs.forEach(b => l.appendChild(b)); return l; };
@@ -3550,6 +3578,15 @@ function render(){
       <p>Река, поля, лес. Среди этой сибирской природы затерялась деревенька.</p>
       <p>Сколько вы живёте уже в ней? 10 лет? Или все 50? Никто уже не помнит, да и не важно.</p>
       <p>А что важно? В этом и суть игры. Понять, что важно, а что нет.</p></div>`);
+    actions.appendChild(btn('Дальше', '', ()=>{ S.phase = 'living'; save(); render(); }, 'secondary next'));
+  }
+
+  else if (S.phase==='living'){   // after the backstory: the yard, how one lives here; then the first day
+    setScene('home');
+    add(`<div class="lines story">
+      <p>Как тут живётся? Да ни плохо ни хорошо.</p>
+      <p>Чтобы купить продуктов да мелочей в местном магазине, вы сдаёте туда рыбу, которую ловите в округе.</p>
+      <p>А когда клёва нет, можете мастерить снасти на продажу заезжим охотникам.</p></div>`);
     actions.appendChild(btn('Начать день', '', ()=>{ startDay(); save(); render(); }, 'primary'));
   }
 
@@ -4317,20 +4354,38 @@ function restart(){
 }
 if (!load()) newSeason();
 hush();
-// the title screen opens a new game, then the backstory and the first morning; later launches go straight to the saved game
+// the title screen opens a new game, then the backstory, the yard and the first morning; later launches go straight to
+// the saved game (one saved before the first day comes back to the title screen, then to the screen it was on). The
+// title screen is a living scene (introScene) over its still picture; the picture shows only if the scene cannot be drawn.
+let splashLive = null;
+function fitSplash(){   // the scene where the picture is: covering the frame, centred across and 80% down, as its CSS
+  if ($('splash').hidden) return;
+  const f = $('splash').firstElementChild, cv = $('splashCanvas'), [pw, ph] = LiveScenes.SIZE.splash;
+  const fw = f.clientWidth, fh = f.clientHeight, k = Math.max(fw/pw, fh/ph), w = pw*k, h = ph*k;
+  Object.assign(cv.style, {width: `${w}px`, height: `${h}px`, left: `${(fw - w)/2}px`, top: `${(fh - h)*.8}px`});
+}
+function endSplash(){
+  $('splash').hidden = true; $('splash').classList.remove('live'); $('splashCanvas').hidden = true;
+  if (splashLive){ splashLive.destroy(); splashLive = null; }
+}
 function showSplash(){
   const kb = !!document.activeElement && $('panel').contains(document.activeElement);
+  endSplash();
   $('splashImg').src = IMG.splash; $('splashGo').disabled = false; $('splash').hidden = false;
+  const cv = $('splashCanvas'); cv.hidden = false; $('splash').classList.add('live'); fitSplash();
+  const sc = splashLive = LiveScenes.create(cv, introScene('splash'));
+  sc.ready().then(ok => { if (!ok && splashLive === sc){ $('splash').classList.remove('live'); cv.hidden = true; } });
   tapLock = performance.now() + TAP_LOCK;
   if (kb) $('splashGo').focus({preventScroll: true});
 }
 $('splashGo').onclick = () => {
   if (tapsLocked()) return;
   const kb = document.activeElement === $('splashGo');
-  $('splash').hidden = true; render();
-  if (kb){ const b = $('panel').querySelector('button.primary'); if (b) b.focus({preventScroll: true}); }
+  endSplash(); render();
+  if (kb){ const b = $('panel').querySelector('button:not(:disabled)'); if (b) b.focus({preventScroll: true}); }
 };
-render(); if (S.phase === 'intro') showSplash();
+addEventListener('resize', fitSplash);
+render(); if (INTRO.has(S.phase)) showSplash();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 </script>
 </body>
