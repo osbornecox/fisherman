@@ -2733,62 +2733,62 @@ const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1
   '0-1':'Облака разошлись, выглянуло солнце.', '0-3':'Поднялся ветер, гнёт деревья.', '2-0':'Дождь перестал.',
   '2-5':'Дождь припустил, льёт стеной.', '3-0':'Ветер стих, небо серое.', '3-1':'Ветер стих, выглянуло солнце.',
   '4-1':'Туман сошёл, выглянуло солнце.', '4-0':'Туман поднялся, небо серое.', '5-2':'Ливень стих, моросит.'};
+// the old man's word on a weather: advice, so since 19 November 2026 never written at home (the izba and the yard),
+// only when the weather steps at 11:00 on the way; the angler's handbook is to take these words over
 const WEATHER_HINT = ['В пасмурный день рыба смелая. На озере, говорят, самое время.', 'В жару рыба уходит в глубину. В омуте прохладнее.', 'Дождь смывает в реку корм с берегов.', 'На озере сейчас волна. Разве что омут под лесом.', 'В туман на реке обычно берёт ровно.', 'В ливень поплавок колотит каплями, рыба почти не берёт. В омуте под лесом потише.'];
 
 // ---------- household numbers ----------
 // What life takes from the piggy bank (the household block below): food, kerosene and soap run out, tackle and tools
 // wear, now and then something breaks, the summer asks for its things, now and then a treat. Each morning decides
-// what the day buys and says what it comes to; the evening takes exactly that. It never touches the fish or the
-// decisions. A purchase never waits: what is needed is bought that day, and the piggy bank may go below zero, into
-// debt, with no other effect. A day never costs less than a day of tackle (LIFE_MIN), about 65 on average, and no day
-// much more: what runs out soon is bought ahead on a light day, and a big thing is paid in parts. Keep these numbers and
-// should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
-// GOODS: what one purchase costs and how many days it lasts (`acc`: its name after «на» and «за»); the morning's words
-// when it is low, two days left (`low`), and on its last day (`out`); a good with no words is bought without a thought.
-// `unit`: what one purchase is, said with its price when the morning thinks of it and the day buys it («пачка 20 руб.»);
-// `asks`: which of its words ask for it already («Надо спичек.»), so the price follows them after a comma alone; `nom`:
-// its name on a morning that thinks of two goods («Кончаются хлеб и крупа»). The last four are tackle and tools that
-// wear.
+// what the day buys and names every purchase with its price; the evening takes exactly that. It never touches the fish
+// or the decisions. A purchase never waits: what is needed is bought that day, and the piggy bank may go below zero,
+// into debt, with no other effect. A day never costs less than a day of tackle (LIFE_MIN), about 65 on average, and no
+// day much more: what runs out soon is bought ahead on a light day, and a big thing is paid in parts. Keep these
+// numbers and should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
+// GOODS: what one purchase costs and how many days it lasts; `acc`: its name after «на» and «за» (the evening's
+// «На хлеб и молоко ушло …»); `of`: how much of it, in the morning's list («хлеба на 30 руб.»); the morning's thought
+// when it is low, two days left (`low`), and on its last day (`out`), a good with no words being bought without a
+// thought; `nom`: its name on a morning that thinks of two goods («Кончаются хлеб и крупа.»). The last four are tackle
+// and tools that wear.
 const GOODS = {
-  milk:     {acc:'молоко', price:20, days:1},
-  bread:    {acc:'хлеб', price:30, days:5, nom:'хлеб', unit:'буханка', low:'Хлеб почти весь.', out:'Хлеба нет.'},
-  sugar:    {acc:'сахар', price:30, days:5, nom:'сахар', unit:'пачка', low:'Сахару на пару дней.', out:'Сахар кончается.'},
-  flour:    {acc:'муку', price:20, days:8, nom:'мука', unit:'пачка', out:'Мука кончается.'},
-  pasta:    {acc:'макароны', price:15, days:5, nom:'макароны', unit:'пачка', out:'Макарон почти нет.'},
-  groats:   {acc:'крупу', price:15, days:5, nom:'крупа', unit:'пачка', out:'Крупы осталось немного.'},
-  tea:      {acc:'чай', price:30, days:8, nom:'чай', unit:'пачка', out:'Чай на донышке.'},
-  oil:      {acc:'масло', price:30, days:10, nom:'масло', unit:'бутылка', out:'Масло кончается.'},
-  kerosene: {acc:'керосин', price:15, days:8, nom:'керосин', unit:'литр', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит — керосин нужен.', asks:'out'},
-  soap:     {acc:'мыло', price:10, days:8},
-  salt:     {acc:'соль', price:5, days:15, nom:'соль', unit:'пачка', out:'Соль на донышке.'},
-  matches:  {acc:'спички', price:5, days:10, nom:'спички', unit:'коробок', low:'Спичек осталось немного.', out:'Надо спичек.', asks:'out'},
-  line:     {acc:'леску', price:25, days:12},
-  hooks:    {acc:'крючки', price:10, days:5},
-  nails:    {acc:'гвозди', price:15, days:8},
-  tar:      {acc:'смолу', price:30, days:20},
+  milk:     {acc:'молоко', of:'молока', price:20, days:1},
+  bread:    {acc:'хлеб', of:'хлеба', price:30, days:5, nom:'хлеб', low:'Хлеб почти весь.', out:'Хлеба нет.'},
+  sugar:    {acc:'сахар', of:'сахару', price:30, days:5, nom:'сахар', low:'Сахару на пару дней.', out:'Сахар кончается.'},
+  flour:    {acc:'муку', of:'муки', price:20, days:8, nom:'мука', out:'Мука кончается.'},
+  pasta:    {acc:'макароны', of:'макарон', price:15, days:5, nom:'макароны', out:'Макарон почти нет.'},
+  groats:   {acc:'крупу', of:'крупы', price:15, days:5, nom:'крупа', out:'Крупы осталось немного.'},
+  tea:      {acc:'чай', of:'чаю', price:30, days:8, nom:'чай', out:'Чай на донышке.'},
+  oil:      {acc:'масло', of:'масла', price:30, days:10, nom:'масло', out:'Масло кончается.'},
+  kerosene: {acc:'керосин', of:'керосину', price:15, days:8, nom:'керосин', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит.'},
+  soap:     {acc:'мыло', of:'мыла', price:10, days:8},
+  salt:     {acc:'соль', of:'соли', price:5, days:15, nom:'соль', out:'Соль на донышке.'},
+  matches:  {acc:'спички', of:'спичек', price:5, days:10, nom:'спички', low:'Спичек осталось немного.', out:'Спички кончаются.'},
+  line:     {acc:'леску', of:'лески', price:25, days:12},
+  hooks:    {acc:'крючки', of:'крючков', price:10, days:5},
+  nails:    {acc:'гвозди', of:'гвоздей', price:15, days:8},
+  tar:      {acc:'смолу', of:'смолы', price:30, days:20},
 };
 // what breaks now and then (never in a new game's first BREAK_FROM days, never two close together): the morning's
-// words, and what that day buys for it. `cost`: how the words go on to its price, which takes the place of their
-// last full stop («Ведро дало течь. Новое — 35 руб.»; a part of a big thing «Доска 50 руб., пока 30 руб.»)
+// thought, and what that day buys for it. In the morning's list a thing bought whole is `buy` («новое ведро за 35
+// руб.»); its first part, when it is paid in parts, is a line of its own, `costs` («Доска стоит 50 руб., пока отдать
+// 30 руб.»); a later part «За доску отдать ещё 20 руб.» (`acc`)
 const BREAKS = {
-  roof:   {acc:'доску', price:50, cost:'. Доска ', thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
-  glass:  {acc:'стекло', price:70, cost:'. Новое — ', thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
-  bucket: {acc:'ведро', price:35, cost:'. Новое — ', thought:'Ведро дало течь.'},
-  shovel: {acc:'лопату', price:35, cost:'. Новая — ', thought:'Лопата треснула по черенку.'},
-  saw:    {acc:'точильный камень', price:25, cost:', ', thought:'Пила тупая — камень нужен.'},
+  roof:   {acc:'доску', buy:'доску', costs:'Доска стоит', price:50, thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
+  glass:  {acc:'стекло', buy:'новое стекло', costs:'Новое стекло стоит', price:70, thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
+  bucket: {acc:'ведро', buy:'новое ведро', costs:'Новое ведро стоит', price:35, thought:'Ведро дало течь.'},
+  shovel: {acc:'лопату', buy:'новую лопату', costs:'Новая лопата стоит', price:35, thought:'Лопата треснула по черенку.'},
+  saw:    {acc:'точильный камень', buy:'точильный камень', costs:'Точильный камень стоит', price:25, thought:'Пила тупая — камень нужен.'},
 };
-// once a summer (SUMMER days, then it comes round again), on a morning between days `from` and `to` of it: the thought,
-// and that day the thing (`cost` as in BREAKS)
+// once a summer (SUMMER days, then it comes round again), on a morning between days `from` and `to` of it: the
+// thought, and that day the thing (`buy`, `costs` as in BREAKS; seeds are bought as a good, «семян на 30 руб.», `of`)
 const SEASON = {
-  net:   {acc:'накомарник', price:30, from:3, to:10, cost:', ', thought:'Комары замучили — накомарник нужен.'},
-  seeds: {acc:'семена', price:30, from:10, to:20, cost:'. Семена — ', thought:'Огород бы посадить, срок подходит.'},
-  socks: {acc:'носки', price:40, from:35, to:45, cost:'. Пара — ', thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
-  boots: {acc:'сапоги', price:150, from:70, to:85, cost:' — ', thought:'К осени сапоги бы новые.'},
+  net:   {acc:'накомарник', buy:'накомарник', costs:'Накомарник стоит', price:30, from:3, to:10, thought:'Комары замучили — накомарник нужен.'},
+  seeds: {acc:'семена', of:'семян', costs:'Семена стоят', price:30, from:10, to:20, thought:'Огород бы посадить, срок подходит.'},
+  socks: {acc:'носки', buy:'носки', costs:'Носки стоят', price:40, from:35, to:45, thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
+  boots: {acc:'сапоги', buy:'сапоги', costs:'Сапоги стоят', price:150, from:70, to:85, thought:'К осени сапоги бы новые.'},
 };
-const TREATS = {gingerbread: {acc:'пряники', price:15}, condensed: {acc:'сгущёнку', price:20}};   // every TREAT_GAP days, no thought
-// the morning when nothing in the house asks for a thought
-const THOUGHTS = ['Проснулся до света.', 'Поясница ныла к ночи. К дождю, что ли.', 'Снилось что-то, не вспомнить.',
-  'Тихо во дворе, птицы ещё молчат.', 'Ночью где-то далеко собака лаяла.', 'Ходики идут, а кукушка молчит.', 'Утро. Чай — и на воду.'];
+// every TREAT_GAP days, with no thought, but named in the morning's list as all the day buys
+const TREATS = {gingerbread: {acc:'пряники', of:'пряников', price:15}, condensed: {acc:'сгущёнку', of:'сгущёнки', price:20}};
 const LIFE_MIN = HOURS*WAGE;      // a day never costs less than a day of tackle
 const LIFE_TOP = LIFE_MIN + 5;    // buying ahead fills a day up to here
 const PART_TOP = 70;              // a part of a big thing lifts a day up to here
@@ -3201,7 +3201,9 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
-  S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {}, planned: 0 };
+  // homeFrom: the day the room starts to open, a thing a morning (ROOM); homeLast: the day each house line came last
+  S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {}, planned: 0,
+    homeFrom: 1, homeLast: {} };
   newHouse();
 }
 // fix: a weather the day keeps from morning to evening, with no step at 11:00 (a new game's first day, startDay())
@@ -3269,10 +3271,9 @@ function startDay(){
   S.life = {};    // the life around the water lookAround() chose, by water and hour
   S.trail = [];   // where the day went, for the evening's page
   S.phase = 'izba';
-  logHome(0, 'Занавеска задёрнута. В избе полумрак, тикают ходики.');
-  const thought = morningThought();   // what the first thought of the day is about, at 6:00
+  const thought = morningThought();   // what the household's first thought of the day is about, at 6:00
   spendDay();   // what the day buys, decided now: the evening takes exactly this
-  morningLines(thought).forEach(x => logHome(0, x));   // the thought, with a price, and what the day will take
+  wakeLines(thought).forEach(x => logAdd(0, x));   // what he wakes to, then the thought and the day's list, a line each
 }
 
 // ---------- the household ----------
@@ -3282,10 +3283,11 @@ function startDay(){
 // tag), never from rnd(): the fishing days stay as they were, and a reload gives the same thoughts and purchases.
 // State, all saved: S.stock, the days each good still lasts counting the day it is reckoned for (a good is bought on
 // the day it comes to 0): this morning's until spendDay() has decided the day, the next morning's from then on;
-// S.house, what is owed for big things, this morning's breakdown and thought, the summer's purchases, the next treat
-// and the last background thought; S.purchases, what the day buys, [{id, price, part, gone}], `part` 'first', 'more'
-// or 'last' for a big thing paid in parts, `gone` for a good bought because it ran out today (nameOf(id) is its name
-// after «на» or «за»); S.planned, the day S.purchases was decided for.
+// S.house, what is owed for big things, this morning's breakdown and thought, the summer's purchases and the next treat
+// (and, in a game from before 19 November 2026, its last background thought, `thought`, read no more); S.purchases,
+// what the day buys, [{id, price, part, gone}], `part` 'first', 'more' or 'last' for a big thing paid in parts, `gone`
+// for a good bought because it ran out today (nameOf(id) is its name after «на» or «за»); S.planned, the day
+// S.purchases was decided for.
 const HOUSE_TAG = 0x484f5553;
 function hashOf(...vals){   // a number in [0, 1) from the game's number and vals
   let x = S.sceneSeed | 0;
@@ -3317,9 +3319,9 @@ function newHouse(from = S.day){
 // The morning's thought, by priority: the season's thing on the last day of its time; what runs low, NEED_DAYS or
 // fewer days left (the good with the fewest, and a second one when both are on their last day); what broke, only on a
 // morning when nothing runs low and the evening has room, so it is told and never piles on; the season's thing in its
-// time; else a background thought, never the last one again. Never about the fish. Returns what it is about,
-// {kind, id}, and for what runs low its goods and which of their words, [[good, 'low' or 'out']]: morningLines() words
-// it once the day is decided.
+// time; else none, a quiet morning (its background thoughts went to the waking message on 19 November 2026,
+// WAKE_AGAIN and WAKE_SOUND). Never about the fish. Returns what it is about, {kind, id}, and for what runs low its
+// goods and which of their words, [[good, 'low' or 'out']]: morningLines() words it once the day is decided.
 function morningThought(){
   const H = S.house, cyc = (S.day - 1) % SUMMER + 1, yr = Math.floor((S.day - 1)/SUMMER);
   const season = ids => ids.find(s => H.season[s] !== yr && cyc >= SEASON[s].from && cyc <= SEASON[s].to);
@@ -3341,36 +3343,32 @@ function morningThought(){
   }
   const due = season(Object.keys(SEASON));
   if (due) return say('season', due);
-  const pool = THOUGHTS.map((_, i) => i).filter(i => i !== H.thought), i = pool[Math.floor(hh(4)*pool.length)];
-  H.thought = i;
-  return say('thought', i);
+  return say('quiet', null);
 }
-// The morning's words, once spendDay() has decided the day: the thought, and when the day buys what it thinks of, its
-// price, in the old man's words («Мука кончается — надо купить, пачка 20 руб.»; two goods on their last day by name
-// and together, «Кончаются хлеб и крупа — надо купить на 45 руб.»; a big thing paid in parts its price and today's
-// part, «Доска 50 руб., пока 30 руб.», after a comma «пока 20 руб. из 30 руб.»); then what the whole day will take,
-// which is what the evening takes («Всего за день уйдёт 65 руб.»). The izba writes each sentence on a line of its own
-// (logHome()). What the thought does not name (milk, a treat, a later part of a big thing, what is bought ahead) is in
-// that sum alone.
+// The household's morning lines, once spendDay() has decided the day (the author, 19 November 2026: every purchase by
+// itself with its price, no total to puzzle over): the thought, with no price; the first part of a thing paid in parts,
+// a line of its own («Доска стоит 50 руб., пока отдать 30 руб.»); the day's list, always, one sentence naming all the
+// rest it buys, what the thought is about first (two goods in the thought's order), then in the order of S.purchases:
+// a good or a treat as how much of it («хлеба на 30 руб.»), a thing as itself («новое ведро за 35 руб.»); and a later
+// part of a big thing a line after it («За стекло отдать ещё 20 руб.», the last «За сапоги отдать последние 10 руб.»).
+// The figures of these lines (a first part's after «пока отдать») come to daySpend(), which the evening takes. A sum
+// keeps its «руб.» on its line (rub()), and a sentence that ends on «руб.» takes no second full stop.
 function morningLines(m){
-  const bought = id => S.purchases.find(p => p.id === id && p.part !== 'more' && p.part !== 'last');
-  const priced = (words, join, what) => words.slice(0, -1) + join + what;   // the price, «руб.», takes the full stop's place
-  let line;
-  if (m.kind === 'need' && m.goods.length > 1){   // both run out today, so the day buys both
-    const [a, b] = m.goods.map(([g]) => g), sum = [a, b].reduce((s, g) => s + (bought(g) ? bought(g).price : 0), 0);
-    line = `Кончаются ${GOODS[a].nom} и ${GOODS[b].nom} — надо купить на ${rub(sum)}`;
-  }
-  else if (m.kind === 'need'){
-    const [g, w] = m.goods[0], G = GOODS[g], p = bought(g);
-    line = p ? priced(G[w], G.asks === w ? ', ' : ' — надо купить, ', `${G.unit} ${rub(p.price)}`) : G[w];
-  }
-  else if (m.kind === 'thought') line = THOUGHTS[m.id];
-  else {
-    const T = m.kind === 'break' ? BREAKS[m.id] : SEASON[m.id], p = bought(m.id);
-    const part = p && p.part === 'first' && (T.cost === ', ' ? `пока ${rub(p.price)} из ${rub(T.price)}` : `${rub(T.price)}, пока ${rub(p.price)}`);
-    line = p ? priced(T.thought, T.cost, part || rub(p.price)) : T.thought;
-  }
-  return [line, `Всего за день уйдёт ${rub(daySpend())}`];
+  const all = (S.purchases || []).filter(known), whole = all.filter(p => !p.part), first = all.filter(p => p.part === 'first');
+  const later = all.filter(p => p.part === 'more' || p.part === 'last');
+  const item = id => GOODS[id] || BREAKS[id] || SEASON[id] || TREATS[id];
+  const about = m.kind === 'need' ? m.goods.map(([g]) => g) : m.kind === 'break' || m.kind === 'season' ? [m.id] : [];
+  const rank = p => about.includes(p.id) ? about.indexOf(p.id) : about.length;
+  const list = whole.map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
+    .map(([p]) => item(p.id).of ? `${item(p.id).of} на ${rub(p.price)}` : `${item(p.id).buy} за ${rub(p.price)}`);
+  const out = [];
+  if (m.kind === 'need' && m.goods.length > 1) out.push(`Кончаются ${GOODS[m.goods[0][0]].nom} и ${GOODS[m.goods[1][0]].nom}.`);
+  else if (m.kind === 'need') out.push(GOODS[m.goods[0][0]][m.goods[0][1]]);
+  else if (m.kind === 'break' || m.kind === 'season') out.push((BREAKS[m.id] || SEASON[m.id]).thought);
+  first.forEach(p => out.push(`${item(p.id).costs} ${rub(item(p.id).price)}, пока отдать ${rub(p.price)}`));
+  if (list.length) out.push(`Надо купить ${list.length > 1 ? list.slice(0, -1).join(', ') + ' и ' + list[list.length - 1] : list[0]}`);
+  later.forEach(p => out.push(`За ${item(p.id).acc} отдать ${p.part === 'last' ? 'последние' : 'ещё'} ${rub(p.price)}`));
+  return out;
 }
 const daySpend = () => S.purchases.reduce((s, p) => s + p.price, 0);   // what the day takes, all of it
 // The day's purchases, decided in the morning; sets S.purchases and S.planned. What runs out today is bought, then what
@@ -3439,6 +3437,10 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   // saved before the scenes showed the signs: a number for the game's scenes from the saved draws (the same until the
   // next save keeps it); the household draws from it too
   if (!Number.isInteger(S.sceneSeed)) S.sceneSeed = seed % 2147483647;
+  // saved before the house's lines: the room opens from the next morning (this one has passed in the old words), from
+  // the first when saved on the screens before the first day; no house line came before
+  if (!Number.isInteger(S.homeFrom)) S.homeFrom = INTRO.has(S.phase) ? 1 : S.day + 1;
+  if (!S.homeLast || typeof S.homeLast !== 'object') S.homeLast = {};
   // saved before the household: it starts now, its first evening this day's (the next one's, when saved at the
   // evening); the money stays as it was
   if (!S.stock || typeof S.stock !== 'object' || !S.house || typeof S.house !== 'object') newHouse(S.phase === 'evening' ? S.day + 1 : S.day);
@@ -3793,7 +3795,7 @@ function render(){
 }
 function logAdd(t, text){ S.log.push({t: clock(t), text}); }
 // In the house, the izba and the yard, every sentence of an entry is a line of its own («Занавеска задёрнута.» /
-// «В избе полумрак, тикают ходики.»; the author, 19 November 2026): the morning there reads a thing at a time. At the
+// «В избе темнее, чем обычно.»; the author, 19 November 2026): the morning there reads a thing at a time. At the
 // water and in the village an entry stays whole: its two sentences belong together, and on a short phone a line
 // more would push the hour's signs under the journal's top edge.
 const sentences = s => s.split(/(?<=[.!?…])\s+(?=[А-ЯЁA-Z«<])/);
@@ -4074,41 +4076,458 @@ function writeLife(w, t){
 }
 function todayCatch(){ return S.fishToday ? 'Сегодня: ' + fishWord(S.fishToday) : 'Сегодня пусто'; }
 
+// ---------- the house ----------
+// What goes on at home, in the izba and its yard, which are one place (should_I_lab's docs/10-dom.md; the author,
+// 19 November 2026): the waking message at 6:00, the room it opens a thing a morning, the hours of «Ничего не делать»
+// and what is seen at the door. Life, not events: nothing to do with them and nothing to decode. The old man is alone:
+// from the village across the river only its rooster, cow and dog. Nothing about the fish, no advice (that is the
+// angler's handbook's) and no omens: a line knows only the weather of its hour, the curtain, the hour, the power, the
+// household (what ran out today), the room opened so far, the izba's calendar (lifeMonth()) and what today wrote
+// (S.log). A line names only what the izba and the yard show, or what stands just out of the frame (the stove, the
+// door, the bed, the entry): the lamp is not lit by day, the clock's weights are pulled up only in the 6:00 hour, and
+// the window shows only the sky, the forest, the river and the meadow. Every sentence is a line of its own.
+// A line: its id; its kind `k` (weather, sound, izba, deed, quiet; the yard's and the morning's have lists of their
+// own); its weathers `w` (WEATHERS indices; none: any), hours `h` (the start of the hour, 6..17) and months `m` by the
+// izba's calendar; the curtain `cur` ('open' or 'closed'); the room's thing `th` it needs opened (ROOM); `power` (true:
+// only with the power on, false: only on a day without it); `need`, what else must hold, from the hour's context; for a
+// chain, `after`: the lines one of which today wrote before it (house lines, the morning's, the weather's change at
+// 11:00 as the window shows it, 'change-a-b', or as it is heard, 'heard-a-b'; 'crafted': an hour at the tackle); how
+// often `f` ('often', 'some', 'rare', 'chain', 'sub' for what stands in for a line when its good ran out, or a quiet
+// line's weight; a function of the hour's context when it depends on it); its group `g` with a limit a day (tea,
+// food); and `meal`, a meal cooked or eaten at the table, one a day.
+const KETTLE = 'Хотел поставить чайник, да света нет.';   // the kettle stands on the electric hotplate
+const HOME_LINES = [
+  // the weather in the izba, the curtain drawn: heard, and seen in the light through it
+  {id: 'veil-drift', k: 'weather', cur: 'closed', w: '013', h: '7-16', f: 'some', s: 'Свет сквозь занавеску то прибудет, то убудет.'},
+  {id: 'veil-grey', k: 'weather', cur: 'closed', w: '0', f: 'some', s: 'Свет сквозь занавеску серый, ровный.'},
+  {id: 'noon-dusk', k: 'weather', cur: 'closed', w: '02', h: '11-13', f: 'some', s: 'Даже в полдень в избе полумрак.'},
+  {id: 'sun-slit', k: 'weather', cur: 'closed', w: '1', h: '7-15', f: 'often', s: 'В щель у занавески бьёт солнце.'},
+  {id: 'sun-glow', k: 'weather', cur: 'closed', w: '1', h: '9-15', f: 'often', s: 'Занавеска светится от солнца.'},
+  {id: 'rain-roof', k: 'weather', cur: 'closed', w: '2', f: 'often', s: 'Дождь шуршит по крыше.'},
+  {id: 'rain-eaves', k: 'weather', cur: 'closed', w: '2', f: 'some', s: 'С крыши капает под окно.'},
+  {id: 'down-roof', k: 'weather', cur: 'closed', w: '5', f: 'often', s: 'Дождь барабанит по крыше.'},
+  {id: 'down-tin', k: 'weather', cur: 'closed', w: '5', f: 'some', s: 'По жести на крыше дождь бьёт дробью.'},
+  {id: 'down-spout', k: 'weather', cur: 'closed', w: '5', f: 'some', s: 'С крыши под окном льёт струёй.'},
+  {id: 'down-dark', k: 'weather', cur: 'closed', w: '5', f: 'some', s: 'В избе темно, хоть лампу зажигай.'},
+  {id: 'wind-chimney', k: 'weather', cur: 'closed', w: '3', f: 'often', s: 'Ветер гудит в трубе.'},
+  {id: 'wind-tin', k: 'weather', cur: 'closed', w: '3', f: 'some', s: 'Ветер гремит листом жести на крыше.'},
+  {id: 'wind-door', k: 'weather', cur: 'closed', w: '3', f: 'some', s: 'Из-под двери тянет холодом.'},
+  {id: 'fog-veil', k: 'weather', cur: 'closed', w: '4', h: '6-10', f: 'often', s: 'Свет сквозь занавеску белёсый.'},
+  {id: 'fog-ears', k: 'weather', cur: 'closed', w: '4', h: '6-10', f: 'some', s: 'Тихо, будто уши заложило.'},
+  // the weather in the window, the curtain open: the window shows all this itself (izbaLive)
+  {id: 'clouds-low', k: 'weather', cur: 'open', w: '0', f: 'often', s: 'Над лесом за рекой низкие облака.'},
+  {id: 'clouds-crawl', k: 'weather', cur: 'open', w: '03', f: 'some', s: 'Облака медленно ползут над лесом.'},
+  {id: 'river-grey', k: 'weather', cur: 'open', w: '02', f: 'some', s: 'Река за окном серая.'},
+  {id: 'river-shine', k: 'weather', cur: 'open', w: '1', f: 'often', s: 'Река за окном блестит.'},
+  {id: 'sun-table', k: 'weather', cur: 'open', w: '1', h: '9-14', f: 'often', s: 'Солнце легло на стол светлым пятном.'},
+  {id: 'heat-meadow', k: 'weather', cur: 'open', w: '1', h: '12-15', m: '7-8', f: 'some', s: 'За окном жарко, трава на лугу не шелохнётся.'},
+  {id: 'drops-glass', k: 'weather', cur: 'open', w: '25', f: 'often', s: 'Капли стекают по стеклу.'},
+  {id: 'river-rain', k: 'weather', cur: 'open', w: '2', f: 'some', s: 'Река за окном рябая от дождя.'},
+  {id: 'down-wall', k: 'weather', cur: 'open', w: '5', f: 'often', s: 'За окном льёт стеной, того берега не видно.'},
+  {id: 'meadow-waves', k: 'weather', cur: 'open', w: '3', f: 'often', s: 'По лугу за окном ходят волны.'},
+  {id: 'whitecaps', k: 'weather', cur: 'open', w: '3', f: 'often', s: 'На реке белые барашки.'},
+  {id: 'leaf', k: 'weather', cur: 'open', w: '3', m: '1-7', f: 'some', s: 'Мимо окна пронесло лист.'},
+  {id: 'leaf-yellow', k: 'weather', cur: 'open', w: '3', m: '9-10', f: 'often', s: 'Мимо окна пронесло жёлтый лист.'},
+  {id: 'fog-window', k: 'weather', cur: 'open', w: '4', h: '6-10', f: 'often', s: 'За окном туман, реки почти не видно.'},
+  {id: 'fog-strip', k: 'weather', cur: 'open', w: '4', h: '6-10', f: 'some', s: 'Над рекой ползёт полоса тумана погуще.'},
+  // the weather's chains: the rain goes on, the wind does not let up, the roof still drips after the rain
+  {id: 'rain-still', k: 'weather', w: '2', f: 'chain', s: 'А дождь всё шуршит по крыше.',
+    after: ['rain-roof', 'am-rain', 'am-rain-night', 'heard-0-2', 'change-0-2', 'heard-5-2', 'change-5-2']},
+  {id: 'down-still', k: 'weather', w: '5', f: 'chain', s: 'А дождь всё барабанит по крыше, ишь как разошлось.',
+    after: ['down-roof', 'am-down', 'heard-2-5', 'change-2-5']},
+  {id: 'wind-still', k: 'weather', w: '3', f: 'chain', s: 'Ветер всё не уймётся.', after: ['wind-chimney', 'am-chimney', 'heard-0-3', 'change-0-3']},
+  {id: 'drip-still', k: 'weather', w: '0', h: '11', f: 'chain', s: 'С крыши ещё капает.', after: ['change-2-0', 'heard-2-0']},
+  // sounds from outside, heard with the curtain drawn or open: the yard, the forest's edge, the village's beasts
+  {id: 'magpie', k: 'sound', w: '013', f: 'often', s: 'С улицы слышна сорока.'},
+  {id: 'sparrows', k: 'sound', w: '01', f: 'often', s: 'Под крышей возятся воробьи.'},
+  {id: 'bird-song', k: 'sound', w: '014', h: '6-11', m: '6-7', f: 'often', s: 'За избой поёт какая-то птица, всё одно и то же.'},
+  {id: 'cuckoo', k: 'sound', w: '014', h: '6-12', m: '6-7', f: 'some', s: 'Где-то в лесу кукует кукушка.'},
+  {id: 'rooster', k: 'sound', w: '01234', h: '6-8', f: 'often', s: 'За рекой прокричал петух.'},
+  {id: 'cow', k: 'sound', w: '01234', h: '8-16', f: 'some', s: 'За рекой мычит корова.'},
+  {id: 'dog', k: 'sound', w: '01234', f: 'some', s: 'Далеко за рекой лает собака.'},
+  {id: 'raven', k: 'sound', w: '01234', f: 'some', s: 'Над избой каркнул ворон.'},
+  {id: 'woodpecker', k: 'sound', w: '01', f: 'some', s: 'На опушке стучит дятел.'},
+  {id: 'grasshoppers', k: 'sound', w: '1', h: '11-15', m: '6-8', f: 'often', s: 'В траве под окном стрекочут кузнечики.'},
+  {id: 'bumblebee', k: 'sound', w: '1', h: '10-16', m: '6-8', f: 'some', s: 'Под окном гудит шмель.'},
+  {id: 'birches', k: 'sound', w: '3', f: 'often', s: 'За избой шумят берёзы.'},
+  {id: 'crows', k: 'sound', w: '01234', h: '15-17', f: 'some', s: 'К вечеру раскаркались вороны.'},
+  {id: 'cow-fog', k: 'sound', w: '4', h: '6-10', f: 'some', s: 'В тумане за рекой мычит корова.'},
+  {id: 'rain-birds', k: 'sound', w: '2', f: 'some', s: 'В дождь и птицы примолкли.'},
+  {id: 'birds-few', k: 'sound', w: '04', m: '8-12', f: 'some', s: 'Птиц почти не слышно.'},
+  {id: 'geese', k: 'sound', w: '01234', m: '9-10', f: 'rare', s: 'Над избой пролетели гуси, их долго слышно.'},
+  // the izba's own life: a mouse, the insects, a floorboard, the clock. No cat, no dog, no hens: he is alone
+  {id: 'mouse', k: 'izba', f: 'rare', s: 'У дальней стены пробежала мышка.'},
+  {id: 'mouse-stove', k: 'izba', th: 'stove', f: 'rare', s: 'За печкой скребётся мышь.'},
+  {id: 'fly', k: 'izba', m: '6-8', f: 'often', s: 'В окно бьётся муха.'},
+  {id: 'floorboard', k: 'izba', f: 'some', s: 'Сама по себе скрипнула половица.'},
+  {id: 'log-crack', k: 'izba', need: c => c.w === 1 || c.mo >= 9, f: 'some', s: 'Щёлкнуло бревно в стене.'},
+  {id: 'weights-down', k: 'izba', h: '13-17', f: 'some', s: 'Гири у ходиков сползли пониже.'},
+  {id: 'spider', k: 'izba', f: 'some', s: 'По потолку ползёт паук.'},
+  {id: 'washstand-drip', k: 'izba', th: 'washstand', f: 'some', s: 'Из рукомойника капнуло в ведро.'},
+  {id: 'butterfly', k: 'izba', cur: 'open', w: '01', m: '6-8', f: 'some', s: 'На стекле сидит бабочка, сложила крылья.'},
+  {id: 'wasp', k: 'izba', cur: 'open', w: '1', m: '7-8', f: 'some', s: 'По стеклу ползает оса, ищет выход.'},
+  {id: 'mosquito', k: 'izba', h: '6-8,15-17', m: '6-7', f: 'often', s: 'Над ухом звенит комар.'},
+  {id: 'calendar-draft', k: 'izba', w: '3', f: 'some', s: 'Листок календаря шевельнулся от сквозняка.'},
+  {id: 'glass-cold', k: 'izba', w: '3', need: () => homeBroken('glass'), f: 'often', s: 'От окна тянет холодом.'},
+  {id: 'roof-drip', k: 'izba', w: '25', need: () => homeBroken('roof'), f: 'often', s: 'В углу с потолка капает.'},
+  {id: 'cricket', k: 'izba', h: '15-17', m: '9-12', th: 'stove', f: 'some', s: 'За печкой застрекотал сверчок.'},
+  {id: 'fly-sleepy', k: 'izba', m: '9', f: 'some', s: 'По стеклу ползает сонная муха.'},
+  {id: 'stove-crumble', k: 'izba', th: 'stove', f: 'rare', s: 'В печи что-то осыпалось.'},
+  {id: 'moth', k: 'izba', th: 'chest', f: 'rare', s: 'Из-за сундука вылетела моль.'},
+  {id: 'dusk', k: 'izba', h: '16-17', f: 'some', s: 'К вечеру в избе темнеет.'},
+  {id: 'bucket-puddle', k: 'izba', need: () => !!S.house && S.house.broke === 'bucket', f: 'often', s: 'Под ведром на полу лужица.'},
+  {id: 'fly-calm', k: 'izba', m: '6-8', f: 'chain', after: ['fly'], s: 'Муха угомонилась.'},
+  {id: 'mouse-again', k: 'izba', th: 'stove', f: 'chain', after: ['mouse', 'mouse-stove'], s: 'Мышка опять скребётся за печкой.'},
+  {id: 'roof-bucket', k: 'izba', w: '25', need: () => homeBroken('roof'), f: 'chain', after: ['roof-drip'], s: 'Подставил под капель ведро.'},
+  // what he does: tea (the kettle stands on the electric hotplate), and what stands in for it when tea or sugar ran
+  // out today; food; the rest
+  {id: 'tea', k: 'deed', g: 'tea', power: true, f: c => inSpans(c.hr, [[6, 10], [14, 17]]) ? 'often' : 'some', s: 'Попил чаю.'},
+  {id: 'tea-window', k: 'deed', g: 'tea', cur: 'open', power: true, f: 'some', s: 'Попил чаю, посмотрел в окно.'},
+  {id: 'tea-sugar', k: 'deed', g: 'tea', power: true, need: () => homeHas('sugar'), f: 'some', s: 'Попил чаю с сахаром вприкуску.'},
+  {id: 'tea-warm', k: 'deed', g: 'tea', power: true, need: c => [2, 3, 5].includes(c.w) || c.mo >= 9, f: 'some', s: 'Погрел руки о кружку с чаем.'},
+  {id: 'tea-cold', k: 'deed', g: 'tea', need: () => !homeSaidAny(HOME_TEA), f: 'chain', after: ['cup'], s: 'Допил холодный чай из кружки.'},
+  {id: 'sugar-last', k: 'deed', g: 'tea', f: 'sub', s: 'Положил в чай последний кусок сахару.'},
+  {id: 'tea-plain', k: 'deed', g: 'tea', f: 'sub', s: 'Попил пустого чаю.'},
+  {id: 'tea-last', k: 'deed', g: 'tea', f: 'sub', s: 'Заварил последний чай, покрепче.'},
+  {id: 'tea-boiled', k: 'deed', g: 'tea', f: 'sub', s: 'Попил кипятку.'},
+  {id: 'sugar', k: 'deed', g: 'food', need: () => homeHas('sugar'), f: 'some', s: 'Пососал кусочек сахару.'},
+  {id: 'bread', k: 'deed', g: 'food', need: () => homeHas('bread') || !homeSaid('bread-none'), f: 'some', s: 'Отрезал и пожевал кусок хлеба.'},
+  {id: 'bread-none', k: 'deed', g: 'food', f: 'sub', s: 'Хотел отрезать хлеба, да хлеба нет.'},
+  {id: 'lunch', k: 'deed', g: 'food', meal: true, h: '12-13', power: true, need: () => homeHas('bread'), f: 'often', s: 'Пообедал: хлеб, луковица, кружка чаю.'},
+  {id: 'lunch-dry', k: 'deed', g: 'food', meal: true, h: '12-13', power: false, need: () => homeHas('bread'), f: 'often', s: 'Пообедал всухомятку: хлеб да луковица.'},
+  {id: 'porridge', k: 'deed', g: 'food', meal: true, h: '11-13', power: true, need: () => homeHas('groats'), f: 'some', s: 'Сварил на плитке каши.'},
+  {id: 'pasta', k: 'deed', g: 'food', meal: true, h: '11-13', power: true, need: () => homeHas('pasta'), f: 'some', s: 'Сварил макарон, поел.'},
+  {id: 'weights', k: 'deed', h: '6', f: 'often', s: 'Подтянул гири у ходиков.'},
+  {id: 'wash', k: 'deed', h: '6-8', th: 'washstand', f: 'some', s: 'Умылся у рукомойника.'},
+  {id: 'rods', k: 'deed', f: 'some', s: 'Привёл в порядок удочки.'},
+  {id: 'reel', k: 'deed', f: 'some', s: 'Перемотал леску на катушке.'},
+  {id: 'old-rods', k: 'deed', th: 'oldrods', f: 'rare', s: 'Перебрал старые удочки за печкой.'},
+  {id: 'hooks', k: 'deed', th: 'box', f: 'some', s: 'Перебрал крючки и грузила в коробке.'},
+  {id: 'album', k: 'deed', th: 'album', f: 'rare', s: 'Полистал альбом с фотографиями.'},
+  {id: 'photos', k: 'deed', th: 'photos', f: 'rare', s: 'Посмотрел на фотографии на стене.'},
+  {id: 'sweep', k: 'deed', f: 'some', s: 'Подмёл пол.'},
+  {id: 'oilcloth', k: 'deed', f: 'some', s: 'Протёр клеёнку на столе.'},
+  {id: 'curtain', k: 'deed', f: 'some', s: 'Поправил занавеску.'},
+  {id: 'knife', k: 'deed', th: 'stove', f: 'rare', s: 'Подточил нож о печной кирпич.'},
+  {id: 'sock', k: 'deed', f: () => homeSocks() ? 'some' : 'rare', s: 'Заштопал носок.'},   // more often while warm socks are wanted
+  {id: 'button', k: 'deed', th: 'coat', f: 'rare', s: 'Пришил к пальто пуговицу.'},
+  {id: 'coat-on', k: 'deed', th: 'coat', need: c => c.mo >= 9 || (c.w === 3 && c.hr <= 9), f: 'some', s: 'Накинул пальто: в избе зябко.'},
+  {id: 'boots-clean', k: 'deed', th: 'boots', f: 'rare', s: 'Почистил сапоги от глины.'},
+  {id: 'doze', k: 'deed', h: '12-16', f: 'some', s: 'Вздремнул сидя.'},
+  {id: 'bed', k: 'deed', h: '12-16', th: 'bed', f: 'some', s: 'Прилёг на кровать, полежал.'},
+  {id: 'kero-glass', k: 'deed', h: '14-17', f: () => S.noPower ? 'often' : 'rare', s: 'Протёр стекло у керосинки.'},
+  {id: 'crumbs', k: 'deed', f: 'chain', after: ['crafted'], s: 'Смёл со стола обрезки после снастей.'},
+  // a day without power (deeds too): the kettle (KETTLE, the first hour of sitting, as ever), the habit reaching for
+  // the light, water from the ladle, and the kerosene lamp before the evening
+  {id: 'kettle-again', k: 'deed', power: false, f: 'chain', after: ['kettle'], s: 'Опять потянулся к чайнику, а света-то нет.'},
+  {id: 'ladle', k: 'deed', power: false, th: 'washstand', f: 'some', s: 'Попил воды из ковшика.'},
+  {id: 'switch', k: 'deed', h: '12-17', power: false, need: () => homeSaid('kettle'), f: 'some', s: 'Щёлкнул выключателем — света так и нет.'},
+  {id: 'hush-dark', k: 'deed', power: false, f: 'some', s: 'Без света в избе как будто тише.'},
+  {id: 'kero-fill', k: 'deed', h: '15-17', power: false, need: () => homeHas('kerosene'), f: 'chain', after: ['kero-glass'], s: 'Долил в лампу керосину.'},
+  {id: 'kero-low', k: 'deed', h: '15-17', power: false, need: () => !homeHas('kerosene'), f: 'often', s: 'Керосину в лампе на донышке.'},
+  // quiet: he sits, and that is all; these may come twice a day, never twice running
+  {id: 'quiet', k: 'quiet', f: 3, s: 'Посидел в тишине.'},
+  {id: 'just-sat', k: 'quiet', f: 2, s: 'Посидел просто так.'},
+  {id: 'window', k: 'quiet', cur: 'open', f: 2, s: 'Посидел у окна.'},
+  {id: 'clock-dusk', k: 'quiet', cur: 'closed', w: '02345', f: 2, s: 'Посидел в полумраке, послушал ходики.'},
+  {id: 'rain-listen', k: 'quiet', w: '25', f: 2, s: 'Посидел, послушал дождь.'},
+  {id: 'river-look', k: 'quiet', cur: 'open', w: '0123', f: 1, s: 'Посидел, посмотрел на реку.'},
+  {id: 'thinking', k: 'quiet', f: 1, s: 'Задумался о чём-то.'},
+  {id: 'hour-gone', k: 'quiet', f: 1, s: 'Час прошёл, не заметил как.'},
+  {id: 'stove-sit', k: 'quiet', th: 'stove', f: 1, s: 'Посидел у печи.'},
+];
+// The room, a thing each morning in this order from the game's first morning (S.homeFrom): the author's three first,
+// then what the picture shows (for the eye to find) and what stands behind the one who looks (the door, the stove, the
+// bed). `th`: what the thing opens, the lines that need it (HOME_LINES' `th`). What the picture shows (the kettle, the
+// mug, the clock, the rods in the corner, the lamp, the table) the lines name from the first day.
+const ROOM = [
+  {id: 'cup', th: ['cup'], s: 'На столе кружка недопитого чаю.'},
+  {id: 'room-coat', th: ['coat'], s: 'У двери на гвозде висит пальто.'},
+  {id: 'room-old-rods', th: ['stove', 'oldrods'], s: 'За печкой стоят старые удочки.'},
+  {id: 'calendar', s: 'Оторвал вчерашний листок календаря.'},
+  {id: 'kettle-cold', s: 'Чайник на плитке за ночь остыл.'},
+  {id: 'room-washstand', th: ['washstand'], s: 'У двери рукомойник, рядом ведро с водой и ковшик.'},
+  {id: 'room-duck', s: 'Под потолком на верёвочках висит деревянная утка.'},
+  {id: 'room-stove', s: 'Печь давно не белена, по боку трещины.'},
+  {id: 'room-rug', s: 'На полу половик из лоскутов.'},
+  {id: 'room-weights', s: 'У ходиков две гири на цепочках, как еловые шишки.'},
+  {id: 'room-boots', th: ['boots'], s: 'У порога сапоги в засохшей глине.'},
+  {id: 'room-rods', s: 'В углу три удочки, на бамбуковой висит поплавок.'},
+  {id: 'room-bed', th: ['bed'], s: 'У стены кровать под лоскутным одеялом.'},
+  {id: 'room-lamp', s: 'На подоконнике керосиновая лампа, стекло сверху закопчено.'},
+  {id: 'room-moss', s: 'В щелях между брёвнами торчит мох.'},
+  {id: 'room-shelf', s: 'На полке у печи миски и чугунок.'},
+  {id: 'room-enamel', s: 'У чайника на боку отбита эмаль.'},
+  {id: 'room-photos', th: ['photos'], s: 'На стене фотографии в общей рамке, лица выцвели.'},
+  {id: 'room-shade', s: 'Над столом абажур, совсем выгорел.'},
+  {id: 'room-chest', th: ['chest'], s: 'В углу сундук, на нём старая шапка-ушанка.'},
+  {id: 'room-album', th: ['album'], s: 'На полке альбом с фотографиями.'},
+  {id: 'room-floats', s: 'На клеёнке два поплавка и катушка лески.'},
+  {id: 'room-tools', s: 'В сенях ящик с инструментом.'},
+  {id: 'room-curtain', s: 'Занавеска в мелкий красный горошек, выгорела.'},
+  {id: 'room-box', th: ['box'], s: 'На полке над кроватью коробка с крючками и грузилами.'},
+  {id: 'room-felt', s: 'У печки валенки, ещё с зимы.'},
+  {id: 'room-brooms', s: 'В сенях пахнет сухими вениками.'},
+  {id: 'room-frame', s: 'На наличнике облупилась краска.'},
+  {id: 'room-cobweb', s: 'Над дверью паутина, в ней сидит паук.'},
+  {id: 'room-mirror', s: 'Над рукомойником зеркальце, мутное, с трещиной.'},
+  {id: 'room-onions', s: 'На гвозде у печи связка лука.'},
+  {id: 'room-suitcase', s: 'Под кроватью старый чемодан, давно не открывали.'},
+  {id: 'room-icon', s: 'В углу под потолком тёмная икона, лика не разобрать.'},
+];
+// The waking message, a line each: «Занавеска задёрнута.», the room's light by the weather, the thing of the morning
+// (ROOM, then once the room is open one of WAKE_AGAIN, never one of the two mornings before; the morning's old
+// background thoughts are among them), the morning's sound (WAKE_SOUND, never yesterday's) and the household's lines
+// (morningLines()). A new game's first morning is overcast and in the author's words. The morning does not know a day
+// without power: the first hour of sitting finds it out (KETTLE)
+const WAKE_LIGHT = [
+  [{id: 'am-dark', s: 'В избе темнее, чем обычно.'}, {id: 'am-dusk', s: 'В избе полумрак.'}],
+  [{id: 'am-sun', s: 'Сквозь занавеску пробивается солнце.'}, {id: 'sun-slit', s: 'В щель у занавески бьёт солнце.'}],
+  [{id: 'am-gloom', s: 'В избе совсем сумрачно.'}, {id: 'am-grey', s: 'Свет сквозь занавеску серый.'}],
+  [{id: 'am-dusk', s: 'В избе полумрак.'}, {id: 'veil-drift', s: 'Свет сквозь занавеску то прибудет, то убудет.'}],
+  [{id: 'fog-veil', s: 'Свет сквозь занавеску белёсый.'}],
+  [{id: 'am-night', s: 'В избе темно, как вечером.'}],
+];
+const WAKE_AGAIN = [
+  {id: 'cup', f: 'often', s: 'На столе кружка недопитого чаю.'},
+  {id: 'calendar', f: 'often', s: 'Оторвал вчерашний листок календаря.'},
+  {id: 'weights', f: 'often', s: 'Подтянул гири у ходиков.'},
+  {id: 'kettle-cold', f: 'some', s: 'Чайник на плитке за ночь остыл.'},
+  {id: 'am-before-dawn', f: 'some', s: 'Проснулся до света.'},
+  {id: 'am-dream', f: 'some', s: 'Снилось что-то, не вспомнить.'},
+  {id: 'am-back', f: 'some', s: 'Поясница ныла к ночи.'},
+  {id: 'am-tea', f: 'some', power: true, s: 'С утра чаю — и на воду.'},
+  {id: 'am-floor', f: 'some', m: '8-12', s: 'Половицы с утра холодные.'},
+  {id: 'am-cold', f: 'often', m: '9-12', s: 'Изба за ночь выстыла.'},
+  {id: 'am-mouse', f: 'rare', s: 'Ночью мышь скреблась за печкой.'},
+];
+const WAKE_SOUND = [
+  {id: 'magpie', w: '013', f: 'often', s: 'С улицы слышна сорока.'},
+  {id: 'sparrows', w: '01', f: 'often', s: 'Под крышей возятся воробьи.'},
+  {id: 'rooster', w: '01234', f: 'often', s: 'За рекой прокричал петух.'},
+  {id: 'am-bird', w: '014', m: '6-7', f: 'often', s: 'За избой поёт какая-то птица.'},
+  {id: 'cuckoo', w: '014', m: '6-7', f: 'some', s: 'Где-то в лесу кукует кукушка.'},
+  {id: 'am-hush', w: '04', m: '8-12', f: 'some', s: 'Тихо во дворе, птицы ещё молчат.'},
+  {id: 'am-rain', w: '2', f: 'often', s: 'По крыше шуршит дождь.'},
+  {id: 'am-rain-night', w: '2', f: 'some', s: 'Дождь, видно, с ночи шуршит по крыше.'},
+  {id: 'am-down', w: '5', f: 'often', s: 'По крыше барабанит дождь.'},
+  {id: 'am-chimney', w: '3', f: 'often', s: 'В трубе гудит ветер.'},
+  {id: 'am-fog', w: '4', f: 'often', s: 'Тихо, даже птиц не слышно.'},
+  {id: 'am-clock', f: 'some', s: 'Тикают ходики.'},   // and always when nothing else fits
+  {id: 'am-cuckoo-clock', f: 'some', s: 'Ходики идут, а кукушка молчит.'},
+  {id: 'am-dog', f: 'some', s: 'Ночью где-то далеко собака лаяла.'},
+];
+// The curtain pulled aside: «Открыл занавеску.» and, the first time the weather is seen, the weather in the house's
+// words, in bold (in the yard it is seen in the game's words, WEATHER_TEXT). The weather's change at 11:00 behind the
+// drawn curtain is heard, or seen in its light, and names no weather: the window will, once the curtain is aside.
+const WEATHER_HOME = ['На улице пасмурно.', 'На улице солнечно.', 'На улице моросит.', 'На улице ветрено.', 'На улице туман.', 'На улице ливень.'];
+const HEARD = {'1-0': 'В избе потемнело — видно, солнце зашло за облака.', '1-3': 'Поднялся ветер, загудело в трубе.',
+  '0-3': 'Поднялся ветер, загудело в трубе.', '0-2': 'По крыше зашуршал дождь.', '0-1': 'Занавеска посветлела — видно, выглянуло солнце.',
+  '2-0': 'Дождь по крыше перестал.', '2-5': 'Дождь припустил, по крыше так и барабанит.', '3-0': 'Ветер стих.',
+  '3-1': 'Ветер стих, занавеска посветлела.', '4-1': 'Занавеска посветлела — видно, туман сошёл.',
+  '4-0': 'Свет сквозь занавеску стал серее — видно, туман поднялся.', '5-2': 'Ливень стих, по крыше еле шуршит.'};
+// The yard: what is seen and heard at the door. Time does not pass there, so its line comes as he steps out: «Вышел во
+// двор.», the weather if not seen yet, then by chance (YARD_P) a line, at most one a game hour, never one the izba or
+// the yard wrote today. The rods by the yard's wall are leaving the picture, so no line names them.
+const HOME_YARD = [
+  {id: 'dew', w: '014', h: '6-8', f: 'often', s: 'Трава мокрая от росы.'},
+  {id: 'sun-hot', w: '1', h: '10-15', f: 'often', s: 'Солнце уже припекает.'},
+  {id: 'wet-grass', w: '2', f: 'often', s: 'Пахнет мокрой травой.'},
+  {id: 'drizzle-face', w: '2', f: 'some', s: 'Мелкий дождь сеется на лицо.'},
+  {id: 'roof-pour', w: '5', f: 'often', s: 'С крыши хлещет вода.'},
+  {id: 'path-mud', w: '025', need: c => c.w !== 0 || S.D.weathers.slice(0, c.t).some(x => x === 2 || x === 5), f: 'some', s: 'Тропинка к реке раскисла.'},
+  {id: 'wind-birches', w: '3', f: 'often', s: 'Ветер треплет берёзы у сарая.'},
+  {id: 'wind-cold', w: '3', f: 'some', s: 'Ветер холодный, пробирает.'},
+  {id: 'tin-rattle', w: '3', f: 'some', s: 'Лист жести на крыше погромыхивает.'},
+  {id: 'fog-shed', w: '4', h: '6-10', f: 'often', s: 'В тумане едва видно сарай.'},
+  {id: 'magpie-woodpile', w: '013', f: 'some', s: 'На поленнице сидит сорока, трещит.'},
+  {id: 'sparrows-dust', w: '1', f: 'some', s: 'В пыли у двери купаются воробьи.'},
+  {id: 'lizard', w: '1', h: '11-15', m: '6-8', f: 'some', s: 'На тёплых поленьях греется ящерица.'},
+  {id: 'mosquitoes', w: '04', h: '6-9,15-17', m: '6-7', f: 'often', s: 'Комары налетели, только вышел.'},
+  {id: 'rooster-far', w: '01234', h: '6-8', f: 'some', s: 'Из-за реки долетел крик петуха.'},
+  {id: 'leaves-yellow', m: '9-10', f: 'often', s: 'Под ногами жёлтые берёзовые листья.'},
+];
+// How an hour of «Ничего не делать» picks its line (homeHourLines()): an open chain by HOME_CHAIN (of several, the one
+// whose line before was written last); else a rare line, each by its own chance (HOME_RARE), then away for HOME_GAP
+// days; else a kind by its weight (HOME_KIND, the weather's by the hour's weather; HOME_DARK on a day without power),
+// a kind with no line that fits dropping out, and a line of it by its weight (HOME_F, a quiet line's its own; halved
+// when it came yesterday or the day before, three times when it needs the thing this morning opened). A line never
+// comes after a chain that goes on from it («А дождь всё шуршит по крыше.» is not followed by «Дождь шуршит по
+// крыше.»). Tea and food come at most HOME_MAX times a day, tea never two hours running and a meal once; a line of
+// tea or bread when its good ran out today gives way to what stands in for it (homeStandIn()). «Тихо.» comes before
+// a sound or the izba's life in a still or a drizzly hour by HUSH_P, at most HOME_MAX times a day. The draws are
+// hashOf()'s with HOME_TAG (the day, the hour and the step), never rnd(): the fishing days stay as they were, and a
+// reload gives the same lines.
+const HOME_TAG = 0x484f4d45, HOME_CHAIN = .6, HOME_RARE = .03, HOME_GAP = 4, HUSH_P = .3, HOME_MAX = 2, YARD_P = .5;
+const HOME_KIND = {weather: [12, 18, 24, 24, 12, 24], sound: 14, izba: 10, deed: 26, quiet: 32};
+const HOME_DARK = {deed: 30, quiet: 28};
+const HOME_F = {often: 3, some: 1, rare: 1/3};   // rare: a morning's rarer thing (an hour's rare line comes by HOME_RARE)
+const HUSH = 'Тихо.';
+// every line's words by its id (the house's, the morning's, the yard's, the weather's change seen and heard, the
+// kettle), each line's spans and weathers as LIFE_LINES' are, and the id of a written line by its words
+const HOME_TEXT = {kettle: KETTLE, hush: HUSH};
+for (const k of Object.keys(CHANGE_TEXT)) HOME_TEXT[`change-${k}`] = CHANGE_TEXT[k];
+for (const k of Object.keys(HEARD)) HOME_TEXT[`heard-${k}`] = HEARD[k];
+[HOME_LINES, ROOM, WAKE_AGAIN, WAKE_SOUND, HOME_YARD, ...WAKE_LIGHT].forEach(list => list.forEach((L, i) => {
+  L.n = i; L.hrs = spans(L.h, START, START + HOURS - 1); L.mos = spans(L.m, 1, 12); L.ws = L.w ? [...L.w].map(Number) : [0, 1, 2, 3, 4, 5];
+  HOME_TEXT[L.id] = L.s;
+}));
+const HOME_BY = Object.fromEntries(HOME_LINES.map(L => [L.id, L]));
+const HOME_ID = Object.fromEntries(Object.entries(HOME_TEXT).map(([id, s]) => [s, id]));
+const HOME_TEA = HOME_LINES.filter(L => L.g === 'tea').map(L => L.id), HOME_FOOD = HOME_LINES.filter(L => L.g === 'food').map(L => L.id);
+const HOME_MEAL = HOME_LINES.filter(L => L.meal).map(L => L.id);
+const HOME_LATER = {};   // the chains that go on from each line: once one is written, the line it goes on from is not
+HOME_LINES.forEach(L => (L.after || []).forEach(id => { (HOME_LATER[id] = HOME_LATER[id] || []).push(L.id); }));
+const ROOM_AT = {};   // the morning (from S.homeFrom, the first 0) that opens each thing
+ROOM.forEach((R, i) => (R.th || []).forEach(th => { ROOM_AT[th] = i; }));
+const hm = (...v) => hashOf(HOME_TAG, S.day, ...v);
+// this morning's place in ROOM; below 0 nothing is open yet (a game saved before the room, until its next morning)
+const roomDay = () => Number.isInteger(S.homeFrom) ? S.day - S.homeFrom : -1;
+const roomHas = th => th in ROOM_AT && ROOM_AT[th] <= roomDay();
+const homeBoost = L => L.th && ROOM_AT[L.th] === roomDay() ? 3 : 1;   // the thing this morning opened comes to mind
+const homeSaid = id => S.log.some(e => e.text === HOME_TEXT[id]);
+const homeSaidAny = ids => ids.some(homeSaid);
+const homeCount = ids => S.log.filter(e => ids.includes(HOME_ID[e.text])).length;
+const homeRecent = id => { const d = S.homeLast[id]; return Number.isFinite(d) && d < S.day && S.day - d <= 2; };   // yesterday or the day before
+// a good that ran out today (S.purchases' `gone`) is missing at home until he has been to the village today, though the
+// day buys it all the same (a purchase is not a trip); a breakage stays until its last part is paid
+const homeHas = g => !(S.purchases || []).some(p => p.id === g && p.gone) || (S.trail || []).some(e => e.k === 'shop');
+const homeBroken = b => !!S.house && (S.house.owe.some(o => o.id === b) || (S.purchases || []).some(p => p.id === b));
+const homeSocks = () => { const cyc = (S.day - 1) % SUMMER + 1, T = SEASON.socks;   // in the socks' time, not bought yet
+  return !!S.house && cyc >= T.from && cyc <= T.to && S.house.season.socks !== Math.floor((S.day - 1)/SUMMER); };
+const homeFreq = (L, c) => typeof L.f === 'function' ? L.f(c) : L.f;
+function homeFits(L, c){
+  return (!L.cur || (L.cur === 'open') === c.open) && L.ws.includes(c.w) && inSpans(c.hr, L.hrs) && inSpans(c.mo, L.mos)
+    && (L.power === undefined || L.power === c.power) && (!L.th || roomHas(L.th)) && (!L.need || L.need(c));
+}
+const homeContext = t => ({t, hr: START + t, w: lifeWeather(t), open: !!S.curtain, power: !S.noPower, mo: lifeMonth()});
+function homePick(list, r, weight){   // one of list by its weight, r in [0, 1)
+  const ws = list.map(weight);
+  let x = r*ws.reduce((s, v) => s + v, 0);
+  for (let i = 0; i < list.length; i++) if ((x -= ws[i]) < 0) return list[i];
+  return list[list.length - 1];
+}
+// a line of the house goes into the journal under hour t's time, and its day into S.homeLast
+function homeWrite(t, id){ logAdd(t, HOME_TEXT[id]); S.homeLast[id] = S.day; }
+// the hour of «Ничего не делать» that starts at t: the ids of its lines, a line or «Тихо.» and a line
+function homeHourLines(t){
+  const c = homeContext(t), texts = S.log.map(e => e.text);
+  const before = S.log.filter(e => e.t === clock(t)).map(e => HOME_ID[e.text]);   // the hour before's lines
+  let last = null;   // the house's line written last, which a quiet line does not repeat
+  for (let i = texts.length - 1; i >= 0 && !last; i--) last = HOME_BY[HOME_ID[texts[i]]] || null;
+  const open = L => homeFits(L, c) && (L.k === 'quiet' ? L !== last : !homeSaid(L.id)) && !homeSaidAny(HOME_LATER[L.id] || [])
+    && !(L.g === 'tea' && (homeCount(HOME_TEA) >= HOME_MAX || before.some(id => HOME_TEA.includes(id))))
+    && !(L.g === 'food' && homeCount(HOME_FOOD) >= HOME_MAX) && !(L.meal && homeCount(HOME_MEAL))
+    && !(homeFreq(L, c) === 'rare' && Number.isFinite(S.homeLast[L.id]) && S.day - S.homeLast[L.id] <= HOME_GAP);
+  const can = HOME_LINES.filter(open);
+  let craftAt = -1;
+  for (let i = texts.length - 1; i >= 0 && craftAt < 0; i--) if (/^Мастерил снасти/.test(texts[i])) craftAt = i;
+  const parent = L => Math.max(...L.after.map(id => id === 'crafted' ? craftAt : texts.lastIndexOf(HOME_TEXT[id])));
+  const chains = can.filter(L => homeFreq(L, c) === 'chain').map(L => [L, parent(L)]).filter(([, i]) => i >= 0).sort((a, b) => b[1] - a[1]);
+  let L = chains.length && hm(t, 1) < HOME_CHAIN ? chains[0][0] : null;
+  if (!L){
+    const rare = can.filter(M => homeFreq(M, c) === 'rare' && hm(t, 2, M.n) < HOME_RARE*homeBoost(M));
+    if (rare.length) L = rare[Math.floor(hm(t, 3)*rare.length)];
+  }
+  if (!L){
+    const pool = can.filter(M => { const f = homeFreq(M, c); return f === 'often' || f === 'some' || typeof f === 'number'; });
+    const kinds = Object.keys(HOME_KIND).filter(k => pool.some(M => M.k === k));
+    const k = homePick(kinds, hm(t, 4), k => k === 'weather' ? HOME_KIND.weather[c.w] : (S.noPower && HOME_DARK[k]) || HOME_KIND[k]);
+    L = homePick(pool.filter(M => M.k === k), hm(t, 5), M => {
+      const f = homeFreq(M, c);
+      return (typeof f === 'number' ? f : HOME_F[f])*(homeRecent(M.id) ? .5 : 1)*homeBoost(M);
+    });
+  }
+  L = homeStandIn(L);
+  const hushed = S.log.filter((e, i) => e.text === HUSH && S.log[i + 1] && S.log[i + 1].t === e.t
+    && ['sound', 'izba'].includes((HOME_BY[HOME_ID[S.log[i + 1].text]] || {}).k)).length;
+  const hush = (L.k === 'sound' || L.k === 'izba') && [0, 1, 2, 4].includes(c.w) && hushed < HOME_MAX && hm(t, 6) < HUSH_P;
+  return hush ? ['hush', L.id] : [L.id];
+}
+// what stands in for a line of tea or bread when its good ran out today: the last piece of sugar in the first tea,
+// then tea with none; the last of the tea brewed strong, then boiled water (with no tea and no sugar the tea's: without
+// tea sugar is not thought of); the bread reached for once, then not
+function homeStandIn(L){
+  if (L.g === 'tea' && L.f !== 'chain' && L.f !== 'sub'){
+    if (!homeHas('tea')) return HOME_BY[homeSaid('tea-last') ? 'tea-boiled' : 'tea-last'];
+    if (!homeHas('sugar')) return HOME_BY[homeSaid('sugar-last') ? 'tea-plain' : 'sugar-last'];
+  }
+  return L.id === 'bread' && !homeHas('bread') ? HOME_BY['bread-none'] : L;
+}
+// The waking message, from «Занавеска задёрнута.» to the household's lines (morningLines(m), a sentence a line). When
+// the household takes three lines or more, the morning's sound gives way: the message stays within seven lines
+function wakeLines(m){
+  const c = {t: 0, hr: START, w: S.D.weathers[0], open: false, power: !S.noPower, mo: lifeMonth()}, first = S.day === 1, i = roomDay();
+  const am = id => Number.isFinite(S.homeLast[`am/${id}`]) ? S.homeLast[`am/${id}`] : -Infinity;   // the last morning it came
+  const pickOf = (list, r) => homePick(list, r, L => HOME_F[L.f] || 1);
+  const light = first ? WAKE_LIGHT[0][0] : WAKE_LIGHT[c.w][Math.floor(hm(-1, 1)*WAKE_LIGHT[c.w].length)];
+  let thing = i >= 0 && i < ROOM.length ? ROOM[i] : null;
+  if (i >= ROOM.length){
+    const fit = WAKE_AGAIN.filter(L => homeFits(L, c)), fresh = fit.filter(L => S.day - am(L.id) > 2);
+    thing = pickOf(fresh.length ? fresh : fit, hm(-1, 2));
+  }
+  const sounds = WAKE_SOUND.filter(L => homeFits(L, c) && am(L.id) !== S.day - 1);
+  const sound = first ? WAKE_SOUND[0] : sounds.length ? pickOf(sounds, hm(-1, 3)) : WAKE_SOUND.find(L => L.id === 'am-clock');
+  const house = morningLines(m).flatMap(sentences);
+  const lines = [light, thing, house.length < 3 ? sound : null].filter(Boolean);
+  lines.forEach(L => { S.homeLast[L.id] = S.homeLast[`am/${L.id}`] = S.day; });
+  return ['Занавеска задёрнута.', ...lines.map(L => L.s), ...house];
+}
+// stepping out into the yard: by chance its line, at most one a game hour (S.t), by the day and the hour
+function yardLine(){
+  const t = S.t, c = homeContext(t);
+  if (S.log.some(e => e.t === clock(t) && HOME_YARD.some(L => L.s === e.text)) || hm(t, 7) >= YARD_P) return;
+  const can = HOME_YARD.filter(L => homeFits(L, c) && !homeSaid(L.id));
+  if (can.length) homeWrite(t, homePick(can, hm(t, 8), L => HOME_F[L.f]*(homeRecent(L.id) ? .5 : 1)).id);
+}
+
 // ---------- actions ----------
-// time passes wherever the old man is; at 11:00 the weather may step, and he sees it (home: the hours pass at home,
-// so its lines are the house's, a sentence a line)
+// time passes wherever the old man is; at 11:00 the weather may step. Away he sees it, and the old man's word on the
+// weather follows (WEATHER_HINT). At home (the hours pass in the izba, a sentence a line, and no advice there: that is
+// the angler's handbook's) the open window shows it in the same words; behind the drawn curtain it is heard, or seen in
+// its light (HEARD), and the weather is not named yet: the window or the yard will name it
 function advance(n, home = false){
-  const from = S.t, D = S.D, put = home ? logHome : logAdd; S.t = Math.min(HOURS, S.t + n);
+  const from = S.t, D = S.D; S.t = Math.min(HOURS, S.t + n);
   if (D.weathers && from < CHANGE_HOUR && S.t >= CHANGE_HOUR && D.weathers[CHANGE_HOUR] !== D.weathers[CHANGE_HOUR-1]){
-    const w = D.weathers[CHANGE_HOUR];
-    put(CHANGE_HOUR, CHANGE_TEXT[`${D.weathers[CHANGE_HOUR-1]}-${w}`]); put(CHANGE_HOUR, WEATHER_HINT[w]); S.seen = w;
+    const w = D.weathers[CHANGE_HOUR], key = `${D.weathers[CHANGE_HOUR-1]}-${w}`;
+    if (!home){ logAdd(CHANGE_HOUR, CHANGE_TEXT[key]); logAdd(CHANGE_HOUR, WEATHER_HINT[w]); S.seen = w; }
+    else if (S.curtain){ logHome(CHANGE_HOUR, CHANGE_TEXT[key]); S.seen = w; }
+    else logHome(CHANGE_HOUR, HEARD[key]);
   }
 }
-// the weather goes into the journal the first time the old man sees it: through the window or outside
-function seeWeather(){
-  const w = nowWeather();
+// the weather goes into the journal, in bold, the first time the old man sees it: through the window in the house's
+// words (WEATHER_HOME), outside in the game's (WEATHER_TEXT), and outside after a change at 11:00 he only heard in
+// the change's (CHANGE_TEXT: «Облака разошлись, выглянуло солнце.», not the morning's «Солнце, с утра уже жарко.»)
+function seeWeather(inside){
+  const w = nowWeather(), ws = S.D.weathers, step = S.t >= CHANGE_HOUR && ws && ws[CHANGE_HOUR] !== ws[CHANGE_HOUR - 1];
   if (S.seen === w) return;
-  S.seen = w; logHome(S.t, `<b>${WEATHER_TEXT[w]}</b>`); logHome(S.t, WEATHER_HINT[w]);
+  S.seen = w; logAdd(S.t, `<b>${inside ? WEATHER_HOME[w] : step ? CHANGE_TEXT[`${ws[CHANGE_HOUR - 1]}-${w}`] : WEATHER_TEXT[w]}</b>`);
 }
-function openCurtain(){ if (busy) return; S.curtain = true; logAdd(S.t, 'Открыл занавеску.'); seeWeather(); save(); render(); }
+function openCurtain(){ if (busy) return; S.curtain = true; logAdd(S.t, 'Открыл занавеску.'); seeWeather(true); save(); render(); }
 function closeCurtain(){ if (busy) return; S.curtain = false; logAdd(S.t, 'Задёрнул занавеску.'); save(); render(); }
-function goOut(){ if (busy) return; S.phase = 'yard'; logAdd(S.t, 'Вышел во двор.'); seeWeather(); save(); render(); }
+function goOut(){ if (busy) return; S.phase = 'yard'; logAdd(S.t, 'Вышел во двор.'); seeWeather(false); yardLine(); save(); render(); }
 function backInside(){ if (busy) return; S.phase = 'izba'; logAdd(S.t, 'Зашёл в избу.'); save(); render(); }
 // 18:00 caught him away from home: the only way is back to the izba for the evening
 function comeHome(){
   if (busy) return;
   S.loc = 'home'; endDay();
 }
-// an hour at home: making tackle pays the wage, sitting pays nothing
-const KETTLE = 'Хотел поставить чайник, да света нет.';   // the kettle stands on the electric hotplate
+// an hour at home: making tackle pays the wage and writes only its own line, sitting pays nothing and writes what went
+// on in the house in that hour (homeHourLines())
 function homeHour(paid){
   if (busy || S.t >= HOURS) return;
   if (paid){ S.money += WAGE; S.earnWork += WAGE; }
   // on a day without power the first hour of sitting finds it out, and there is no tea all day
   const kettle = !paid && S.noPower && !S.log.some(e => e.text === KETTLE);
   S.trail.push({k: paid ? 'craft' : 'idle', t: S.t});
-  logHome(S.t + 1, paid ? `Мастерил снасти, +${rub(WAGE)}` : kettle ? KETTLE
-    : choice(S.curtain ? ['Посидел у окна.', ...(S.noPower ? [] : ['Попил чаю, посмотрел в окно.'])] : ['Посидел в полумраке, послушал ходики.', 'Посидел просто так.']));
+  if (paid) logHome(S.t + 1, `Мастерил снасти, +${rub(WAGE)}`);
+  else if (kettle) homeWrite(S.t + 1, 'kettle');
+  else {
+    // until 19 November 2026 the hour's line was this draw's: it stays, unused, where it was, so that the days after
+    // stay as they were (the kettle's hour and the tackle's never drew)
+    rnd();
+    homeHourLines(S.t).forEach(id => homeWrite(S.t + 1, id));
+  }
   advance(1, true);
   if (S.t >= HOURS) return endDay();
   save(); render();
@@ -4472,7 +4891,8 @@ function closeBook(){ bookOpen = false; render(); }
 // line written when it was over); at the evening, the hours «Мастерить до вечера» took, which wrote no line then: from
 // the hour he was back home to the evening, if the day earned more at the tackle than its hour lines say. Counted in
 // hours, not in money: a day saved before the tackle paid 5 an hour paid 10. Its hour line says «+N руб.», and «+N ₽»
-// in a day saved before 19 November 2026
+// in a day saved before 19 November 2026. A day saved before S.trail wrote its hours at home in the old words alone
+// (IDLE_LINES), before the house had its lines (HOME_LINES), which keep them
 const IDLE_LINES = ['Посидел у окна.', 'Попил чаю, посмотрел в окно.', 'Посидел в полумраке, послушал ходики.', 'Посидел просто так.', KETTLE];
 function trailFromLog(){
   const trail = [], at = e => parseInt(e.t, 10) - START, arrived = {'Деревня. Бабки на лавке у магазина.': 'shop'};
