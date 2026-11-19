@@ -3201,9 +3201,10 @@ function choice(a){ return a[Math.floor(rnd()*a.length)]; }
 let S = null;
 function newSeason(){
   // sceneSeed: the game's number for its scenes (where the signs show), not from rnd(), so the game's draws stay as they were
-  // homeFrom: the day the room starts to open, a thing a morning (ROOM); homeLast: the day each house line came last
+  // homeFrom: the day the room starts to open, a thing a morning (ROOM); homeLast: the day each house line came last;
+  // talkLast: the day each piece of the shop's talk was heard last; yesterday: {noPower, downpour}, for the shop's talk
   S = { day:1, money:0, phase:'intro', sceneSeed: Math.floor(Math.random()*2147483647), book: [], totals: noTotals(), lifeLast: {}, planned: 0,
-    homeFrom: 1, homeLast: {} };
+    homeFrom: 1, homeLast: {}, talkLast: {}, yesterday: {} };
   newHouse();
 }
 // fix: a weather the day keeps from morning to evening, with no step at 11:00 (a new game's first day, startDay())
@@ -3441,6 +3442,9 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   // the first when saved on the screens before the first day; no house line came before
   if (!Number.isInteger(S.homeFrom)) S.homeFrom = INTRO.has(S.phase) ? 1 : S.day + 1;
   if (!S.homeLast || typeof S.homeLast !== 'object') S.homeLast = {};
+  // saved before one could stay at the shop: no piece of its talk heard before, and nothing known of yesterday
+  if (!S.talkLast || typeof S.talkLast !== 'object') S.talkLast = {};
+  if (!S.yesterday || typeof S.yesterday !== 'object') S.yesterday = {};
   // saved before the household: it starts now, its first evening this day's (the next one's, when saved at the
   // evening); the money stays as it was
   if (!S.stock || typeof S.stock !== 'object' || !S.house || typeof S.house !== 'object') newHouse(S.phase === 'evening' ? S.day + 1 : S.day);
@@ -3607,7 +3611,10 @@ function frame(img, t){
     return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
   }
   if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed,
-    // and the hour's life if the scene draws it; on the omut the lilies stand open in the summer hours after they opened
+    // and the hour's life if the scene draws it; on the omut the lilies stand open in the summer hours after they opened.
+    // The shop's bench is empty from 17:00 on a day without power (benchEmpty(t)), but the engine has no `people`
+    // option yet (should_I_lab's docs/11-magazin.md): once it draws the empty bench, pass people: !benchEmpty(t) for
+    // the shop here, and put it in the key
     const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [], water = WATERS.includes(img) && !!S.life;
     const L = water ? lifeOf(img, t) : null, kind = L && L.draw || '', lilies = water && img === 'omut' && liliesOpen(t);
     return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}/${kind}/${lilies}`,
@@ -3646,7 +3653,7 @@ function warmUp(){
   if (S.phase === 'water'){ if (t < HOURS){ at(S.loc, t + 1); at(room, t); } else at('izbaEvening', HOURS); }
   else if (S.phase === 'izba'){ at(S.curtain ? 'izbaClosed' : 'izba', t); at('home', t); at(t + 1 < HOURS ? room : 'izbaEvening', t + 1); }
   else if (S.phase === 'yard'){ at(room, t); trips([...WATERS, 'shop']); }
-  else if (S.phase === 'shop'){ trips(WATERS); at(room, t); }
+  else if (S.phase === 'shop'){ if (t < HOURS){ trips(WATERS); at(room, t); } else at('izbaEvening', HOURS); }
   else if (S.phase === 'living')   // «Начать день» opens day 1 in the izba at 6:00, the curtain drawn, in the intro's weather
     list.push({draw: () => izbaScene(false, WEATHERS[INTRO_WEATHER], START, S.day, false)});
   warmList = list;
@@ -3755,10 +3762,12 @@ function render(){
     actions.appendChild(btn('Домой', '', backInside));
   }
 
-  else if (S.phase==='shop'){
+  else if (S.phase==='shop'){   // the bench: another hour there, any water there is time for, or home; at 18:00 only home.
+    // No catch line here, as in the house: the main button takes the room (11)
     setScene('shop');
-    add(`<div class="meta"><span>${todayCatch()}</span></div>${journal()}`);
-    actions.appendChild(moveButtons());
+    add(journal());
+    if (S.t >= HOURS) actions.appendChild(btn('Вернуться домой', '', comeHome, 'primary'));
+    else { actions.appendChild(btn('Остаться ещё на час', '', stay, 'primary')); actions.appendChild(moveButtons()); }
   }
 
   else if (S.phase==='water'){
@@ -4389,9 +4398,10 @@ const homeSaid = id => S.log.some(e => e.text === HOME_TEXT[id]);
 const homeSaidAny = ids => ids.some(homeSaid);
 const homeCount = ids => S.log.filter(e => ids.includes(HOME_ID[e.text])).length;
 const homeRecent = id => { const d = S.homeLast[id]; return Number.isFinite(d) && d < S.day && S.day - d <= 2; };   // yesterday or the day before
-// a good that ran out today (S.purchases' `gone`) is missing at home until he has been to the village today, though the
-// day buys it all the same (a purchase is not a trip); a breakage stays until its last part is paid
-const homeHas = g => !(S.purchases || []).some(p => p.id === g && p.gone) || (S.trail || []).some(e => e.k === 'shop');
+// a good that ran out today (S.purchases' `gone`) is missing at home until he has been to the village today (and found
+// someone there), though the day buys it all the same (a purchase is not a trip); a breakage stays until its last part
+// is paid
+const homeHas = g => !(S.purchases || []).some(p => p.id === g && p.gone) || (S.trail || []).some(e => e.k === 'shop' && !e.empty);
 const homeBroken = b => !!S.house && (S.house.owe.some(o => o.id === b) || (S.purchases || []).some(p => p.id === b));
 const homeSocks = () => { const cyc = (S.day - 1) % SUMMER + 1, T = SEASON.socks;   // in the socks' time, not bought yet
   return !!S.house && cyc >= T.from && cyc <= T.to && S.house.season.socks !== Math.floor((S.day - 1)/SUMMER); };
@@ -4481,6 +4491,413 @@ function yardLine(){
   if (can.length) homeWrite(t, homePick(can, hm(t, 8), L => HOME_F[L.f]*(homeRecent(L.id) ? .5 : 1)).id);
 }
 
+// ---------- the shop ----------
+// The village is a place of its own (should_I_lab's docs/11-magazin.md; the author, 19 November 2026). The walk there,
+// its first hour, gives the rumour exactly as ever (rumorLines(): its rnd() draws, its chances, again on every
+// arrival). Then «Остаться ещё на час», hour by hour till 18:00, gives a piece of talk (TALK) and nothing else: no
+// money, no rumour again, no signs. Such an hour passes at once, as an hour of sitting at home does, its piece under
+// the hour's end, a journal line to a line of speech and to a sentence of the old man. Who is at the shop comes from
+// their habits (atShop()): the weekday, the hour, its weather, the month and the power. A piece comes only when its
+// people are there, never twice a day, and not again until its pause is over (S.talkLast). Every number here comes
+// from hashOf() with the shop's tag, never from rnd(): the fishing days stay as they were, and a reload gives the
+// same people and the same next piece. Nothing here looks at the fish or at where the neighbour fishes; all it takes
+// from the day's draws is the weather of the hour and, in the minute the journal writes it, the change at 11:00.
+// A day without power: the talk is of that while such a piece is free, they leave in the hour from 16:00, and from
+// 17:00 nobody is at the shop and its lamp stays dark at 18:00.
+const TALK_TAG = 0x54414c4b;
+const th = (...v) => hashOf(TALK_TAG, S.day, ...v);         // the day's: who comes (their number, from 1), the bread
+const tHour = (hr, k) => hashOf(TALK_TAG, S.day, -hr, k);   // an hour's: its piece (1), a quiet line (2), the empty bench (3)
+const tGame = (...v) => hashOf(TALK_TAG, -1, ...v);         // the game's: its slow changes, one of each a game, with no day
+const TALK_WHO = ['ny', 'va', 'lu', 'ta', 'pe', 'mi', 'ai', 'eg', 'ko', 'st'];   // their numbers in th(), from 1
+const LEAVE_HOUR = 16, EMPTY_FROM = 17;   // a day without power: they leave in the hour from 16:00; from 17:00 nobody
+const ROWS_HOUR = 5;   // an hour at the shop, its piece and its fixed lines, takes at most this many journal rows at 320 px
+const SHOP_ARRIVE = 'Деревня. Бабки на лавке у магазина.';   // trailFromLog() finds the arrival by it: keep its words
+const SHOP_EMPTY = ['Деревня. У магазина никого.', 'На двери замок.'];   // arriving at 17:00 on a day without power
+const NO_VALYA = 'Бабы Вали на лавке нет.', LEFT = 'Разошлись по домам.';
+const LAMP_ON = 'Зажёгся фонарь у магазина.', LAMP_OFF = 'Фонарь так и не зажёгся.';
+const EMPTY_BENCH = [['Посидел на лавке один.'], ['На площади ни души.', 'Соболь спит у крыльца.'], ['Тихо.', 'По площади ходят куры.']];
+// a line of the old man's when no piece is free, by who is there and the weather (wx), each once a day
+const SHOP_QUIET = [{s: 'Помолчали.', two: true}, {s: 'Баба Нюра вяжет.', p: 'ny'}, {s: 'Соболь лёг на другой бок.'},
+  {s: 'Люба гремит ящиками.', p: 'lu'}, {s: 'Петрович курит на крыльце.', p: 'pe'}, {s: 'Егорыч дремлет на солнце.', p: 'eg', wx: [1]},
+  {s: 'С крыши магазина капает.', wx: [2, 5]}, {s: 'На крыше чирикают воробьи.', wx: [0, 1, 2, 3, 4]}, {s: 'По площади ходят куры.', wx: [0, 1, 2, 3, 4]}];
+// who comes how often (11, «Кто у магазина»): Valya 9 days in 10, Tamara at 7 and at 17, Petrovich, Mikhalych on a bread
+// day and on another, Anatoly Ivanovich on a day not Saturday, Egorych, Kolka; no bread on a bread day without a downpour
+const SHOP_P = {va: .9, ta: .6, taEve: .5, pe: .6, miBread: .8, mi: .1, ai: .1, eg: .5, ko: 1/12, noBread: 1/6};
+// ---------- talk: the shop talk pool, put here by should_I_lab/talk/to_game.py; change it there ----------
+const TALK = [
+{id:'nyura-valya-alive', l:['Баба Нюра: «Валя, жива?»','Баба Валя: «Не дождёшься».'], p:['ny','va'], h:'7-10', c:1, ln:2},
+{id:'t1-bread-two-each', l:['Люба из дверей: «Разбирайте, пока тёплый».','Баба Нюра: «Мне две».','Люба: «Всем по две».'], p:['lu','ny'], h:'9-11', br:1, c:12, ln:4},
+{id:'t1-bread-on-credit', l:['Баба Нюра: «Люба, ещё буханочку. Под запись».','Люба: «Под запись».'], p:['ny','lu'], h:'9-11', br:1, c:12, ln:3},
+{id:'t1-bread-sobol-up', l:['Баба Нюра: «Соболь-то встал. Учуял».','Баба Валя: «Ради хлеба встанет».'], p:['ny','va'], h:'9-11', m:[6,7], br:1, c:12, ln:4},
+{id:'t1-bread-none-van', l:['Люба из дверей: «Хлеба сегодня не будет».','Баба Нюра: «Опять?»','Люба: «Вахтовка не пришла».'], p:['lu','ny'], h:'9-11', br:0, c:12, ln:4},
+{id:'t1-bread-none-rusks', l:['Баба Нюра: «Сухари есть. Проживём».','Баба Валя: «Проживём».'], p:['ny','va'], h:'9-11', br:0, c:12, ln:3},
+{id:'t1-bread-none-bridge', l:['Люба: «Мост у ручья залило. Хлеба не ждите».','Баба Нюра: «До пятницы, значит».'], p:['lu','ny'], h:'9-11', d:[2], af:'d', br:0, c:12, ln:4},
+{id:'t1-tue-lyuba-sleeps', l:['Баба Нюра: «Хлебный сегодня, а Люба спит».','Баба Валя: «В девять откроет».'], p:['ny','va'], h:'7-8', d:[2], c:12, ln:4},
+{id:'t1-tue-will-vovka-pass', l:['Баба Нюра: «Вовка-то проедет сегодня?»','Баба Валя: «Кто его знает».'], p:['ny','va'], h:'7-8', d:[2], c:12, ln:3},
+{id:'t1-mikh-up-friday', l:['Баба Нюра: «Михалыч, в пятницу наверх?»','Михалыч: «Наверх».'], p:['ny','mi'], d:[2], c:12, ln:3},
+{id:'t1-mikh-last-papirosy', l:['Люба: «Папиросы будешь?»','Михалыч: «Но».','Люба: «Последние».','Михалыч: «Давай».'], p:['lu','mi'], c:12, ln:4},
+{id:'t1-mikh-loaf-armpit', l:['Михалыч сунул буханку под мышку.','Баба Нюра: «В сумку бы».','Михалыч не ответил.'], p:['ny','mi'], d:[2], br:1, c:12, ln:4},
+{id:'t1-herd-whose-turn', l:['Тамара пробежала к стаду.','Баба Нюра: «Чья очередь-то?»','Тамара: «Моя».'], p:['ny','ta'], h:'7', c:12, ln:4},
+{id:'t1-herd-mine-drove', l:['Баба Нюра: «Кто пасёт-то?»','Тамара: «Мой».','Баба Нюра: «Сам пошёл?»','Тамара: «Погнала».'], p:['ny','ta'], h:'7', c:12, ln:4},
+{id:'t1-shop-opens-sit', l:['Люба открыла магазин.','Люба: «Кому чего?»','Баба Нюра: «Мне ничего. Я посижу».'], p:['lu','ny'], h:'9', c:12, ln:4},
+{id:'t1-mon-who-knocked', l:['Люба: «Вчера кто стучал?»','Баба Нюра: «Не я».','Баба Валя: «И не я».'], p:['lu','ny','va'], h:'9-11', d:[1], c:12, ln:3},
+{id:'t1-wed-lost-count', l:['Баба Нюра: «Сегодня что, среда?»','Баба Валя: «Среда».','Баба Нюра: «Счёт потеряла».'], p:['ny','va'], d:[3], c:12, ln:4},
+{id:'t1-bread-half-karlovna', l:['Баба Валя: «Мне половинку».','Люба: «Половинок не режу, Карловна».','Баба Валя: «Тогда целую».'], p:['va','lu'], h:'9-11', br:1, c:12, ln:4},
+{id:'t1-wed-till-friday', l:['Баба Нюра: «Хлеба-то до пятницы хватит?»','Баба Валя: «Растяну».'], p:['ny','va'], d:[3], c:12, ln:3},
+{id:'t1-since-six', l:['Баба Валя: «Давно сидишь?»','Баба Нюра: «С шести».','Баба Валя: «Не спится?»','Баба Нюра: «Какой сон».'], p:['ny','va'], h:'7', c:12, ln:4},
+{id:'t1-lyuba-late-call', l:['Люба открыла в десятом часу.','Баба Нюра: «Проспала?»','Люба: «Дочке звонила».'], p:['lu','ny'], h:'9', c:12, ln:3},
+{id:'t2-kto-za-pensiey', l:['Люба: «Кто ещё за пенсией?»','Баба Нюра: «Валя ещё».','Баба Валя: «Получила».'], p:['lu','ny','va'], dt:'p', c:12, ln:3},
+{id:'t2-tetrad-zakryvayu', l:['Люба: «Тетрадь сегодня закрываю».','Баба Нюра: «Закрывай. Завтра откроешь».'], p:['lu','ny'], dt:'p', c:12, ln:4},
+{id:'t2-vycherknula', l:['Петрович: «Вычеркнула?»','Люба: «Вычеркнула».','Петрович: «Пиши заново».'], p:['pe','lu'], dt:'p', c:12, ln:3},
+{id:'t2-hleb-i-pensiya', l:['Люба из дверей: «Хлеб и пенсия в один день».','Баба Нюра: «Праздник».','Люба: «Кому как».'], p:['lu','ny'], h:'11-12', dt:'p', br:1, c:12, ln:4},
+{id:'t2-mihalychu-otlozhila', l:['Люба: «Хлеб весь разобрали».','Баба Нюра: «А Михалычу?»','Люба: «Михалычу отложила».'], p:['lu','ny'], h:'11-12', d:[5], br:1, c:12, ln:4},
+{id:'t2-egorych-pensiya', l:['Люба: «Егорыч, пенсия!»','Егорыч: «Ась?»','Люба: «Пенсия, говорю!»','Егорыч поднялся.'], p:['lu','eg'], dt:'p', c:12, ln:4},
+{id:'t3-chg-sunday-no-lyuba', l:['Баба Нюра: «Любы нет — и поругаться не с кем».','Баба Валя: «Завтра поругаешься».'], p:['ny','va'], d:[0], c:12, ln:4},
+{id:'t3-chg-sunday-papirosy', l:['Петрович: «Папиросы кончились, а закрыто».','Баба Нюра: «Бросай».','Петрович: «Завтра брошу».'], p:['pe','ny'], d:[0], c:12, ln:4},
+{id:'t4-ev-pokupateli', l:['Люба: «За день и не зашёл никто».','Баба Нюра: «А мы?»','Люба: «Вы не покупатели».'], p:['lu','ny'], h:'16', d:[1,3,4,6], c:12, ln:4},
+{id:'t4-ev-ten', l:['Баба Валя: «Тень до крыльца дошла».','Баба Нюра: «Скоро Тамарины пойдут».'], p:['va','ny'], h:'16', wx:[1], c:12, ln:4},
+{id:'t4-ev-bukhanki', l:['Люба: «Хлеба ни буханки не осталось».','Баба Нюра: «Михалыч наверх половину увёз».'], p:['lu','ny'], h:'14-16', d:[5], br:1, c:12, ln:4},
+{id:'t4-ev-zakryvayu', l:['Люба: «Всё, закрываю. Сидите на здоровье».'], p:['lu'], h:'17', c:12, ln:2},
+{id:'t4-ev-tvoi-idut', l:['Баба Нюра: «Твои идут».','Тамара: «Вижу».'], p:['ny','ta'], h:'17', c:12, ln:2},
+{id:'t4-ev-schyoty', l:['Люба щёлкает счётами.','Баба Нюра: «Сошлось?»'], p:['lu','ny'], h:'16-17', c:12, ln:2},
+{id:'t4-mih-chetyre', l:['Люба: «Ульяне сколько?»','Михалыч: «Четыре».','Михалыч сложил хлеб в мешок.'], p:['mi','lu'], d:[5], br:1, c:12, ln:4},
+{id:'t4-ai-rano', l:['Баба Нюра: «Не звонила ещё?»','Анатолий Иванович: «Рано ещё».'], p:['ny','ai'], h:'10-12', d:[6], c:12, ln:4},
+{id:'t4-tam-ochered', l:['Тамара: «Чья очередь пасти?»','Баба Нюра: «Ширяевых».'], p:['ta','ny'], h:'7', c:12, ln:3},
+{id:'t4-lu-pensiya', l:['Люба: «Пенсию по одному. Не толпитесь».','Баба Нюра: «Нас трое».'], p:['lu','ny'], dt:'p', c:12, ln:3},
+{id:'t1-fog-white', l:['Баба Нюра: «Бело-то как. Домов не видать».','Баба Валя: «Туман».'], p:['ny','va'], h:'7-9', wx:[4], c:12, ln:3},
+{id:'t1-fog-bells', l:['Тамара: «Коров не видать. По колокольцу гоню».','Баба Нюра: «Не потеряй».'], p:['ta','ny'], h:'7', wx:[4], c:12, ln:3},
+{id:'t1-sun-shade-gadfly', l:['Бабки пересели в тень.','Баба Нюра: «Паут-то как жрёт».','Баба Валя: «Июль».'], p:['ny','va'], h:'10-11', m:[7], wx:[1], c:12, ln:4},
+{id:'t1-sun-egorych-bones', l:['Баба Нюра: «Егорыч, напечёт ведь!»','Егорыч: «Кости-те погреть».'], p:['ny','eg'], wx:[1], c:12, ln:3},
+{id:'t1-overcast-grey', l:['Баба Нюра: «Серенько сегодня».','Баба Валя: «Зато не печёт».'], p:['ny','va'], wx:[0], c:12, ln:3},
+{id:'t1-drizzle-sows', l:['Баба Нюра: «Сеет и сеет».','Баба Валя: «Сеет».','Баба Нюра: «Бельё не высохнет».'], p:['ny','va'], wx:[2], c:12, ln:4},
+{id:'t1-drizzle-hay-asleep', l:['Тамара: «Сено мокнет, а мой спит».','Баба Нюра: «Разбуди».','Тамара: «Его разбудишь».'], p:['ta','ny'], h:'7', m:[7], wx:[2], c:12, ln:4},
+{id:'t1-downpour-goat-wet', l:['Под навесом тесно.','Баба Нюра: «Майку-то не загнала. Мокнет, холера».','Баба Валя: «Не растает».'], p:['ny','va'], wx:[5], c:12, ln:4},
+{id:'t1-after-rain-puddle', l:['Баба Нюра: «Вчера-то как лило».','Баба Валя: «Лило».','Баба Нюра: «В огороде лыва».'], p:['ny','va'], af:'d', c:12, ln:4},
+{id:'t1-nopower-night', l:['Баба Нюра: «Ночью погасло. Я не спала».','Баба Валя: «А я спала».'], p:['ny','va'], h:'7-11', pw:0, c:10, ln:3},
+{id:'t1-nopower-diesel', l:['Баба Нюра: «Петрович опять про дизель начнёт».','Баба Валя: «Начнёт».'], p:['ny','va'], h:'7-11', pw:0, c:10, ln:3},
+{id:'t1-nopower-radio-quiet', l:['Из дверей не слышно радио.','Люба: «Без радио-то тихо как».','Баба Нюра: «Непривычно».'], p:['lu','ny'], h:'9-15', pw:0, c:10, ln:4},
+{id:'t1-power-back-across', l:['Баба Нюра: «А у вас за рекой дали?»','Кивнул.'], p:['ny'], h:'7-11', af:'n', c:30, q:0.3, ln:3},
+{id:'t3-drizzle-brusnika', l:['Баба Нюра: «За брусникой собиралась».','Баба Валя: «Мокро».','Баба Нюра: «Мокро».'], p:['ny','va'], m:[8,9], wx:[2,5], c:12, ln:4},
+{id:'t3-rain-potato', l:['Петрович: «Картошка подождёт».','Баба Нюра: «У тебя всё подождёт».'], p:['ny','pe'], m:[9], wx:[2,5], c:12, ln:4},
+{id:'t3-rain-firewood', l:['Петрович: «Дрова у меня так под небом и лежат».','Баба Нюра: «С весны лежат».','Петрович: «Проветриваются».'], p:['pe','ny'], m:[8,9], wx:[2,5], c:12, ln:4},
+{id:'t3-drizzle-bench', l:['Баба Нюра вытерла лавку подолом.','Баба Валя: «Всё равно сыро».'], p:['ny','va'], wx:[2], c:12, ln:3},
+{id:'t3-rain-sobol', l:['Баба Нюра: «Соболь, лезь под крыльцо-то».','Соболь не шевелится.','Баба Нюра: «Мокни, раз так».'], p:['ny'], wx:[2,5], c:12, ln:4},
+{id:'t3-drizzle-tamara-herd', l:['Тамара: «Мокро, а гнать надо».','Баба Нюра: «Кто пасёт-то?»','Тамара: «Я. Некогда мне».'], p:['ta','ny'], h:'7', wx:[2,5], c:12, ln:4},
+{id:'t3-rain-stacks', l:['Баба Нюра: «Сметали стога?»','Баба Валя: «Не все».','Баба Нюра: «Михалыч, поди».','Баба Валя: «Михалыч».'], p:['ny','va'], m:[8], wx:[2,5], c:12, ln:4},
+{id:'t3-damp-knees', l:['Баба Нюра: «Колени-то в сырость крутит».','Баба Валя: «Мазь есть».','Баба Нюра: «Мне бы новые».'], p:['ny','va'], wx:[2,5], c:12, ln:4},
+{id:'t3-sunday-rain-warm', l:['Баба Нюра: «Открыла бы Люба — посидели бы в тепле».','Баба Валя: «Воскресенье».'], p:['ny','va'], d:[0], wx:[2,5], c:12, ln:3},
+{id:'t3-downpour-greenhouse', l:['Баба Нюра: «Парник-то закрыла?»','Баба Валя: «С утра».','Баба Нюра: «А я забыла».'], p:['ny','va'], m:[8], wx:[5], c:12, ln:4},
+{id:'t3-downpour-ceiling', l:['Петрович: «В сенях опять с потолка».','Баба Нюра: «А ведро?»','Петрович: «Два».'], p:['pe','ny'], wx:[5], c:12, ln:4},
+{id:'t3-downpour-lyuba-in', l:['Люба из дверей: «Заходите, чего мокнуть».','Баба Нюра: «Нам и тут хорошо».'], p:['lu','ny'], wx:[5], c:12, ln:4},
+{id:'t3-downpour-kolka', l:['Колька: «Мам, пошли, довезу».','Баба Нюра: «Переждём».','Колька: «Мам, ну хватит».'], p:['ko','ny'], wx:[5], c:12, ln:4},
+{id:'t3-rain-pressure-ai', l:['Анатолий Иванович: «В сырость голова тяжёлая».','Баба Валя: «Давайте померяю».'], p:['ai','va'], wx:[2,5], c:12, ln:4},
+{id:'t3-after-ural', l:['Петрович: «Развезло. Разве на „Урале“ проехать».','Баба Нюра: «Не заведёшь».','Петрович: «Не заведу».'], p:['pe','ny'], af:'d', c:12, ln:4},
+{id:'t3-after-vahtovka', l:['Люба из дверей: «Вовка звонил — вахтовки не будет».','Баба Нюра: «Развезло?»','Люба: «Развезло».'], p:['lu','ny'], d:[2,5], af:'d', br:0, c:12, ln:4},
+{id:'t3-after-oldman', l:['Баба Нюра: «Вам-то через реку по такой грязи».','Кивнул.'], p:['ny'], af:'d', c:30, q:0.3, ln:3},
+{id:'t3-after-tamara', l:['Тамара: «Коровы по брюхо в грязи».','Баба Нюра: «А ты?»','Тамара: «А мне некогда».'], p:['ta','ny'], h:'7', af:'d', c:12, ln:4},
+{id:'t3-wind-ural', l:['Петрович: «Мотоцикл с подножки сдуло».','Баба Нюра: «Хоть так поездил».'], p:['pe','ny'], wx:[3], c:12, ln:4},
+{id:'t3-wind-notice', l:['Люба из дверей: «Объявление опять сорвало».','Баба Нюра: «Какое хоть?»','Люба: «Кто его помнит».'], p:['lu','ny'], wx:[3], c:12, ln:4},
+{id:'t3-wind-karlovna', l:['Петрович: «Карловна, в ветер давление скачет?»','Баба Валя: «У кого как».'], p:['pe','va'], wx:[3], c:12, ln:3},
+{id:'t3-fog-august', l:['Баба Нюра: «Туманы пошли».','Баба Валя: «Август».'], p:['ny','va'], h:'7-10', m:[8], wx:[4], c:12, ln:2},
+{id:'t3-fog-ai-metres', l:['Анатолий Иванович: «Видно метров на двадцать».','Баба Нюра: «Метров, ишь».'], p:['ai','ny'], h:'10', wx:[4], c:12, ln:3},
+{id:'t3-fog-bell', l:['Где-то в тумане брякает колокольчик.','Баба Нюра: «Тамарина пошла».'], p:['ny'], h:'7-8', wx:[4], c:12, ln:4},
+{id:'t3-fog-lyuba', l:['Баба Нюра: «Не видать ничего».','Люба из дверей: «К обеду разойдётся».'], p:['ny','lu'], h:'9-10', wx:[4], c:12, ln:4},
+{id:'t3-fog-mittens', l:['Баба Нюра: «Руки зябнут».','Баба Валя: «Варежки бери».','Баба Нюра: «В сентябре?»','Баба Валя: «Бери».'], p:['ny','va'], h:'7-10', m:[9], wx:[4], c:12, ln:4},
+{id:'t3-frost-tops', l:['Баба Нюра: «Ночью-то подмёрзло».','Баба Валя: «Ботва вся чёрная».'], p:['ny','va'], m:[9], wx:[4,0], c:12, ln:4},
+{id:'t4-np-lampochka', l:['Баба Нюра: «Я утром думала, лампочка перегорела».','Баба Валя: «Все перегорели».'], p:['ny','va'], h:'7-10', pw:0, c:10, ln:3},
+{id:'t4-np-pogreb', l:['Люба из дверей: «Холодильник-то встал».','Баба Нюра: «А масло?»','Люба: «В погреб снесла».'], p:['lu','ny'], h:'9-15', pw:0, c:10, ln:4},
+{id:'t4-np-troitsa', l:['Петрович: «При мне свет не гас».','Баба Нюра: «А в Троицу?»','Петрович: «Праздник».'], p:['pe','ny'], h:'13-15', pw:0, c:10, ln:4},
+{id:'t4-np-elektriki', l:['Петрович: «Электрики-то едут?»','Люба: «Как дорога будет».','Петрович: «Дорога-то есть».'], p:['pe','lu'], h:'14-15', pw:0, c:10, ln:4},
+{id:'t4-np-moloko', l:['Тамара: «Молоко скиснет».','Баба Нюра: «Творогу наделаешь».','Тамара: «Некогда мне».'], p:['ta','ny'], h:'7', pw:0, c:10, ln:4},
+{id:'t4-np-sorok-km', l:['Анатолий Иванович: «Сорок километров линии по лесу. За каждой сосной не уследишь».','Баба Валя: «Не уследишь».'], p:['ai','va'], h:'10-13', pw:0, c:10, ln:4},
+{id:'t4-np-svechi-ulyane', l:['Люба: «Свечей-то возьмёшь?»','Михалыч: «Возьму. И Ульяне».'], p:['lu','mi'], h:'7-15', pw:0, c:10, ln:3},
+{id:'t4-np-egorych', l:['Егорыч: «Свет-от сёдни есть ли?»','Баба Валя: «Нет».','Егорыч: «Но. Быват».'], p:['eg','va'], h:'11-15', pw:0, c:10, ln:4},
+{id:'t4-np-pechka', l:['Баба Нюра: «Печку летом затопила. Ради чайника».','Баба Валя: «А я на керосинке».'], p:['ny','va'], h:'7-12', m:[6,7,8], pw:0, c:10, ln:4},
+{id:'t4-np-za-rekoy', l:['Баба Нюра: «У вас-то за рекой тоже нету?»','Кивнул.'], p:['ny'], h:'7-15', pw:0, c:30, q:0.3, ln:3},
+{id:'t4-ux-kerosin', l:['Баба Нюра: «Пойду. Керосин-то есть ли у меня, не помню».'], p:['ny'], h:'16', pw:0, r:'leave', c:10, ln:2},
+{id:'t4-ux-sobol', l:['Баба Нюра: «Соболь, сторожи тут. Я пошла».'], p:['ny'], h:'16', pw:0, r:'leave', c:10, ln:2},
+{id:'t4-ux-polezhu', l:['Петрович: «Пойду полежу».','Баба Нюра: «Ты и со светом лежишь».'], p:['pe','ny'], h:'16', pw:0, r:'leave', c:10, ln:3},
+{id:'t4-dali-gorit', l:['Баба Нюра: «Ночью дали. Лампочку забыла выключить, проснулась — горит».','Баба Валя: «И у меня».'], p:['ny','va'], pw:1, af:'n', c:10, ln:4},
+{id:'t4-dali-pilili', l:['Петрович: «Электрики сами сосну пилили».','Баба Нюра: «А ты где был?»','Петрович: «Не звали».'], p:['pe','ny'], pw:1, af:'n', c:10, ln:4},
+{id:'t4-ev-paut', l:['Баба Нюра: «Паут-то к вечеру злее».','Петрович: «Меня не берёт. Я прокуренный».'], p:['ny','pe'], h:'15-16', m:[7], wx:[1], c:12, ln:4},
+{id:'t4-eg-basko', l:['Егорыч: «Сёдни баско. Посижу».','Баба Валя: «Посидите».'], p:['eg','va'], wx:[1], c:12, ln:3},
+{id:'t4-liven-navec', l:['Баба Нюра: «Льёт-то как».','Баба Валя: «Льёт».','Посидели под навесом.'], p:['ny','va'], wx:[5], c:12, ln:3},
+{id:'t4-most-svai', l:['Петрович: «Мост у ручья опять унесло».','Баба Нюра: «Унесло?»','Петрович: «Одни сваи».'], p:['pe','ny'], af:'d', c:12, ln:4},
+{id:'t4-provoda-gudeli', l:['Петрович: «Гудят провода».','Баба Нюра: «Лишь бы гудели».'], p:['pe','ny'], wx:[3], pw:1, c:12, ln:2},
+{id:'t1-hay-to-the-meadow', l:['Тамара: «Коров отгоню — и на покос».','Баба Нюра: «Отдохни хоть».','Тамара: «Зимой отдохну».'], p:['ta','ny'], h:'7', m:[7], c:12, ln:4},
+{id:'t1-hay-mikh-in-time', l:['Баба Нюра: «Михалыч, косить-то когда?»','Михалыч: «Успею».','Баба Нюра: «Все уж косят».'], p:['ny','mi'], m:[7], c:12, ln:4},
+{id:'t1-hay-too-early', l:['Тамара: «Мой косить хочет. Рано, говорю».','Баба Нюра: «С Петрова пусть».'], p:['ta','ny'], h:'7', m:[6], c:12, ln:4},
+{id:'t1-hay-fog-dew', l:['Баба Нюра: «Колька по туману косить ушёл».','Баба Валя: «По росе-то легче».'], p:['ny','va'], h:'7-9', m:[7], wx:[4], c:12, ln:4},
+{id:'t1-garden-potato-patchy', l:['Баба Нюра: «У меня картошка через раз».','Баба Валя: «И у меня».'], p:['ny','va'], m:[6], c:12, ln:3},
+{id:'t1-garden-hilling-back', l:['Баба Нюра: «Окучивать пора, а спина не гнётся».','Баба Валя: «Кольку попроси».','Баба Нюра: «Попросишь его».'], p:['ny','va'], m:[7], c:12, ln:4},
+{id:'t1-garden-cucumbers', l:['Баба Нюра: «Огурцы пошли».','Баба Валя: «Рано у тебя».','Баба Нюра: «Навоз-то Тамарин».'], p:['ny','va'], m:[7], c:12, ln:4},
+{id:'t1-garden-onion-bolted', l:['Баба Валя: «Лук-то у тебя стрелку пустил».','Баба Нюра: «Пустил, холера».'], p:['ny','va'], m:[6,7], c:12, ln:3},
+{id:'t1-well-low', l:['Баба Нюра: «В колодце воды мало стало».','Баба Валя: «Лето».'], p:['ny','va'], m:[7], c:12, ln:3},
+{id:'t1-berries-past-farm', l:['Баба Нюра: «Земляника, говорят, пошла».','Баба Валя: «За фермой».','Баба Нюра: «Мне не дойти».'], p:['ny','va'], m:[7], c:12, ln:4},
+{id:'t1-firewood-kolka-enough', l:['Колька: «В субботу дрова пилим».','Баба Нюра: «А колоть кто?»','Колька: «Мам, ну хватит».'], p:['ko','ny'], c:12, ln:4},
+{id:'t1-cow-limping', l:['Тамара: «Младшая захромала».','Баба Нюра: «Копыто?»','Тамара: «Вечером гляну».'], p:['ta','ny'], h:'7', c:12, ln:4},
+{id:'t1-milk-tonight', l:['Тамара: «Нюра, молоко вечером занесу».','Баба Нюра: «Занеси. Колька всё выпил».'], p:['ta','ny'], h:'7', c:12, ln:4},
+{id:'t1-goat-stayed-home', l:['Тамара: «Нюра, Майка в стадо не пошла».','Баба Нюра: «Холера. В огород залезет».'], p:['ta','ny'], h:'7', c:12, ln:4},
+{id:'t1-ai-pills-every-day', l:['Баба Валя: «Таблетки пьёте?»','Анатолий Иванович: «Пью».','Баба Валя: «Каждый день?»'], p:['va','ai'], c:12, ln:4},
+{id:'t1-injection-walks', l:['Баба Нюра: «Тамариному-то укол ставила?»','Баба Валя: «Ставила. Ходит».'], p:['ny','va'], h:'8-11', c:12, ln:3},
+{id:'t1-ledger-new', l:['Люба: «Тетрадь новую заводить пора».','Баба Нюра: «Меня-то перепиши».'], p:['lu','ny'], c:12, ln:4},
+{id:'t1-flour-no-yeast', l:['Люба: «Муку привезли, а дрожжей нет».','Баба Нюра: «А мне стряпать».'], p:['lu','ny'], h:'9-11', br:1, c:12, ln:3},
+{id:'t1-motorbike-no-start', l:['Баба Нюра: «Петрович опять мотоцикл заводил».','Баба Валя: «Слыхала».','Баба Нюра: «Не завёлся».'], p:['ny','va'], h:'7-11', c:12, ln:4},
+{id:'t1-radio-louder', l:['Баба Нюра: «Люба, сделай погромче».','Люба: «Глохнешь, Нюра?»'], p:['ny','lu'], pw:1, c:12, ln:3},
+{id:'t1-knit-glasses', l:['Баба Нюра: «Глаза не те, петли не вижу».','Баба Валя: «Очки надень».','Баба Нюра: «Дома забыла».'], p:['ny','va'], c:12, ln:4},
+{id:'t1-how-living', l:['Тамара: «Как живёшь, Нюра?»','Баба Нюра: «Живём — хлеб жуём».'], p:['ta','ny'], h:'7', c:3, ln:3},
+{id:'t1-egorych-whats-new', l:['Баба Нюра: «Что нового, Егорыч?»','Егорыч: «Всё по-старому, как мать поставила».'], p:['ny','eg'], c:3, ln:4},
+{id:'t1-goat-hay-kolka', l:['Баба Нюра: «Майке сена бы».','Баба Валя: «Колька накосит».','Баба Нюра: «Если не уедет».'], p:['ny','va'], m:[6,7], c:12, ln:3},
+{id:'t1-shanezhki-flat', l:['Баба Нюра: «Шанежки вчера не поднялись».','Баба Валя: «Дрожжи старые».'], p:['ny','va'], c:12, ln:3},
+{id:'t2-kosu-tochit', l:['Баба Нюра: «Михалыч косит».','Петрович: «Косу точит».','Баба Нюра: «Третий день».','Петрович: «Острая будет».'], p:['ny','pe'], m:[7], c:12, ln:4},
+{id:'t2-ural-zavodil', l:['Петрович: «Я раньше за утро луг выкашивал».','Баба Нюра: «Ты раньше и „Урал“ заводил».'], p:['pe','ny'], m:[7], c:12, ln:4},
+{id:'t2-ogurtsy', l:['Баба Нюра: «Огурцы пошли, не успеваю».','Баба Валя: «Соли».','Баба Нюра: «Банок нет».'], p:['ny','va'], m:[7,8], c:12, ln:4},
+{id:'t2-lebeda', l:['Баба Нюра: «У тебя лебеда выше забора».','Петрович: «Сорт такой».'], p:['ny','pe'], m:[7,8], c:12, ln:3},
+{id:'t2-vodu-taskat', l:['Баба Нюра: «Воду таскать замучилась».','Петрович: «А ты не поливай».','Баба Нюра: «Как ты, что ли?»'], p:['ny','pe'], m:[6,7,8], wx:[1], c:12, ln:4},
+{id:'t2-luk-melkiy', l:['Баба Валя: «В этом году лук мелкий».','Баба Нюра: «У всех мелкий».','Баба Валя: «Не у всех».'], p:['va','ny'], m:[8], c:12, ln:4},
+{id:'t2-belye', l:['Баба Нюра: «Колька корзину белых принёс».','Баба Валя: «Где брал?»','Баба Нюра: «Не говорит».'], p:['ny','va'], m:[8], c:12, ln:4},
+{id:'t2-egorych-griby', l:['Егорыч: «Грибов-то лонись не было».','Баба Валя: «Были».','Егорыч: «Не было, дак».'], p:['eg','va'], m:[8], c:12, ln:4},
+{id:'t2-griby-sushit', l:['Баба Нюра: «Печь топила, грибы сушу».','Баба Валя: «В такую жару?»','Баба Нюра: «Куда деваться».'], p:['ny','va'], m:[8], wx:[1], c:12, ln:4},
+{id:'t2-drova-kolka', l:['Петрович: «Колька дров обещал привезти».','Баба Нюра: «Раз обещал, привезёт».'], p:['pe','ny'], c:12, ln:4},
+{id:'t2-drova-kuby', l:['Анатолий Иванович: «Дрова я сложил. Восемь кубов».','Баба Валя: «Сами?»','Анатолий Иванович: «Сам».'], p:['ai','va'], m:[8], c:12, ln:4},
+{id:'t2-tamara-moloko', l:['Баба Нюра: «У Тамары молока меньше стало».','Баба Валя: «Паут».','Баба Нюра: «Паут, да».'], p:['ny','va'], m:[7], c:12, ln:4},
+{id:'t2-kto-pasyot', l:['Баба Нюра: «Кто пасёт-то?»','Петрович: «Не я».','Баба Нюра: «Тебя и не пустят».'], p:['ny','pe'], c:12, ln:4},
+{id:'t2-golova-gudit', l:['Баба Нюра: «Голова гудит».','Баба Валя: «Пила?»','Баба Нюра: «Пила. Не ту».','Баба Валя: «Зайди вечером».'], p:['ny','va'], c:12, ln:4},
+{id:'t2-kurit-brosay', l:['Баба Валя: «Курить бросай».','Петрович: «Брошу. Вот докурю».'], p:['va','pe'], c:3, ln:3},
+{id:'t2-davlenie-ai', l:['Баба Валя: «Давление как?»','Анатолий Иванович: «В норме».','Баба Валя: «Сами мерили?»'], p:['va','ai'], c:3, ln:4},
+{id:'t2-egorych-davlenie', l:['Баба Валя: «Как давление?»','Егорыч: «Чё?»','Баба Валя: «Давление!»','Егорыч: «Есть, дак».'], p:['va','eg'], c:12, ln:4},
+{id:'t2-k-shiryaevym', l:['Баба Нюра: «К кому ходила?»','Баба Валя: «К Ширяевым».','Баба Нюра: «К старшим?»','Баба Валя: «Да».'], p:['ny','va'], c:12, ln:4},
+{id:'t2-pod-zapis-mihalych', l:['Михалыч взял папирос и спичек.','Люба: «Под запись?»','Михалыч: «Под запись».'], p:['mi','lu'], c:12, ln:4},
+{id:'t2-ne-rezinovaya', l:['Баба Нюра: «Запиши мыло».','Люба: «Тетрадь-то не резиновая».','Баба Нюра: «Мельче пиши».'], p:['ny','lu'], c:12, ln:4},
+{id:'t2-glava-greyder', l:['Петрович: «Глава, пишут, приедет».','Баба Нюра: «Про грейдер?»','Петрович: «Про что ж ещё».'], p:['pe','ny'], c:30, q:0.3, ln:4},
+{id:'t2-radio-perm-zhara', l:['Анатолий Иванович: «В Перми, передают, жара».','Баба Валя: «Про нас не передают».'], p:['ai','va'], m:[7], wx:[1], pw:1, c:12, ln:4},
+{id:'t2-moskvu-pokazyvali', l:['Баба Нюра: «Москву показывали».','Баба Валя: «И как там?»','Баба Нюра: «Бегают».'], p:['ny','va'], pw:1, c:12, ln:4},
+{id:'t2-ural-zavtra', l:['Баба Нюра: «„Урал“-то завёл?»','Петрович: «Завтра».'], p:['ny','pe'], c:3, ln:3},
+{id:'t2-ural-kolka', l:['Петрович: «Колька „Урал“ смотрел».','Баба Нюра: «И что?»','Петрович: «Красивый, грит».'], p:['pe','ny'], c:12, ln:4},
+{id:'t2-voda-mutnaya', l:['Баба Нюра: «Вода в колодце мутная».','Баба Валя: «Кипятить».','Баба Нюра: «Кипятим».'], p:['ny','va'], c:12, ln:4},
+{id:'t2-vyazhet-kolke', l:['Баба Валя: «Кому вяжешь?»','Баба Нюра: «Кольке».','Баба Валя: «Летом?»','Баба Нюра: «На Север».'], p:['va','ny'], m:[6,7,8], c:12, ln:4},
+{id:'t4-ev-vesy', l:['Люба: «Весы-то опять врут».','Петрович: «Они у тебя всегда врут».','Люба: «В твою пользу».'], p:['lu','pe'], h:'14-16', c:12, ln:4},
+{id:'t4-ev-davlenie-utrom', l:['Баба Валя: «Утром давление померим».','Баба Нюра: «Доживу — померим».'], p:['va','ny'], h:'16', c:12, ln:4},
+{id:'t4-ev-ural', l:['Петрович: «Колька, глянь мой „Урал“».','Колька: «Глянуть гляну».','Петрович: «А заведёшь?»'], p:['pe','ko'], h:'13-16', c:12, ln:4},
+{id:'t4-mih-smetali', l:['Баба Нюра: «Все уж сметали, Михалыч».','Михалыч: «Все».','Михалыч закурил.'], p:['ny','mi'], m:[8], c:12, ln:4},
+{id:'t4-mih-spina', l:['Баба Валя: «Спина-то как?»','Михалыч: «Сплавная».'], p:['va','mi'], c:12, ln:2},
+{id:'t4-ai-davlenie', l:['Баба Валя: «Руку давайте».','Анатолий Иванович: «Давление нормальное».','Баба Валя: «Сто шестьдесят».'], p:['va','ai'], c:12, ln:4},
+{id:'t4-eg-shapka', l:['Баба Валя: «Без шапки?»','Егорыч: «Ась?»','Баба Валя: «Шапка где?»','Егорыч: «Дома шапка-та».'], p:['va','eg'], wx:[1], c:12, ln:4},
+{id:'t4-kolka-kalitka', l:['Баба Валя: «Коля, калитку бы мне».','Колька: «Вечером зайду».'], p:['va','ko'], c:12, ln:3},
+{id:'t4-tam-banka', l:['Баба Нюра: «Тамара, молоко-то будет вечером?»','Тамара: «Будет. Банку неси».'], p:['ny','ta'], h:'7', c:12, ln:3},
+{id:'t4-lu-verevochka', l:['Петрович: «Под запись, Люба».','Люба: «Сам пиши. Ручка на верёвочке».'], p:['pe','lu'], c:12, ln:4},
+{id:'t4-drova-vesna', l:['Баба Нюра: «Дров-то на зиму хватит?»','Петрович: «На зиму хватит. На весну нет».'], p:['ny','pe'], m:[9], c:12, ln:4},
+{id:'t2-sobol-v-ten', l:['Баба Нюра: «Соболь, в тень иди».','Соболь перелёг под крыльцо.'], p:['ny'], m:[6,7,8], wx:[1], c:12, ln:3},
+{id:'t2-sobol-korka', l:['Петрович отдал Соболю корку.','Баба Нюра: «Сам-то обедал?»','Петрович: «Мы на пару».'], p:['pe','ny'], c:12, ln:3},
+{id:'t2-sobol-nocheval', l:['Баба Нюра: «Соболь у меня ночевал».','Баба Валя: «И у меня».'], p:['ny','va'], c:12, ln:3},
+{id:'t2-sobol-buhanka', l:['Люба: «Кто Соболю буханку скормил?»','Баба Нюра: «Не я».','Баба Валя: «Не я».'], p:['lu','ny','va'], br:1, c:12, ln:4},
+{id:'t2-egorych-rovesnik', l:['Егорыч: «Пёс-от мне ровесник, поди».','Баба Нюра: «Тебе ровесников нет».'], p:['eg','ny'], c:12, ln:4},
+{id:'t2-mayka-domoy', l:['У крыльца стоит коза.','Баба Нюра: «Майка, домой! Кому сказала!»','Коза не идёт.'], p:['ny'], c:12, ln:4},
+{id:'t2-mayka-ogurtsy', l:['Баба Нюра: «Майка огурцы объела».','Баба Валя: «Привяжи».','Баба Нюра: «Отвязывается».'], p:['ny','va'], m:[7,8], c:12, ln:4},
+{id:'t2-mayka-lebeda', l:['Петрович: «Майка у меня лебеду ела».','Баба Нюра: «Хоть кому-то польза».'], p:['pe','ny'], m:[7,8], c:12, ln:4},
+{id:'t2-mayka-krysha', l:['Колька: «Мам, Майка опять на сарае».','Баба Нюра: «Сними».','Колька: «Сама слезет».'], p:['ko','ny'], c:12, ln:4},
+{id:'t2-mayka-seni', l:['Баба Нюра: «Майка в сенях муку рассыпала, а утром стоит, будто не она».','Баба Валя: «Коза».'], p:['ny','va'], c:30, q:0.3, ln:4},
+{id:'t2-ryabaya', l:['Баба Нюра: «Рябая не несётся».','Баба Валя: «Старая».','Баба Нюра: «А я несусь».'], p:['ny','va'], c:12, ln:4},
+{id:'t2-tamarina-poshla', l:['Мимо магазина идёт корова.','Баба Нюра: «Тамарина пошла».','Баба Валя: «Отбилась».'], p:['ny','va'], c:12, ln:4},
+{id:'t2-tamarina-ogorod', l:['Петрович: «Тамарина в огороде у Ширяевых».','Баба Нюра: «Которая?»','Петрович: «Обе».'], p:['pe','ny'], m:[6,7,8], c:12, ln:4},
+{id:'t2-medved-chernika', l:['Петрович: «В чернике медведя видел».','Баба Нюра: «Опять?»','Петрович: «Опять».'], p:['pe','ny'], m:[8], c:12, ln:4},
+{id:'t2-medved-svalka', l:['Баба Нюра: «Медведь, говорят, на свалке».','Баба Валя: «Кто говорит?»','Баба Нюра: «Все говорят».'], p:['ny','va'], m:[8], c:12, ln:4},
+{id:'t2-medved-egorych', l:['Баба Нюра: «Слыхал, медведь ходит?»','Егорыч: «Пусть ходит, дак».'], p:['ny','eg'], m:[8], c:12, ln:3},
+{id:'t2-paut-vorobey', l:['Петрович: «Паут с воробья».','Баба Нюра: «А медведь с баню?»'], p:['pe','ny'], m:[7], wx:[1], c:12, ln:3},
+{id:'t4-kury-umnee', l:['Баба Нюра: «Куры-то под крыльцо забились».','Петрович: «Умнее нас».'], p:['ny','pe'], h:'14-16', wx:[2], c:12, ln:3},
+{id:'t4-sobol-chey', l:['Баба Нюра: «Соболь, ты чей сегодня?»'], p:['ny'], h:'16-17', c:12, ln:2},
+{id:'t4-ev-mayka-stado', l:['Тамара: «Нюра, Майку-то забери от стада».'], p:['ta','ny'], h:'17', c:12, ln:2},
+{id:'t3-mem-internat', l:['Баба Нюра: «В эту пору ребят в интернат провожали».','Баба Валя: «Ревели».','Баба Нюра: «И матери».'], p:['ny','va'], m:[8], c:90, q:0.3, ln:4},
+{id:'t3-mem-bakery', l:['Баба Нюра: «Пекарня своя была — хоть всё залей».','Баба Валя: «Была».'], p:['ny','va'], af:'d', c:30, q:0.3, ln:3},
+{id:'t3-mem-ferry-bridge', l:['Егорыч: «Раньше баяли — к Ефиму. Нонче к мостику».','Баба Нюра: «Ефим, царство небесное».'], p:['eg','ny'], c:30, q:0.3, ln:4},
+{id:'t3-mem-kino-deaf', l:['Баба Нюра: «Кино помнишь?»','Егорыч: «Чё?»','Баба Нюра: «Кино, говорю!»','Егорыч: «Чё не помнить-то».'], p:['ny','eg'], c:30, q:0.3, ln:4},
+{id:'t3-mem-moose', l:['Баба Нюра: «Лосёнок-то к хлебному ходил, помнишь?»','Баба Валя: «Из рук брал».'], p:['ny','va'], c:30, q:0.3, ln:3},
+{id:'t3-mem-kino-diesel', l:['Петрович: «Кино-то на моём дизеле крутили».','Баба Нюра: «И гасло».','Петрович: «Для интересу».'], p:['pe','ny'], c:30, q:0.3, ln:4},
+{id:'t3-mem-farm', l:['Баба Нюра: «На ферме-то двести голов было».','Тамара: «А теперь мои две. Некогда мне».'], p:['ny','ta'], h:'7', m:[8], c:30, q:0.3, ln:4},
+{id:'t3-mem-zakharovna-salt', l:['Баба Нюра: «Захаровна, царство небесное, в эту пору грибы солила».','Баба Валя: «Солила».'], p:['ny','va'], m:[8,9], c:90, q:0.3, ln:4},
+{id:'t3-mem-sovkhoz-hay', l:['Баба Нюра: «При совхозе всем миром метали».','Петрович: «А теперь Михалыч сам-один».'], p:['ny','pe'], m:[8], c:30, q:0.3, ln:4},
+{id:'t3-mem-pikes', l:['Егорыч: «Верхних-то щуками звали, дак».','Баба Нюра: «Наверху одна щука и осталась».'], p:['eg','ny'], c:90, q:0.3, ln:4},
+{id:'t3-mem-motovoz', l:['Петрович: «На мотовозе-то за час доезжали».','Баба Нюра: «И вагончик тёплый был».'], p:['pe','ny'], c:30, q:0.3, ln:4},
+{id:'t3-mem-barracks', l:['Баба Нюра: «Внизу давно не бараки, а всё — у бараков».','Баба Валя молчит.'], p:['ny','va'], c:90, q:0.3, ln:3},
+{id:'t3-mem-valya-shots', l:['Баба Нюра: «Ты, Валя, всю деревню переколола».','Баба Валя: «Всю».'], p:['ny','va'], c:30, q:0.3, ln:3},
+{id:'t3-mem-ai-three-years', l:['Анатолий Иванович: «Меня ведь сюда на три года прислали».','Баба Валя: «Знаем».'], p:['ai','va'], c:30, q:0.3, ln:4},
+{id:'t3-mem-well', l:['Егорыч: «В ту зиму колодец-от до дна встал».','Баба Нюра: «Снег топили».'], p:['eg','ny'], c:30, q:0.3, ln:3},
+{id:'t3-mem-school-barefoot', l:['Егорыч: «В школу-ту я босиком бегал».','Баба Нюра: «Знаем, Егорыч, босиком».'], p:['eg','ny'], m:[8,9], c:30, q:0.3, ln:4},
+{id:'t3-mem-ferry-fog', l:['Баба Нюра: «Ефим, бывало, и в туман возил».','Баба Валя: «По голосу».'], p:['ny','va'], h:'7-10', wx:[4], c:30, q:0.3, ln:3},
+{id:'t3-mem-michalych-logs', l:['Баба Нюра: «Михалыч-то при сплаве по брёвнам бегал».','Михалыч: «Бегал».'], p:['ny','mi'], c:30, q:0.3, ln:3},
+{id:'t3-mem-sunday-dances', l:['Баба Нюра: «По воскресеньям в клубе танцы были».','Баба Валя: «Ты в красном ходила».'], p:['ny','va'], d:[0], c:30, q:0.3, ln:4},
+{id:'t4-ai-kontora', l:['Анатолий Иванович: «При мне в конторе до ночи свет горел».','Баба Валя: «Горел».'], p:['ai','va'], c:30, q:0.3, ln:3},
+{id:'t4-eg-vozov', l:['Егорыч: «Сено-то ставили, паря, по сорок возов».','Петрович: «Сорок?»','Егорыч: «Но».'], p:['eg','pe'], h:'13-15', c:30, q:0.3, ln:4},
+{id:'t4-kino-sreda', l:['Баба Нюра: «В клубе кино по субботам крутили».','Баба Валя: «По средам».'], p:['ny','va'], c:30, q:0.3, ln:3},
+{id:'t3-chg-valya-petrovich', l:['Баба Нюра: «Валька-то не пришла».','Петрович: «Придёт».','Баба Нюра: «Не придёт».'], p:['ny','pe'], wo:['va'], c:12, ln:4},
+{id:'t3-chg-valya-lyuba', l:['Баба Нюра: «Валя-то где?»','Люба: «Не видала».'], p:['ny','lu'], wo:['va'], c:12, ln:2},
+{id:'t3-chg-valya-sobol', l:['Баба Нюра: «Одни мы с тобой, Соболь».','Соболь стучит хвостом.'], p:['ny'], h:'8', wo:['va'], c:12, ln:3},
+{id:'t3-chg-shutter', l:['Баба Нюра: «У Захаровны ставня хлопает».','Баба Валя: «Некому закрыть».'], p:['ny','va'], wx:[3], ph:'zahEmpty', c:30, q:0.3, ln:4},
+{id:'t3-chg-zakh-razbor', l:['Баба Нюра: «Захаровнин-то дом раскатывают».','Баба Валя: «На дрова».'], p:['ny','va'], ph:'zahDown', c:12, ln:3},
+{id:'t3-chg-zakh-gone', l:['Баба Нюра: «Иду мимо — а дома-то нет».','Баба Валя: «Привыкнешь».'], p:['ny','va'], ph:'zahGone', c:30, q:0.3, ln:3},
+{id:'t3-chg-zakh-stove', l:['Петрович: «От Захаровны одна печка стоит».','Баба Нюра: «Царство небесное».'], p:['pe','ny'], ph:'zahGone', c:90, q:0.3, ln:4},
+{id:'t3-chg-cow-one', l:['Баба Нюра: «Одна у Тамары-то теперь».','Баба Валя: «Одна».'], p:['ny','va'], ph:'oneCow', c:30, q:0.3, ln:3},
+{id:'t3-chg-cow-searches', l:['Тамара: «Одна-то всё мычит, ищет».','Баба Нюра: «Ищет».'], p:['ta','ny'], h:'7', ph:'oneCow', c:30, q:0.3, ln:3},
+{id:'t3-chg-cow-evening', l:['Тамара встречает с поля одну корову.'], p:['ta'], h:'17', ph:'oneCow', c:30, q:0.3, ln:2},
+{id:'t3-chg-students-words', l:['Баба Нюра: «Студентки-то уехали. Все мои слова увезли».','Баба Валя: «Не все».'], p:['ny','va'], m:[8], c:30, q:0.3, ln:4},
+{id:'t3-chg-students-petrovich', l:['Петрович: «Студентки-то и меня записали».','Баба Нюра: «Тебя-то зачем?»','Петрович: «Для науки».'], p:['pe','ny'], m:[8], c:30, q:0.3, ln:4},
+{id:'t3-chg-sobol-lies', l:['Соболь поднял голову и опять лёг.','Баба Нюра: «Лежи, лежи».'], p:['ny'], ph:'sobolOld', c:12, ln:3},
+{id:'t3-chg-sobol-bring', l:['Баба Нюра: «Соболь, на!»','Соболь не встаёт.','Баба Нюра: «Сама принесу».'], p:['ny'], ph:'sobolOld', c:12, ln:3},
+{id:'t3-chg-perm-lyuba', l:['Баба Нюра: «Иваныч-то всё в Перми?»','Люба: «В Перми».'], p:['ny','lu'], ph:'perm', c:12, ln:3},
+{id:'t3-chg-perm-gate', l:['Баба Нюра: «У Иваныча калитка всё на замке».','Баба Валя: «В Перми он».'], p:['ny','va'], ph:'perm', c:12, ln:3},
+{id:'t3-chg-petrovich-absent', l:['Баба Нюра: «Дизеля-то сегодня не видать».','Баба Валя: «Не видать».'], p:['ny','va'], h:'15-16', wo:['pe'], c:12, ln:3},
+{id:'t3-chg-mosquitoes', l:['Петрович: «Комар пропал».','Баба Нюра: «И паут».','Петрович: «Хоть что-то хорошее».'], p:['pe','ny'], m:[9], c:30, q:0.3, ln:4},
+{id:'t3-chg-nights', l:['Баба Нюра: «Ночи-то потемнели».','Баба Валя: «Потемнели».'], p:['ny','va'], m:[8], c:30, q:0.3, ln:3},
+{id:'t3-chg-razvezyot', l:['Петрович: «Развезёт скоро — до льда сидеть».','Баба Нюра: «Сидели и посидим».'], p:['pe','ny'], m:[9], c:30, q:0.3, ln:4},
+{id:'t4-zaharovna-krapiva', l:['Баба Нюра: «У Захаровны крапива по окна».','Баба Валя: «Некому».'], p:['ny','va'], ph:'zahEmpty', c:30, q:0.3, ln:3},
+{id:'t4-eg-lonis', l:['Егорыч: «Лонись-то Захаровна тут сидела».','Баба Нюра: «Сидела».'], p:['eg','ny'], c:30, q:0.3, ln:3},
+{id:'t2-kak-ulyana', l:['Михалыч взял шесть буханок.','Баба Нюра: «Как Ульяна-то?»','Михалыч: «Живёт».'], p:['mi','ny'], d:[5], br:1, c:12, ln:3},
+{id:'t2-vovka-gde', l:['Хлеба не привезли.','Баба Нюра: «Вовка-то где?»','Люба: «Леший его знает».'], p:['ny','lu'], br:0, c:12, ln:3},
+{id:'t2-ulyana-odna', l:['Баба Нюра: «Как Ульяна там одна?»','Баба Валя: «Так и одна».'], p:['ny','va'], c:12, ln:3},
+{id:'t2-ulyana-drova', l:['Баба Нюра: «Ульяна дрова сама пилит».','Баба Валя: «Двуручкой?»','Баба Нюра: «Ножовкой».'], p:['ny','va'], c:12, ln:4},
+{id:'t2-petrovich-sever', l:['Петрович: «Может, и мне на Север?»','Баба Нюра: «Тебя там ждали».'], p:['pe','ny'], c:12, ln:4},
+{id:'t2-lena-ne-priezzhala', l:['Баба Нюра: «Лена-то давно не приезжала».','Анатолий Иванович: «Работа у неё».'], p:['ny','ai'], c:12, ln:4},
+{id:'t2-luzha-studentki', l:['Студентка: «Как у вас называют лужу?»','Баба Нюра: «Лужа и есть».','Студентка записывает.'], p:['st','ny'], m:[7], ph:'students', c:90, q:0.3, ln:4},
+{id:'t2-egorych-pishi', l:['Студентки записывают за Егорычем.','Егорыч: «Пиши-ко, девка, я много знаю».'], p:['st','eg'], m:[7], ph:'students', c:90, q:0.3, ln:4},
+{id:'t2-kak-po-radio', l:['Баба Нюра: «Девки-то как по радио говорят».','Баба Валя: «Правильно говорят».'], p:['ny','va'], m:[7], ph:'students', c:90, q:0.3, ln:4},
+{id:'t2-noski-studentki', l:['Люба: «Студентки две пары носков взяли».','Баба Нюра: «Летом-то?»','Люба: «На память».'], p:['lu','ny'], m:[7], ph:'students', c:90, q:0.3, ln:4},
+{id:'t2-shiryaevu-v-gorod', l:['Баба Нюра: «Колька Ширяеву в город возил».','Баба Валя: «Давно пора».'], p:['ny','va'], c:30, q:0.3, ln:3},
+{id:'t2-ai-poryadok', l:['Анатолий Иванович: «При мне тут порядок был».','Петрович: «При тебе и я молодой был».'], p:['ai','pe'], h:'13', c:12, ln:4},
+{id:'t2-skuchno-vam', l:['Баба Нюра: «Не скучно вам одному?»','Промолчал.'], p:['ny'], c:30, q:0.3, ln:3},
+{id:'t4-ev-dymish', l:['Баба Нюра: «Петрович, ты дымишь, как твой дизель».','Петрович: «Дизель хоть работал».'], p:['ny','pe'], h:'14-16', c:12, ln:4},
+{id:'t4-kolka-el', l:['Баба Нюра: «Колька, ты ел?»','Колька: «Мам, ну хватит».'], p:['ny','ko'], h:'9-16', c:3, ln:2},
+{id:'t4-ev-obedal', l:['Баба Нюра: «Петрович, ты сегодня обедал?»','Петрович: «Курил».'], p:['ny','pe'], h:'14-16', c:12, ln:3},
+{id:'t4-ev-uzhinat', l:['Колька: «Мам, ужинать не жди».','Баба Нюра: «Опять до ночи?»'], p:['ko','ny'], h:'15-16', c:12, ln:3},
+{id:'t4-nekogda', l:['Баба Нюра: «Посиди с нами».','Тамара: «Некогда мне».'], p:['ny','ta'], h:'7,17', c:3, ln:2},
+{id:'t4-ai-vnuk', l:['Анатолий Иванович: «Внук осенью в первый класс идёт».','Баба Валя: «Большой уже».','Баба Нюра: «Растут».'], p:['ai','va','ny'], m:[6,7,8], c:30, q:0.3, ln:4},
+{id:'t4-kolka-sever', l:['Петрович: «Колька, на Север-то когда?»','Колька: «Как позовут».'], p:['pe','ko'], h:'13-16', c:12, ln:3},
+{id:'t4-lu-karlovna-zvonili', l:['Люба: «Карловна, вам из города звонили».','Баба Валя: «Знаю».'], p:['lu','va'], c:30, q:0.3, ln:3},
+{id:'t4-st-zapisyvayut', l:['Баба Нюра: «Записывают Егорыча-то».','Баба Валя: «Пусть пишут».'], p:['ny','va','eg','st'], h:'11-14', m:[7], ph:'students', c:90, q:0.3, ln:3},
+{id:'t4-kryltso', l:['Баба Нюра: «Колька всем чинит, а у самих крыльцо падает».','Баба Валя: «Так всегда».'], p:['ny','va'], c:12, ln:4},
+{id:'t4-vovka-lyva', l:['Петрович: «Вовка вчера в лыве сел».','Баба Нюра: «Вытащили?»','Петрович: «Трактором».'], p:['pe','ny'], d:[3,6], c:12, ln:4}
+];
+// ---------- end of talk ----------
+TALK.forEach(c => { c.hrs = spans(c.h, 7, 16); });   // start hours; with none 7-16: the hour from 17:00 only where it is named
+const who = id => TALK_WHO.indexOf(id) + 1;
+const comes = (id, p) => th(who(id)) < p;
+const comesAt = (id, k) => Math.floor(th(who(id), 1)*k);   // its hour, one of k
+// a date of the game's first summer as its day (dayDate(1) is 15 June, a Sunday)
+const dayOn = (m, d) => Math.round((Date.UTC(2025, m - 1, d) - Date.UTC(2025, 5, 14))/864e5);
+// the slow changes (07), [first day, day after the last): Zakharovna's house empty till a day in 1-20 August, three days
+// taken down, then gone; Anatoly Ivanovich in Perm two or three weeks from a day in 10 July-10 August; the students
+// three days from a day in 5-25 July; Sobol old from 1 September; Tamara with one cow from a day in 5-20 September
+function talkPhases(){
+  const zah = dayOn(8, 1) + Math.floor(tGame(1)*20), perm = dayOn(7, 10) + Math.floor(tGame(2)*32);
+  const st = dayOn(7, 5) + Math.floor(tGame(3)*21), cow = dayOn(9, 5) + Math.floor(tGame(4)*16);
+  return {zahEmpty: [-Infinity, zah], zahDown: [zah, zah + 3], zahGone: [zah + 3, Infinity], perm: [perm, perm + 14 + Math.floor(tGame(2, 1)*8)],
+    students: [st, st + 3], sobolOld: [dayOn(9, 1), Infinity], oneCow: [cow, Infinity]};
+}
+const inPhase = ph => { const [a, b] = talkPhases()[ph]; return S.day >= a && S.day < b; };
+const weekday = () => dayDate(S.day).getUTCDay();
+const breadDay = () => weekday() === 2 || weekday() === 5;   // Tuesday and Friday
+const breadCame = () => breadDay() && !(S.yesterday || {}).downpour && th(20) >= SHOP_P.noBread;
+// the pension on the 4th, on the 5th when the 4th is a Sunday
+const pensionDay = () => { const t = dayDate(S.day); return t.getUTCDate() === 4 && t.getUTCDay() !== 0 || t.getUTCDate() === 5 && t.getUTCDay() === 1; };
+// the neighbour as the journal saw him at a water today: then he does not come to the shop that day
+const NB_SEEN = /^(?:Пришёл Михалыч|Михалыч тоже пришёл|Михалыч уже здесь|У Михалыча|Михалыч уходит|Михалыч сматывает)/;
+const valyaHere = () => S.day === 1 || comes('va', SHOP_P.va);   // never away on a new game's first day
+// who is at the shop in the hour from hr:00 today, by their habits (11, «Кто у магазина»); Sobol is always there
+function atShop(hr){
+  const at = new Set(), dow = weekday(), wx = lifeWeather(hr - START), put = (id, yes) => { if (yes) at.add(id); };
+  if (S.noPower && hr >= EMPTY_FROM || hr < 7 || hr > 17) return at;
+  put('ny', true);
+  put('va', valyaHere());
+  put('lu', dow !== 0 && (hr >= 9 && hr <= 12 || hr >= 14));   // opens at nine, «Обед» at one, closes at six; Sunday shut
+  put('ta', hr === 7 && comes('ta', SHOP_P.ta) || hr === 17 && th(who('ta'), 2) < SHOP_P.taEve);
+  put('pe', comes('pe', SHOP_P.pe) && hr >= 13 + comesAt('pe', 3));
+  put('mi', !S.log.some(e => NB_SEEN.test(e.text))
+    && (breadDay() ? comes('mi', SHOP_P.miBread) && hr === 10 + comesAt('mi', 3) : comes('mi', SHOP_P.mi) && hr === 11 + comesAt('mi', 5)));
+  put('ai', !inPhase('perm') && (dow === 6 ? hr >= 10 && hr <= 13 : comes('ai', SHOP_P.ai) && hr === 10 + comesAt('ai', 4)));
+  if (comes('eg', SHOP_P.eg) && (wx === 0 || wx === 1)){   // in the sun or overcast, two to four hours in a row in 11-15
+    const n = 2 + comesAt('eg', 3), a = 11 + Math.floor(th(who('eg'), 2)*(6 - n)); put('eg', hr >= a && hr < a + n);
+  }
+  put('ko', comes('ko', SHOP_P.ko) && hr === 9 + comesAt('ko', 8));
+  put('st', inPhase('students') && hr >= 10 && hr <= 14);
+  return at;
+}
+// a piece may sound in the hour from hr:00 with these people there: its hours, people, day, date, month, the hour's
+// weather, the power, yesterday («дали свет» only once it is back), the bread and the slow change
+function talkFits(c, hr, at){
+  const t = dayDate(S.day), y = S.yesterday || {};
+  return inSpans(hr, c.hrs) && c.p.every(id => at.has(id)) && !(c.wo && c.wo.some(id => at.has(id)))
+    && (!c.d || c.d.includes(t.getUTCDay())) && (!c.dt || pensionDay()) && (!c.m || c.m.includes(t.getUTCMonth() + 1))
+    && (!c.wx || c.wx.includes(lifeWeather(hr - START))) && (!('pw' in c) || (c.pw === 0) === !!S.noPower)
+    && (!c.af || (c.af === 'd' ? !!y.downpour : !!y.noPower && !S.noPower))
+    && (!('br' in c) || breadDay() && breadCame() === !!c.br) && (!c.ph || inPhase(c.ph));
+}
+const talkFree = c => { const d = S.talkLast[c.id]; return !Number.isFinite(d) || S.day - d >= c.c; };
+// an occasion's piece weighs three times (a weekday, the pension, the weather, no power, yesterday, the bread, a slow
+// change, someone away): on a bread day the bread is heard. A rare one weighs .3 (q)
+const talkWeight = c => (c.q || 1)*(c.d || c.dt || c.wx || c.pw === 0 || c.af || 'br' in c || c.ph || c.wo ? 3 : 1);
+const shopHours = () => (S.trail || []).reduce((s, e) => s + (e.k === 'shop' ? e.n || 0 : 0), 0);   // sat there today
+// the rows lines take in the journal of the narrowest phone, 320 px wide (its journal 288 px: the panel's sides are 16
+// px), on any phone: an hour at the shop keeps within ROWS_HOUR rows there, where the pool's `ln` is measured
+let rowProbe = null;
+function rows320(lines){
+  if (!rowProbe){
+    rowProbe = document.createElement('div'); rowProbe.className = 'log'; rowProbe.setAttribute('aria-hidden', 'true');
+    rowProbe.style.cssText = 'position:absolute;left:-10000px;top:0;width:288px;visibility:hidden';
+    rowProbe.innerHTML = '<div class="rows" style="max-height:none"></div>'; document.body.appendChild(rowProbe);
+  }
+  const el = rowProbe.firstChild, lh = parseFloat(getComputedStyle(el).lineHeight) || 19;
+  el.innerHTML = lines.map(s => `<div><span class="tm">11:00</span><span>${s}</span></div>`).join('');
+  return [...el.children].reduce((n, r) => n + Math.max(1, Math.round(r.getBoundingClientRect().height / lh)), 0);
+}
+// the rows the piece of the hour from S.t may take: four, two in the hour from 17:00 (the lamp and «Вечереет» come
+// under it at 18:00), three for the leaving piece («Разошлись по домам.» under it), and what the weather change leaves
+// when the hour ends at 11:00 with one (it is written under the same time)
+function talkRoom(t){
+  const hr = START + t, ws = S.D.weathers;
+  let n = hr >= EMPTY_FROM ? 2 : S.noPower && hr === LEAVE_HOUR ? 3 : 4;
+  if (t + 1 === CHANGE_HOUR && ws && ws[CHANGE_HOUR] !== ws[CHANGE_HOUR - 1]) n = Math.min(n, ROWS_HOUR - rows320(changeAway()));
+  return n;
+}
+// The piece of the hour from S.t (11, «Как игра выбирает»), or none: of those that fit, its people there, its rows
+// and not heard today, the free ones (their pause over) by weight. What an hour must take first: on a day without
+// power, a piece about it while one is free, and in the day's first hour at the shop one even if none is free (the
+// one heard longest ago); in its hour from 16:00 a leaving piece, always; the day after, its first hour «дали свет», if
+// one is free
+function pickTalk(t){
+  const hr = START + t, at = atShop(hr), room = talkRoom(t), first = !shopHours();
+  const fit = TALK.filter(c => c.ln <= room && S.talkLast[c.id] !== S.day && talkFits(c, hr, at)), free = fit.filter(talkFree);
+  const byWeight = list => list.length ? homePick(list, tHour(hr, 1), talkWeight) : null;
+  const oldest = list => list.reduce((a, c) => (S.talkLast[c.id] || 0) < (S.talkLast[a.id] || 0) ? c : a, list[0]) || null;
+  if (S.noPower && hr === LEAVE_HOUR){ const leave = fit.filter(c => c.r === 'leave'); if (leave.length) return byWeight(leave.filter(talkFree)) || oldest(leave); }
+  if (S.noPower){
+    const dark = fit.filter(c => c.pw === 0 && !c.r);
+    if (dark.some(talkFree)) return byWeight(dark.filter(talkFree));
+    if (first && dark.length) return oldest(dark);
+  }
+  if (first && (S.yesterday || {}).noPower && free.some(c => c.af === 'n')) return byWeight(free.filter(c => c.af === 'n'));
+  return byWeight(free.filter(c => !c.r));
+}
+// no piece: a quiet line by who is there and the weather, each once a day (all used: one not in the hour before)
+function shopQuiet(t){
+  const hr = START + t, at = atShop(hr), wx = lifeWeather(t), last = S.log.length ? S.log[S.log.length - 1].text : '';
+  const fit = SHOP_QUIET.filter(L => (!L.p || at.has(L.p)) && (!L.two || at.size > 1) && (!L.wx || L.wx.includes(wx)));
+  const fresh = fit.filter(L => !S.log.some(e => e.text === L.s)), list = fresh.length ? fresh : fit.filter(L => L.s !== last);
+  return homePick(list.length ? list : fit, tHour(hr, 2), () => 1).s;
+}
+// the bench is empty from 17:00 on a day without power (the picture does not show it yet: see frame())
+const benchEmpty = t => !!S.noPower && START + Math.min(t, HOURS) >= EMPTY_FROM;
+// the lines of the hour at the shop from S.t, written under its end: the piece or a quiet line, then the hour's fixed
+// lines; on the empty bench one of its own
+function shopHourLines(t){
+  if (benchEmpty(t)){
+    const ways = EMPTY_BENCH.filter(v => !S.log.some(e => e.text === v[v.length - 1]));
+    return (ways.length ? ways : EMPTY_BENCH)[Math.floor(tHour(START + t, 3)*(ways.length || EMPTY_BENCH.length))];
+  }
+  const c = pickTalk(t), out = c ? [...c.l] : [shopQuiet(t)];
+  if (c) S.talkLast[c.id] = S.day;
+  if (S.noPower && START + t === LEAVE_HOUR) out.push(LEFT);
+  return out;
+}
+
 // ---------- actions ----------
 // time passes wherever the old man is; at 11:00 the weather may step. Away he sees it, and the old man's word on the
 // weather follows (WEATHER_HINT). At home (the hours pass in the izba, a sentence a line, and no advice there: that is
@@ -4490,11 +4907,14 @@ function advance(n, home = false){
   const from = S.t, D = S.D; S.t = Math.min(HOURS, S.t + n);
   if (D.weathers && from < CHANGE_HOUR && S.t >= CHANGE_HOUR && D.weathers[CHANGE_HOUR] !== D.weathers[CHANGE_HOUR-1]){
     const w = D.weathers[CHANGE_HOUR], key = `${D.weathers[CHANGE_HOUR-1]}-${w}`;
-    if (!home){ logAdd(CHANGE_HOUR, CHANGE_TEXT[key]); logAdd(CHANGE_HOUR, WEATHER_HINT[w]); S.seen = w; }
+    if (!home){ changeAway().forEach(s => logAdd(CHANGE_HOUR, s)); S.seen = w; }
     else if (S.curtain){ logHome(CHANGE_HOUR, CHANGE_TEXT[key]); S.seen = w; }
     else logHome(CHANGE_HOUR, HEARD[key]);
   }
 }
+// what the journal writes away from home when the weather steps at 11:00 (the day's weathers do): the change and the
+// old man's word on it
+function changeAway(){ const ws = S.D.weathers, w = ws[CHANGE_HOUR]; return [CHANGE_TEXT[`${ws[CHANGE_HOUR-1]}-${w}`], WEATHER_HINT[w]]; }
 // the weather goes into the journal, in bold, the first time the old man sees it: through the window in the house's
 // words (WEATHER_HOME), outside in the game's (WEATHER_TEXT), and outside after a change at 11:00 he only heard in
 // the change's (CHANGE_TEXT: «Облака разошлись, выглянуло солнце.», not the morning's «Солнце, с утра уже жарко.»)
@@ -4559,10 +4979,20 @@ function go(dest){
   if (busy || WATERS.includes(S.loc) || !canGo(dest)) return;
   advance(TRAVEL[dest]); S.loc = dest; S.dry = null; S.hoursHere = 0;
   S.trail.push({k: dest, t: S.t});   // arrived at hour S.t
-  if (dest === 'shop'){ logAdd(S.t, 'Деревня. Бабки на лавке у магазина.'); rumorLines().forEach(x=>logAdd(S.t, x)); S.phase='shop'; }
+  if (dest === 'shop'){
+    // the rumour is drawn on every arrival, said or not, so that the days stay as they were; at 17:00 on a day
+    // without power nobody is there to say it (S.trail's `empty`); `n`, the hours sat there, stay() counts
+    const rumor = rumorLines();
+    if (benchEmpty(S.t)){ SHOP_EMPTY.forEach(x => logAdd(S.t, x)); S.trail[S.trail.length - 1].empty = true; }
+    else { logAdd(S.t, SHOP_ARRIVE); rumor.forEach(x => logAdd(S.t, x)); }
+    S.phase = 'shop';
+  }
   else { logAdd(S.t, `${NAME[dest]}. Закинул удочку.`); S.phase='water'; lookAround(); }
   save(); render();
 }
+// the bench's talk on arrival: on a day without power the power first, then baba Nyura's rumour and baba Valya's reply.
+// On a day Valya is away (atShop()) the arrival says so, Nyura speaks of the power and the rumour has no reply; the
+// reply is drawn all the same (choice() from rnd()), so the days stay as they were
 function rumorLines(){
   const {w, lv} = S.D.rumor[Math.min(S.t, HOURS-1)];
   const a = lv===2 && w ? `Баба Нюра: «Колька только что ${WHERE[w]} во какую рыбину взял!»`
@@ -4570,8 +5000,20 @@ function rumorLines(){
           : S.t < CHANGE_HOUR ? 'Баба Нюра: «Говорят, нигде не клюёт. Петрович с утра сидит зазря».'
                               : 'Баба Нюра: «Говорят, нигде не клюёт, Петрович весь день просидел зазря».';
   const b = choice(['Баба Валя: «Да брешут».','Баба Валя: «Ну-ну».','Баба Валя: «Сходите да проверьте».','Баба Валя молча кивает.']);
-  // on a day without power the bench talks of that first; the rumour and its reply are as on any other day
-  return S.noPower ? ['Баба Валя: «Опять свет отключили».', a, b] : [a, b];
+  const valya = atShop(START + Math.min(S.t, HOURS - 1)).has('va');
+  const power = S.noPower ? [`${valya ? 'Баба Валя' : 'Баба Нюра'}: «Опять свет отключили».`] : [];
+  return valya ? [...power, a, b] : [NO_VALYA, ...power, a];
+}
+// an hour at the shop (11): its piece of talk or a quiet line under the hour's end, the hours sat there in S.trail,
+// then the hour passes at once; at 18:00 the shop's lamp, lit or not, and the way home
+function stay(){
+  if (busy || S.phase !== 'shop' || S.t >= HOURS) return;
+  const t = S.t, e = S.trail[S.trail.length - 1];
+  shopHourLines(t).forEach(x => logAdd(t + 1, x));
+  if (e && e.k === 'shop') e.n = (e.n || 0) + 1;
+  advance(1);
+  if (S.t >= HOURS){ logAdd(S.t, S.noPower ? LAMP_OFF : LAMP_ON); logAdd(S.t, 'Вечереет, пора домой.'); }
+  save(); render();
 }
 // the neighbour caught something today (his bites stay 0 after he leaves)
 function nbCaught(){ return S.D.nb.bites.some(n => n > 0); }
@@ -4721,7 +5163,7 @@ function dayParts(){
       if (!p || p.k !== 'home') parts.push(p = {k: 'home', craft: 0, idle: 0});
       p[e.k] += e.n || 1; p.to = e.t + (e.n || 1);
     }
-    else if (e.k === 'shop') parts.push({k: 'shop', t: e.t, rumor: D.rumor[Math.min(e.t, HOURS - 1)]});
+    else if (e.k === 'shop') parts.push({k: 'shop', t: e.t, n: e.n || 0, empty: !!e.empty, rumor: D.rumor[Math.min(e.t, HOURS - 1)]});
     else if (WATERS.includes(e.k)){
       const w = e.k, until = trail[i + 1] ? trail[i + 1].t : HOURS, hrs = S.presence[w].filter(h => h >= e.t && h < until);
       const v = {k: 'water', w, from: e.t, to: e.t + hrs.length, hrs, fish: 0, lost: 0, scare: false, boil: false, nb: false, nbLeft: false};
@@ -4750,8 +5192,9 @@ function dayProse(parts){
       return p.craft ? 'Потом дома, снасти.' : 'Потом дома.';
     }
     if (p.k === 'shop'){   // after anything already told: «Потом»; the village again: «опять», and its word only if new
+      // (none from an empty bench)
       const r = p.rumor, then = said.some(Boolean), before = parts.slice(0, i).filter(q => q.k === 'shop');
-      const heard = before.some(q => q.rumor.w === r.w && q.rumor.lv === r.lv);
+      const heard = p.empty || before.some(q => !q.empty && q.rumor.w === r.w && q.rumor.lv === r.lv);
       return `${then ? 'Потом' : p.t <= CHANGE_HOUR ? 'Утром' : 'Днём'}${before.length ? ' опять' : ''} в деревню.` + (heard ? ''
         : r.w && r.lv ? ` Говорят, ${WHERE[r.w]} ${r.lv === 2 ? 'берёт' : 'клюёт помаленьку'}.` : ' Говорят, нигде не клюёт.');
     }
@@ -4771,7 +5214,7 @@ const EVENTS = [
   parts => {   // the village's word, checked on the water the old man went to straight from it
     for (let i = 0; i + 1 < parts.length; i++){
       const p = parts[i], v = parts[i + 1], r = p.rumor;
-      if (p.k !== 'shop' || v.k !== 'water' || v.to === v.from) continue;
+      if (p.k !== 'shop' || p.empty || v.k !== 'water' || v.to === v.from) continue;
       if (r.w && r.lv && r.w === v.w) return [i + 1, v.fish ? 'Бабки не соврали.' : 'Бабки наврали.'];
       if (!(r.w && r.lv) && v.fish !== 1) return [i + 1, v.fish ? 'Бабки наврали.' : 'Бабки не соврали.'];
     }
@@ -4833,7 +5276,7 @@ function closePage(){
   S.book.push(eveningPage(parts));
   const sat = WATERS.reduce((s, w) => s + S.presence[w].length, 0);
   const quiet = WATERS.reduce((s, w) => s + S.presence[w].filter(h => !D.catchT[w][h] && !D.lost[w][h] && !D.scare[w][h]).length, 0);
-  const home = Math.max(0, HOURS - sat - trail.reduce((s, e) => s + (TRAVEL[e.k] || 0), 0));
+  const home = Math.max(0, HOURS - sat - trail.reduce((s, e) => s + (TRAVEL[e.k] || 0) + (e.k === 'shop' ? e.n || 0 : 0), 0));
   // the hours at the tackle as the day went (S.trail), and the pay they got: a day saved before the tackle paid 5 an
   // hour was paid 10, and so would tackle all day have been
   const craft = trail.reduce((s, e) => s + (e.k === 'craft' ? e.n || 1 : 0), 0), wage = craft && S.earnWork ? Math.round(S.earnWork/craft) : WAGE;
@@ -4895,13 +5338,13 @@ function closeBook(){ bookOpen = false; render(); }
 // (IDLE_LINES), before the house had its lines (HOME_LINES), which keep them
 const IDLE_LINES = ['Посидел у окна.', 'Попил чаю, посмотрел в окно.', 'Посидел в полумраке, послушал ходики.', 'Посидел просто так.', KETTLE];
 function trailFromLog(){
-  const trail = [], at = e => parseInt(e.t, 10) - START, arrived = {'Деревня. Бабки на лавке у магазина.': 'shop'};
+  const trail = [], at = e => parseInt(e.t, 10) - START, arrived = {[SHOP_ARRIVE]: 'shop', [SHOP_EMPTY[0]]: 'shop'};
   WATERS.forEach(w => { arrived[`${NAME[w]}. Закинул удочку.`] = w; });
   let paid = 0;   // what the hour lines at the tackle say they earned
   for (const e of S.log){
     if (!e || typeof e.text !== 'string' || !Number.isFinite(at(e))) continue;
     const m = /^Мастерил снасти, \+(\d+)[ \u00a0](?:₽|руб)\.$/.exec(e.text);
-    if (arrived[e.text]) trail.push({k: arrived[e.text], t: at(e)});
+    if (arrived[e.text]) trail.push(e.text === SHOP_EMPTY[0] ? {k: 'shop', t: at(e), empty: true} : {k: arrived[e.text], t: at(e)});
     else if (m){ trail.push({k: 'craft', t: at(e) - 1}); paid += +m[1]; }
     else if (IDLE_LINES.includes(e.text)) trail.push({k: 'idle', t: at(e) - 1});
   }
@@ -4916,7 +5359,10 @@ addEventListener('resize', () => { fitEvening(); fitLiving(); aimAll(); fitLog()
 if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => { fitEvening(); fitLiving(); aimAll(); fitLog(); });
 let askRestart = false;   // the evening's 'start again' waits for a second tap
 function nextDay(){
-  askRestart = false; S.day++; startDay(); save(); render();
+  askRestart = false;
+  // what the shop's talk knows of yesterday: a day without power («дали свет»), a downpour (the mud, no bread)
+  S.yesterday = {noPower: !!S.noPower, downpour: !!S.D && (S.D.weathers || [S.D.weather]).includes(5)};
+  S.day++; startDay(); save(); render();
 }
 // a new game: the save is wiped, the title screen and the backstory come again
 function restart(){
