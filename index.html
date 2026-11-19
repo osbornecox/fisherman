@@ -113,6 +113,8 @@
                -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text; }
   .log .rows.more { -webkit-mask-image: linear-gradient(rgba(0,0,0,.2), #000 1.4em); mask-image: linear-gradient(rgba(0,0,0,.2), #000 1.4em); }
   .log .rows > div { display:flex; gap:8px; }
+  .log .rows > div.in { animation: logIn .5s ease-out; }   /* a line of the waking message as it comes in (wakeUp()) */
+  @keyframes logIn { from { opacity: 0; } }
   .log .tm { flex: 0 0 2.9em; color: var(--sub); }
   .note { font-size:14px; color:var(--sub); line-height:1.35; }
   .splash { position:fixed; inset:0; z-index:10; background:#55663f; display:flex; justify-content:center; }
@@ -2805,14 +2807,14 @@ const GOODS = {
   milk:     {acc:'молоко', of:'молока', price:20, days:1},
   bread:    {acc:'хлеб', of:'хлеба', price:30, days:5, nom:'хлеб', low:'Хлеб почти весь.', out:'Хлеба нет.'},
   sugar:    {acc:'сахар', of:'сахару', price:30, days:5, nom:'сахар', low:'Сахару на пару дней.', out:'Сахар кончается.'},
-  flour:    {acc:'муку', of:'муки', price:20, days:8, nom:'мука', out:'Мука кончается.'},
-  pasta:    {acc:'макароны', of:'макарон', price:15, days:5, nom:'макароны', out:'Макарон почти нет.'},
-  groats:   {acc:'крупу', of:'крупы', price:15, days:5, nom:'крупа', out:'Крупы осталось немного.'},
-  tea:      {acc:'чай', of:'чаю', price:30, days:8, nom:'чай', out:'Чай на донышке.'},
-  oil:      {acc:'масло', of:'масла', price:30, days:10, nom:'масло', out:'Масло кончается.'},
+  flour:    {acc:'муку', of:'муки', price:20, days:8, nom:'мука', low:'Муки на пару дней.', out:'Мука кончается.'},
+  pasta:    {acc:'макароны', of:'макарон', price:15, days:5, nom:'макароны', low:'Макарон на пару дней.', out:'Макарон почти нет.'},
+  groats:   {acc:'крупу', of:'крупы', price:15, days:5, nom:'крупа', low:'Крупы на пару дней.', out:'Крупы осталось немного.'},
+  tea:      {acc:'чай', of:'чаю', price:30, days:8, nom:'чай', low:'Чаю на пару дней.', out:'Чай на донышке.'},
+  oil:      {acc:'масло', of:'масла', price:30, days:10, nom:'масло', low:'Масла на пару дней.', out:'Масло кончается.'},
   kerosene: {acc:'керосин', of:'керосину', price:15, days:8, nom:'керосин', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит.'},
   soap:     {acc:'мыло', of:'мыла', price:10, days:8},
-  salt:     {acc:'соль', of:'соли', price:5, days:15, nom:'соль', out:'Соль на донышке.'},
+  salt:     {acc:'соль', of:'соли', price:5, days:15, nom:'соль', low:'Соли на пару дней.', out:'Соль на донышке.'},
   matches:  {acc:'спички', of:'спичек', price:5, days:10, nom:'спички', low:'Спичек осталось немного.', out:'Спички кончаются.'},
   line:     {acc:'леску', of:'лески', price:25, days:12},
   hooks:    {acc:'крючки', of:'крючков', price:10, days:5},
@@ -3312,10 +3314,12 @@ function genDay(fix = null){
   return { weather, weathers, level, catchT, ripple, boil, bubbles, lost, scare, midge, nb, rumor };
 }
 // A new game opens overcast: the screens before the first day and the whole first day, with no step at 11:00 (the
-// author, 19 November 2026); from the second day the weather is drawn as ever. The first day still takes from rnd()
-// exactly the numbers it always took, so the days after it stay as they were: genDay() is drawn as ever and only
-// leaves the generator where it always left it, and the day itself is drawn from the same numbers with the weather
-// fixed (genDay(INTRO_WEATHER)), the generator put back after it.
+// author, 19 November 2026); from the second day the weather is drawn as ever. startDay() still takes from rnd()
+// exactly the numbers it always took: genDay() is drawn as ever and only leaves the generator where it always left it,
+// and the day itself is drawn from the same numbers with the weather fixed (genDay(INTRO_WEATHER)), the generator put
+// back after it. So the days after it stay as they were for a first day at home, in the yard or at the shop; an hour
+// at a water draws by what that hour shows (lookAround(): a word for the ripple), and an overcast first day shows
+// other hours, so after a first day at a water the same game goes on to other days.
 const INTRO_WEATHER = 0;   // overcast
 function startDay(){
   if (S.day === 1){ const from = seed; genDay(); const after = seed; seed = from; S.D = genDay(INTRO_WEATHER); seed = after; }
@@ -3518,10 +3522,12 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   if (!S.stock || typeof S.stock !== 'object' || !S.house || typeof S.house !== 'object') newHouse(S.phase === 'evening' ? S.day + 1 : S.day);
   if (!Array.isArray(S.purchases)) S.purchases = [];
   // saved before the morning's thought kept its goods for the evening's list: a thought of two goods has them in its
-  // line at 6:00 («Кончаются хлеб и крупа.»), and the evening names them first in that order, as the morning did
+  // line at 6:00 («Кончаются хлеб и крупа.»; before 19 November 2026 with the sum after them, «Кончаются хлеб и
+  // крупа — надо купить на 45.», then «… на 45 руб.»), and the evening names them first in that order, as the morning did
   const said = S.house.said;
   if (said && said.kind === 'need' && !Array.isArray(said.goods)){
-    const two = (S.log || []).map(e => e && e.t === clock(0) && /^Кончаются (.+) и (.+)\.$/.exec(e.text)).find(Boolean);
+    const two = (S.log || []).map(e => e && e.t === clock(0)
+      && /^Кончаются (.+?) и (.+?)(?: — надо купить на \d+(?:\u00a0руб)?)?\.$/.exec(e.text)).find(Boolean);
     const id = nom => GOOD_IDS.find(g => GOODS[g].nom === nom);
     said.goods = two && id(two[1]) && id(two[2]) ? [id(two[1]), id(two[2])] : [said.id];
   }
@@ -3785,6 +3791,7 @@ function render(){
   const P = $('panel'), hadFocus = !!document.activeElement && P.contains(document.activeElement);
   tapLock = performance.now() + TAP_LOCK;
   if (toast.fresh) toast.fresh = false; else hideToast();   // a toast is shown on the screen drawn right after it only
+  if (wake && (S.log !== wake.log || S.log.length !== wake.len || S.phase !== 'izba')) wakeEnd();   // a tap moved on: all of it
   hud(); P.innerHTML='';
   $('wrap').classList.toggle('fit', FIT.has(S.phase));
   $('wrap').classList.toggle('intro', S.phase === 'intro');
@@ -3806,7 +3813,7 @@ function render(){
   else if (S.phase==='living'){   // after the backstory: the yard, how the days go here; then the first day
     setScene('home');
     add(storyHTML(LIVING));
-    actions.appendChild(btn('Начать день', '', ()=>{ startDay(); save(); render(); }, 'primary'));
+    actions.appendChild(btn('Начать день', '', ()=>{ startDay(); save(); wakeUp(); render(); }, 'primary'));
   }
 
   else if (S.phase==='izba'){   // at home inside: the curtain, the door, tackle to make, or just sitting
@@ -3875,11 +3882,13 @@ function logAdd(t, text){ S.log.push({t: clock(t), text}); }
 // In the house, the izba and the yard, every sentence of an entry is a line of its own («Занавеска задёрнута.» /
 // «В избе темнее, чем обычно.»; the author, 19 November 2026): the morning there reads a thing at a time. At the
 // water and in the village an entry stays whole: its two sentences belong together, and on a short phone a line
-// more would push the hour's signs under the journal's top edge.
-const sentences = s => s.split(/(?<=[.!?…])\s+(?=[А-ЯЁA-Z«<])/);
+// more would push the hour's signs under the journal's top edge. No lookbehind here: Safari before 16.4 (iOS 15
+// phones) cannot parse one, and a single such regex stops the whole script there.
+const sentences = s => s.replace(/([.!?…])\s+(?=[А-ЯЁA-Z«<])/g, '$1\u0000').split('\u0000');
 function logHome(t, text){ sentences(text).forEach(s => logAdd(t, s)); }
-// the journal's lines: the time is written only on the first line of each hour
-const logRows = () => S.log.map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('');
+// the journal's lines: the time is written only on the first line of each hour; while the waking message comes in, the
+// lines come so far (wake)
+const logRows = () => (wake ? S.log.slice(0, wake.n) : S.log).map((e,i)=>`<div><span class="tm">${i && S.log[i-1].t === e.t ? '' : e.t}</span><span>${e.text}</span></div>`).join('');
 function journal(){ return `<div class="log"><div class="rows" id="log">${logRows()}</div></div>`; }   // fitLog() sizes it
 // The journal shows whole lines. Its frame takes the room from where its lines start down to the buttons, less the
 // frame's bottom and the panel's gap, and never less than LOG_MIN lines, even where a short screen has less room; it
@@ -3917,6 +3926,43 @@ function fitLog(){
   const more = () => el.classList.toggle('more', el.scrollTop > .5);   // older lines above: the top edge fades
   more(); el.onscroll = more;
 }
+// The waking message comes in a line at a time, as he takes in the room (the author's «Тикают ходики. В доме
+// полумрак. На столе чашка недопитого чаю. С улицы слышна сорока.»). At 6:00 most phones keep three to five of its
+// seven to twelve rows in sight, the newest, the household's: shown at once, the curtain, the room's light, the thing
+// the room reveals that morning and the morning's sound would wait above the journal's top edge. So on the screen a
+// day opens with, after «Начать день» or «Лечь спать», the journal first holds «Занавеска задёрнута.», and each next
+// line comes once the one before has had time to be read (WAKE_GAP, and WAKE_LETTER a letter of it), fading in on the
+// frame's bottom as the lines of an hour stand there (fitLog()). It is the screen's alone: S.log holds the whole
+// message from the start, so the save, a reload and a screen reader (announce()) have all of it; a tap that writes a
+// line or changes the screen, or a touch or a wheel on the journal, shows the rest at once, and while the handbook is
+// open the next line waits. With reduced motion the message is all there at once, as before.
+const WAKE_GAP = 500, WAKE_LETTER = 40;   // ms before the next line: a pause, and the line just come a letter at a time
+let wake = null;   // while the message comes in: {log, len, n, stop}, the journal showing the first n of S.log's len lines
+function wakeUp(){   // a new day's first screen, from a tap: after startDay(), before render()
+  wakeEnd();
+  if (!FADE || S.phase !== 'izba' || !S.log || S.log.length < 2) return;
+  wake = {log: S.log, len: S.log.length, n: 1, stop: null};
+  wakeNext(wake);
+}
+function wakeNext(w){
+  const step = () => {
+    if (wake !== w) return;
+    if (hb.open){ w.stop = shownTimeout(step, 300); return; }   // the handbook over the game: the line waits for it
+    w.n++; wakeShow(true);
+    if (w.n >= w.len) wake = null; else wakeNext(w);
+  };
+  w.stop = shownTimeout(step, WAKE_GAP + WAKE_LETTER*S.log[w.n - 1].text.replace(/<[^>]*>/g, '').length);
+}
+function wakeShow(fresh){   // the journal's lines as they stand; `fresh`: the newest fades in
+  const el = $('log'); if (!el) return;
+  el.innerHTML = logRows();
+  if (fresh && el.lastElementChild) el.lastElementChild.classList.add('in');
+  fitLog();
+}
+function wakeEnd(){ const w = wake; wake = null; if (w && w.stop) w.stop(); }
+function wakeAll(){ if (wake){ wakeEnd(); wakeShow(false); } }
+['pointerdown', 'wheel'].forEach(k => $('panel').addEventListener(k, e => {
+  if (wake && e.target.closest && e.target.closest('.log')) wakeAll(); }, {passive: true}));
 // The journal is drawn anew on every screen, so a screen reader hears its new lines from a lasting region (#say);
 // a line the toast has just said is not said twice
 let saidLog = null, saidN = 0;
@@ -4454,6 +4500,12 @@ const HOME_BY = Object.fromEntries(HOME_LINES.map(L => [L.id, L]));
 const HOME_ID = Object.fromEntries(Object.entries(HOME_TEXT).map(([id, s]) => [s, id]));
 const HOME_TEA = HOME_LINES.filter(L => L.g === 'tea').map(L => L.id), HOME_FOOD = HOME_LINES.filter(L => L.g === 'food').map(L => L.id);
 const HOME_MEAL = HOME_LINES.filter(L => L.meal).map(L => L.id);
+// an hour's line that says again what the waking message said in other words («По крыше шуршит дождь.» at 6:00,
+// «Дождь шуршит по крыше.» at 7:00): once the morning has said it, the line does not come that day, and the rain or
+// the wind goes on in its chain («А дождь всё шуршит по крыше.»)
+const HOME_ECHO = {'rain-roof': ['am-rain', 'am-rain-night'], 'down-roof': ['am-down'], 'wind-chimney': ['am-chimney'],
+  'veil-grey': ['am-grey'], 'down-dark': ['am-night'], 'fog-ears': ['am-fog'], 'birds-few': ['am-fog', 'am-hush'],
+  'bird-song': ['am-bird']};
 const HOME_LATER = {};   // the chains that go on from each line: once one is written, the line it goes on from is not
 HOME_LINES.forEach(L => (L.after || []).forEach(id => { (HOME_LATER[id] = HOME_LATER[id] || []).push(L.id); }));
 const ROOM_AT = {};   // the morning (from S.homeFrom, the first 0) that opens each thing
@@ -4494,7 +4546,8 @@ function homeHourLines(t){
   const before = S.log.filter(e => e.t === clock(t)).map(e => HOME_ID[e.text]);   // the hour before's lines
   let last = null;   // the house's line written last, which a quiet line does not repeat
   for (let i = texts.length - 1; i >= 0 && !last; i--) last = HOME_BY[HOME_ID[texts[i]]] || null;
-  const open = L => homeFits(L, c) && (L.k === 'quiet' ? L !== last : !homeSaid(L.id)) && !homeSaidAny(HOME_LATER[L.id] || [])
+  const open = L => homeFits(L, c) && (L.k === 'quiet' ? L !== last : !homeSaidAny([L.id, ...(HOME_ECHO[L.id] || [])]))
+    && !homeSaidAny(HOME_LATER[L.id] || [])
     && !(L.g === 'tea' && (homeCount(HOME_TEA) >= HOME_MAX || before.some(id => HOME_TEA.includes(id))))
     && !(L.g === 'food' && homeCount(HOME_FOOD) >= HOME_MAX) && !(L.meal && homeCount(HOME_MEAL))
     && !(homeFreq(L, c) === 'rare' && Number.isFinite(S.homeLast[L.id]) && S.day - S.homeLast[L.id] <= HOME_GAP);
@@ -4870,6 +4923,9 @@ const pensionDay = () => { const t = dayDate(S.day); return t.getUTCDate() === 4
 // the neighbour as the journal saw him at a water today: then he does not come to the shop that day
 const NB_SEEN = /^(?:Пришёл Михалыч|Михалыч тоже пришёл|Михалыч уже здесь|У Михалыча|Михалыч уходит|Михалыч сматывает)/;
 const valyaHere = () => S.day === 1 || comes('va', SHOP_P.va);   // never away on a new game's first day
+// the rumour that nobody catches anything has Petrovich at the water (rumorLines()): once the journal has it today, he
+// does not come to the shop that day, as the neighbour seen at a water does not
+const PE_AWAY = /Петрович (?:с утра сидит|весь день просидел) зазря/;
 // who is at the shop in the hour from hr:00 today, by their habits (11, «Кто у магазина»); Sobol is always there
 function atShop(hr){
   const at = new Set(), dow = weekday(), wx = lifeWeather(hr - START), put = (id, yes) => { if (yes) at.add(id); };
@@ -4878,7 +4934,7 @@ function atShop(hr){
   put('va', valyaHere());
   put('lu', dow !== 0 && (hr >= 9 && hr <= 12 || hr >= 14));   // opens at nine, «Обед» at one, closes at six; Sunday shut
   put('ta', hr === 7 && comes('ta', SHOP_P.ta) || hr === 17 && th(who('ta'), 2) < SHOP_P.taEve);
-  put('pe', comes('pe', SHOP_P.pe) && hr >= 13 + comesAt('pe', 3));
+  put('pe', !S.log.some(e => PE_AWAY.test(e.text)) && comes('pe', SHOP_P.pe) && hr >= 13 + comesAt('pe', 3));
   put('mi', !S.log.some(e => NB_SEEN.test(e.text))
     && (breadDay() ? comes('mi', SHOP_P.miBread) && hr === 10 + comesAt('mi', 3) : comes('mi', SHOP_P.mi) && hr === 11 + comesAt('mi', 5)));
   put('ai', !inPhase('perm') && (dow === 6 ? hr >= 10 && hr <= 13 : comes('ai', SHOP_P.ai) && hr === 10 + comesAt('ai', 4)));
@@ -5226,11 +5282,12 @@ function dayParts(){
 // Where he went, a line for every part of the day in its order: a water with the hours sat and the fish («На омуте пять
 // часов, поймал пять рыб.», «На озере десять часов, ничего не поймал.»; there and back at once: «Дошёл до озера и
 // повернул назад.»; the same water again, a line again), the village with the hours at the shop, without the road
-// («В деревне два часа.»; none: «Сходил в деревню.»). Home only when the whole day was there («Весь день дома.»): the
+// («Просидел у магазина два часа.», not «В деревне два часа.», which reads as the time of day; none: «Сходил в
+// деревню.»). Home only when the whole day was there («Весь день дома.»): the
 // hours at the tackle are the tackle's line, the idle hours are not written
 function whereLines(parts){
   if (!parts.some(p => p.k !== 'home')) return ['Весь день дома.'];
-  return parts.filter(p => p.k !== 'home').map(p => p.k === 'shop' ? (p.n ? `В деревне ${hoursWords(p.n)}.` : 'Сходил в деревню.')
+  return parts.filter(p => p.k !== 'home').map(p => p.k === 'shop' ? (p.n ? `Просидел у магазина ${hoursWords(p.n)}.` : 'Сходил в деревню.')
     : p.to > p.from ? `${cap(WHERE[p.w])} ${hoursWords(p.to - p.from)}, ${caught(p.fish)}.` : `Дошёл до ${WATER_GEN[p.w]} и повернул назад.`);
 }
 // «Если бы» (the author, 19 November 2026): what another choice would have given, in руб., from the day's hour grid
@@ -5433,7 +5490,7 @@ const HB_TEXT = [
     {h: 'Сорвалась', p: ['Клюнуло, но рыба сорвалась — досадно, но знак хороший: рыба здесь и берёт. Такой час пустым не считайте.']},
     {h: 'Поймали', p: ['Поймали — значит, клюёт. Пока стоит погода, клёв сам собой не кончается: сидите.']},
     {h: 'Большая тень', p: ['У берега мелькнула большая тень, мелочь брызнула врассыпную — прошла крупная рыба и распугала мелкую. Этот час пропал, но о месте он ничего не говорит: не считайте его ни пустым, ни добрым.']},
-    {h: 'Тихие часы', p: ['Тихий час — ни поклёвки, ни схода — ещё ничего не значит: и на хорошем месте рыба берёт не каждый час. Самая дорогая ошибка — сматывать удочки после первого же тихого часа. Два тихих часа подряд — уже повод задуматься, три — клёва здесь, скорее всего, нет. Уходить тогда лучше не к снастям, а на другую воду, если до вечера хватит времени.']},
+    {h: 'Тихие часы', p: ['Тихий час — ни поклёвки, ни схода — ещё ничего не значит: и на хорошем месте рыба берёт не каждый час. Самая дорогая ошибка — сматывать удочки после первого же тихого часа. Но когда тихо час за часом, клёва здесь, скорее всего, нет. Уходить тогда лучше не к снастям, а на другую воду, если до вечера хватит времени.']},
     {h: 'Сосед на воде', p: ['Если рядом сидит другой рыболов, поглядывайте и на его поплавок: клюёт у соседа — клюёт и здесь. Ушёл он с полным ведром — место доброе. Ушёл, так ничего и не поймав, — плохой знак и для вас. А если у него клевало и он ушёл, когда перестало, — не спешите за ним: рыба здесь была, а терпение у всех разное.']}]},
   {id: 'talk', n: 5, h: 'Что говорят в деревне', p: [
     'Где клюёт, в деревне знают всегда — или думают, что знают. Расспросить полезно, но верить следует с оглядкой: слух чаще правдив, чем нет, и всё же проверять его придётся самому.',
@@ -5555,7 +5612,7 @@ function nextDay(){
   askRestart = false;
   // what the shop's talk knows of yesterday: a day without power («дали свет»), a downpour (the mud, no bread)
   S.yesterday = {noPower: !!S.noPower, downpour: !!S.D && (S.D.weathers || [S.D.weather]).includes(5)};
-  S.day++; startDay(); save(); render();
+  S.day++; startDay(); save(); wakeUp(); render();
 }
 // a new game: the save is wiped, the title screen and the backstory come again
 function restart(){
