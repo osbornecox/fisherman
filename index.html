@@ -335,9 +335,11 @@
 //     It draws nothing and changes nothing: the sound (art/anim/sound.js) reads it, so no sound comes without its picture.
 //   LiveScenes.gusts(t0, t1) -> the 'gust' cues of that time: a gust is the same in every windy scene (the izba's sound
 //     takes them, having no scene).
-//   LiveScenes.preload(place, src) -> a promise of true once the picture is analysed (false if it cannot be): a scene
-//     of a preloaded place draws its first frame inside create() or set(). Once a water's picture is analysed, the
-//     engine finds where its signs may show bit by bit in idle time, so a scene with signs need not.
+//   LiveScenes.preload(place, src, {people}) -> a promise of true once the picture is analysed (false if it cannot
+//     be): a scene of a preloaded place draws its first frame inside create() or set(). people: false preloads the
+//     picture a scene with people: false draws (the shop's, its bench empty), which is analysed apart from the other.
+//     Once a water's picture is analysed, the engine finds where its signs may show bit by bit in idle time, so a
+//     scene with signs need not.
 //   LiveScenes.names(place, weather) -> the Russian names of what really moves there (the demo's caption), by the
 //     picture of the place analysed last; null until a picture of the place has been analysed. A scene draws its
 //     first frame of a place in the task that analyses the picture, so a page that asks again at every display frame
@@ -409,9 +411,12 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0, splash: .8,
 // bench, the shop's: where the two babushki sit and what scene_shop drew behind them, for people: false.
 // The game shows a scene whole across, standing on its bottom edge: a shorter phone loses the top rows (the 375x548
 // screen shows rows 76 and below, 320x568 rows 57, 375x667 rows 38, 390x664 rows 44), and the hud's two chips lie
-// over its top corners, about 18 rows deep, from the left edge to x 50 and from x 97 to the right edge (x 59 and 92
-// at 320 px). So what a life starts at, and what it is drawn still at with reduced motion, keeps in the columns
-// between the chips where it can; the sky that those phones do not show at all cannot hold it there. A flock flies
+// over its top corners, about 18 rows deep (20 at 320 px), outline and all: the left one from the left edge to x 47
+// on days 1..9 and to x 51 on days 10..99 (x 50 and 54 at 320 px), the right one from x 96 with a sum of up to three
+// digits or x 93 with four (x 94 and 91 at 320 px) to the right edge. So what a life starts at, and what it is drawn
+// still at with reduced motion, keeps in the columns between the chips where it can (on the 375x548 screen the chips
+// cover rows 80..96, on 320x568 rows 62..81: left of x 51 no row of the far bank shows on both, so the river's beasts
+// keep right of it); the sky that those phones do not show at all cannot hold it there. A flock flies
 // high all the same: 6 sky rows or more over the land under it, wherever it is, so that it never seems to come down
 // onto a hill, though those phones then show little or nothing of it; only the river's pair of ducks flies low, over
 // the water, and every phone shows it.
@@ -458,11 +463,15 @@ const ANCHORS = {
     low: [95, 100],                     // a pair of ducks low over the far half of the water, mostly over the hill's
                                         // reflection; the lower one's wings (two rows under the lead's row) stay above the
                                         // quiet box (rows 104..120), and every phone shows these rows
-    bank: {y: 89, x: [12, 18, 24, 30]}, // the cow's feet on rect(0, 88, W, 2, grass) at the foot of the meadow (x 0..69),
-                                        // its muzzle on the water (from row 90) when it drinks; its left edges, west of the
-                                        // birch(47, 80) and of izba(54, 83), under izba(32, 75)
-    meadow: {y: 80, x: [8, 12, 16]},    // the roe deer's feet on the meadow between izba(6, 66) and izba(32, 75), under
-                                        // spruce(26, 70, 7); rows 76..80, which the 375x548 screen still shows
+    bank: {y: 89, x: [52, 62]},         // the cow's feet on rect(0, 88, W, 2, grass) at the foot of the meadow (x 0..69),
+                                        // its muzzle on the water (from row 90) when it drinks; it is 7 wide on rows
+                                        // 85..89, so its left edges stand it under izba(54, 83): under its west wall, east
+                                        // of the trunk of birch(47, 80), or under its east wall (x 62..68), short of the
+                                        // hill's spruces from x 70; its back a row under the window's frame (x 57..61,
+                                        // down to row 84). Between the chips on 375x548, under them on 320x568
+    meadow: {y: 87, x: [51, 63]},       // the roe deer's feet at the foot of the meadow (rows 83..87, 5 wide), either side
+                                        // of izba(54, 83)'s window frame with a pixel to spare whichever way it faces, the
+                                        // hill's spruces from x 70: between the chips on 375x548, under them on 320x568
     leaves: [91, 101],                  // the rows yellow leaves drift on: the far half of water(d, rng, 90, 140), above
                                         // the rod's tip (row 106) and the quiet box
   },
@@ -2523,7 +2532,9 @@ const EFFECTS = [
 // A scene holds its picture and its still layer, so nothing is looked up per tick. Each cache keeps what the live
 // scenes hold and a few more for switching back, the most recent last. It is trimmed once the scenes made or switched
 // in one go have taken what they need, so a page that makes its scenes again finds every layer still there.
-const PICTURE_SPARE = 5, LAYER_SPARE = 8;
+// Pictures are kept 8 spare: a page like the game, which preloads its five places and the shop's empty bench and has
+// shown the title screen and the backstory, then finds every one of them still analysed (one is well under 1 MB).
+const PICTURE_SPARE = 8, LAYER_SPARE = 8;
 const pictures = new Map();   // `${place} ${src}` -> {P, failed, wait}: P once analysed, failed (why) if it was not
 const latest = {};            // place -> the P analysed last, for names()
 function decode(src, H) {   // the RGBA pixels of a W x H picture
@@ -2990,11 +3001,12 @@ function names(place, weather) {   // what really moves in a place and weather, 
   F.P = P; F.S = sitesFor(P, weather); F.w = weather; F.windy = WINDY.has(weather); F.L = {glints: weather === 'sun' ? {n: glints} : null};
   return [...new Set(EFFECTS.flatMap(e => e.names()))];
 }
-function preload(place, src) {   // analyse a place's picture ahead, so its scenes draw at once
+function preload(place, src, opts) {   // analyse a place's picture ahead, so its scenes draw at once; with
+  // {people: false}, the picture as a scene with people: false draws it (the shop's bench empty)
   if (!PLACES.includes(place) || typeof src !== 'string' || !src) {
     warn(`preload() of an unknown place or without a src: "${brief(place)}"`); return Promise.resolve(false);
   }
-  const e = pictureFor(place, src);
+  const e = pictureFor(place, src, !(opts && opts.people === false));
   trimSoon();
   return e.wait.then(() => !!e.P);
 }
@@ -3012,7 +3024,7 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
   EVENTS: Object.freeze({strike: Object.freeze({frames: STRIKE.map(k => Math.round(k * 1000 / FPS)), ms: Math.round(EVENT_TICKS.strike * 1000 / FPS)}),
                          scare: Object.freeze({ms: Math.round(EVENT_TICKS.scare * 1000 / FPS)})}),
   SIZE: Object.freeze(Object.fromEntries(Object.entries(SIZE).map(([p, wh]) => [p, Object.freeze(wh)]))),
-  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '8'});
+  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '9'});
 })();
 // ---------- end of scenes.js ----------
 </script>
@@ -3140,6 +3152,7 @@ const BREAK_FROM = 10, BREAK_GAP = 8, BREAK_P = .2, BREAK_ROOM = 40;   // a brea
 // izba is lit below with the engine's light of the hour, the way should_I_lab/art/tools/daytime.py's izba_light does.
 const LIVE = new Set(['river', 'lake', 'omut', 'shop', 'home']);   // the outdoor places
 LIVE.forEach(p => LiveScenes.preload(p, IMG[p]));   // analysed now, so a place's scene is drawn the moment it is shown
+LiveScenes.preload('shop', IMG.shop, {people: false});   // and the shop with its bench empty (benchEmpty), its own picture
 const dayLight = h => LiveScenes.dayLight(h);
 const {first: DAY_FIRST, last: DAY_LAST, litFrom: LIT_FROM} = LiveScenes.DAY;   // the bulb over the table is on at 18:00
 const lerp3 = (x,y,t) => x.map((v,i)=>v*(1-t)+y[i]*t);
@@ -5897,8 +5910,13 @@ $('hb').onclick = () => { if (hb.step === 0) hbTurn(); };   // a tap on the clos
 whenIdle(() => { hb.pre = ['shut', 'half', 'open'].map(k => { const i = new Image(); i.src = IMG.book[k]; if (i.decode) i.decode().catch(() => {}); return i; }); });
 addEventListener('keydown', e => { if (hb.open && e.key === 'Escape'){ e.preventDefault(); closeHandbook(); } });
 // back to a step that is not the book's: the book closes. Back to one that is keeps it open (the book opened again
-// before the history went back from its last closing)
-addEventListener('popstate', e => { if (hb.open && !(e.state && e.state.hb)){ hb.hist = false; closeHandbook(true); } });
+// before the history went back from its last closing). Forward onto the step of a book that is closed, or closing,
+// goes back off it at once, so that step never waits for a back press that does nothing
+addEventListener('popstate', e => {
+  const onBook = !!(e.state && e.state.hb);
+  if (hb.open && !onBook){ hb.hist = false; closeHandbook(true); }
+  else if (onBook && !hb.hist) try { history.back(); } catch (err) {}
+});
 // reloaded with the book open, the game starts closed on the book's step: it goes back to the game's own at once (the
 // same page, no reload), so the back button never has a step that does nothing
 try { if (history.state && history.state.hb) history.back(); } catch (e) {}
