@@ -403,14 +403,18 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0, splash: .8,
 // wedge spanning that row -6..+9 and the cranes' line 0..+9; bank, the row the far bank's beasts stand on and the
 // left edges they may take (or the two ends of the shore a beast's walk starts between); lilies, the buds of the water
 // lilies [x, y]; hover, [x, y], where a bird of prey hangs on the wind; perch, the pixel of the dead trunk a raven's
-// foot is on. bench, the shop's: where the two babushki sit and what scene_shop drew behind them, for people: false.
+// foot is on; low, [y0, y1], the rows a pair of ducks flies at low over the water (as sky does for a flock); meadow,
+// like bank, where a beast grazes on the meadow; leaves, [y0, y1], the rows leaves drift on; shade, {y: [y0, y1], x,
+// cy: [c0, c1]}, the rows a cloud's shadow darkens, where its middle is as the hour starts and the rows of its middle.
+// bench, the shop's: where the two babushki sit and what scene_shop drew behind them, for people: false.
 // The game shows a scene whole across, standing on its bottom edge: a shorter phone loses the top rows (the 375x548
 // screen shows rows 76 and below, 320x568 rows 57, 375x667 rows 38, 390x664 rows 44), and the hud's two chips lie
 // over its top corners, about 18 rows deep, from the left edge to x 50 and from x 97 to the right edge (x 59 and 92
 // at 320 px). So what a life starts at, and what it is drawn still at with reduced motion, keeps in the columns
 // between the chips where it can; the sky that those phones do not show at all cannot hold it there. A flock flies
 // high all the same: 6 sky rows or more over the land under it, wherever it is, so that it never seems to come down
-// onto a hill, though those phones then show little or nothing of it.
+// onto a hill, though those phones then show little or nothing of it; only the river's pair of ducks flies low, over
+// the water, and every phone shows it.
 const ANCHORS = {
   home: {
     smoke: {x: 61, y: 104, n: 12},      // scene_home: px(61 + i % 3, 104 - 2 * i) over the chimney's tin cap (rows 106..107)
@@ -451,6 +455,16 @@ const ANCHORS = {
     circle: [32, 34, 12, 3],            // over the village: izba(6, 66), izba(32, 75), izba(54, 83) under the sky of pix.sky
     sky: [12, 21],                      // high over the river: from 12 the wedge stays in the picture, up to 21 it
                                         // keeps 6 rows or more over the hill (dome(92, 84, 64, 42), its top row 40 at x 81)
+    low: [95, 100],                     // a pair of ducks low over the far half of the water, mostly over the hill's
+                                        // reflection; the lower one's wings (two rows under the lead's row) stay above the
+                                        // quiet box (rows 104..120), and every phone shows these rows
+    bank: {y: 89, x: [12, 18, 24, 30]}, // the cow's feet on rect(0, 88, W, 2, grass) at the foot of the meadow (x 0..69),
+                                        // its muzzle on the water (from row 90) when it drinks; its left edges, west of the
+                                        // birch(47, 80) and of izba(54, 83), under izba(32, 75)
+    meadow: {y: 80, x: [8, 12, 16]},    // the roe deer's feet on the meadow between izba(6, 66) and izba(32, 75), under
+                                        // spruce(26, 70, 7); rows 76..80, which the 375x548 screen still shows
+    leaves: [91, 101],                  // the rows yellow leaves drift on: the far half of water(d, rng, 90, 140), above
+                                        // the rod's tip (row 106) and the quiet box
   },
   omut: {
     float: [30, 128],                   // rod(53, 150, 30, 118, 10)
@@ -488,6 +502,9 @@ const ANCHORS = {
                                         // 375x667 shows its lowest birds now and then, 390x664 (rows 44 and below) none
     bank: {y: 85, x: [50, 84]},         // the far shore: ridge(d, rng, 82, 3, mid, spruce), the water from row 86; a beast
                                         // starts between these x, between the hud's chips, and walks along row 85
+    shade: {y: [50, 86], x: 70, cy: [57, 64]},   // a cloud's shadow on the round hill (top = 52 + 14 * min(1, ((x - 90) / 40)
+                                        // ** 2), down to row 81) and the taiga under it (ridges at 76 and 82): the rows it
+                                        // darkens, where its middle is when the hour starts, and the rows its middle takes
     perch: [113, 104],                  // the stub on the right of the shorter dead trunk, rect(112, 112 - 18, 1, 18):
                                         // px(tx + 1, 112 - th + 10); the trunk's top (row 94) is under the money chip on
                                         // the 375x548 screen (down to row 96), the stub and the raven on it (101..103) not
@@ -1758,6 +1775,12 @@ const LIFE_C = {   // the clean colours of the sprites, by the letters they are 
                                                                                   // light on its hump and back, its snout
   W: [240, 238, 228], Y: [222, 196, 92],                                          // a water lily's petals and heart
   u: [80, 82, 84], s: [36, 32, 30], v: [30, 30, 34],                              // cranes, the dark spot, a raven
+  b: [44, 42, 40], x: [222, 220, 212],                                            // a pied cow of the village: black, white
+  p: [164, 112, 70], i: [226, 218, 200],                                          // a roe deer: red summer coat, white rump
+  H: [140, 126, 106],                                                             // a hare in its summer grey-brown
+  d: [64, 58, 52],                                                                // ducks
+  S: [236, 236, 230], Z: [196, 198, 194], N: [52, 48, 44],                        // a swan: white, its wings' grey, its bill
+  z: [214, 178, 64], O: [198, 142, 58],                                           // yellow birch leaves on the water
 };
 // The sprites, rows split by '/', '.' for nothing. Beasts face left; their feet are on row `feet` of the sprite. A drift's
 // waterline is its row `wl`.
@@ -1788,6 +1811,23 @@ const LIFE_ART = {
   spot: ['.sss./sssss/s.s.s', {feet: 2}], spot2: ['.sss./sssss/.s.s.', {feet: 2}],
   raven: ['vv../.vvv/..v.', {feet: 2}], ravenShift: ['vv../.vvvv/..v..', {feet: 2}],
   ravenFly: ['vv.vv/..v..'], ravenFly2: ['..v../vv.vv'],
+  // a pied village cow on the river's far bank, its head down to the water when it drinks
+  cattleUp: ['bb...../bxbbxbb/.bxxbbb/.b...b./.b...b.', {feet: 4}],
+  cattleDown: ['......./.xbbxbb/bbxxbbb/b.b..b./b....b./b......', {feet: 4}],
+  cattleWalk: ['bb...../bxbbxbb/.bxxbbb/.b...b./b.....b', {feet: 4}],
+  cattleWalk2: ['bb...../bxbbxbb/.bxxbbb/..b.b../..b.b..', {feet: 4}],
+  // a roe deer on the far meadow: grazing, its head down, or looking up on its long neck
+  roeUp: ['.p.../pp.../.pppi/.p..p/.p..p', {feet: 4}],
+  roeDown: ['...../...../.pppi/pp..p/p...p', {feet: 4}],
+  roeWalk: ['.p.../pp.../.pppi/.p..p/p...p', {feet: 4}],
+  roeWalk2: ['.p.../pp.../.pppi/..pp./..pp.', {feet: 4}],
+  // a hare on the omut's far bank: sitting up, its ears up; nibbling, its ears laid back; mid hop, stretched out
+  hareUp: ['.H.H/.H.H/HHH./.HHH/HHHH', {feet: 4}],
+  hareDown: ['..../..../HHH./.HHH/HHHH', {feet: 4}],
+  hareHop: ['...../HH.../.HHHH/H...H', {feet: 3}],
+  duck: ['.d../dddd'], duck2: ['..../dddd/.d..'],   // its wings up, and down: the body stays on its row
+  swan: ['..Z.../NSSSSS'], swan2: ['....../NSSSSS/..Z...'],   // its long neck out in front, the bill dark
+  leaf: ['zz'], leaf2: ['zO'],
 };
 // the elk cow: an elk without antlers
 for (const k of ['Up', 'Down', 'Walk', 'Walk2']) LIFE_ART['cow' + k] = [LIFE_ART['elk' + k][0].replace(/a/g, '.'), LIFE_ART['elk' + k][1]];
@@ -1806,16 +1846,29 @@ for (const k in LIFE_ART) {   // each into {w, h, q: [dx, dy, colour, ...], wl, 
 //     (to the `side` given, -1 left, or either way by the seed; with ANCHORS.dodge in the sun, away from the sun), and
 //     comes back from there.
 //   flock: a flock (`form`, each bird's place flying left; it flies either way) crosses the sky at v, at a height in
-//     ANCHORS.sky, its wings beating slowly, in sight from the start, nearly half way across.
-//   beast: on the far bank or shore (ANCHORS.bank), there from the start: an elk drinks and lifts its head now and then
-//     (`calf`: her calf beside her), a bear sniffs the air; after `stay` it walks off, fading into the forest, and later
-//     comes back out of it. `walk`: the dark spot plods along the shore all the while, fading in and out at the ends.
+//     ANCHORS.sky, its wings beating (a pose every `flap` steps), in sight from the start, nearly half way across. `low`:
+//     a pair of ducks low over the water instead, level, at a height in ANCHORS.low.
+//   leaves: `n` yellow leaves drift down the river at about v, each on its row of ANCHORS.leaves, all the hour: as one
+//     goes out on the right another comes in on the left. On the water's face, as a drift.
+//   shade: a cloud's shadow runs across the hill (ANCHORS.shade) to the right at v, the clouds' way in the sun: an oval
+//     rx by ry that darkens the land under it, its rim dithered on a fixed checkerboard (so a pixel changes once as the
+//     rim passes, and never blinks); in sight from the start, its middle at ANCHORS.shade.x.
+//   beast: on the far bank or shore (ANCHORS.bank, or the anchor `on` names), there from the start: an elk drinks and
+//     lifts its head now and then (`calf`: her calf beside her), a bear sniffs the air, a hare (`hop`) sits up with its
+//     ears up and nibbles now and then; after `stay` it walks (or hops) off, fading into the forest, and later comes back
+//     out of it. `walk`: the dark spot plods along the shore all the while, fading in and out at the ends. `edge`: in the
+//     open, with no forest to fade into, it walks off along the bank to the left edge of the picture and out of it, a
+//     pixel every `pace` steps, and later comes back the same way; the river's cow drinks, the roe deer (`graze`) grazes
+//     with its head down and looks up now and then.
 //   perch: a raven sits on the dead trunk (ANCHORS.perch) and shifts now and then; after `stay` it flies off, and later
 //     comes back.
 //   lilies: the water lilies' buds (ANCHORS.lilies) open, or the open flowers close, one after another in the first 20 s,
 //     and stay so. Between the two the game passes lilies: true, and they stand open all the hour.
 const GEESE = [[0, 0], [4, -2], [8, -4], [12, -6], [4, 2], [8, 4], [12, 6], [16, 8]];   // a wedge, one arm longer
 const CRANES = [[0, 0], [6, 1], [11, 3], [17, 4], [23, 6], [28, 7]];                   // a slanting, uneven line
+const SWANS = [[0, 0], [9, 1], [18, 3], [27, 4], [36, 5]];                             // a long line, wide apart
+const DUCKS = [[0, 0], [6, 1]];                                                        // a pair
+const GOLDENEYES = [[0, 0], [5, -2], [9, 1], [14, -1], [19, 2]];                       // a loose little flock
 const LIFE = {
   river: {
     log: {is: 'drift', art: 'log', v: 1.2, gap: [240, 360]},                   // «Мимо медленно проплыло бревно»
@@ -1825,6 +1878,10 @@ const LIFE = {
     wagtail: {is: 'drift', art: 'log', v: 1.1, gap: [300, 420], bird: true},   // «Проплыло бревно, на нём сидит трясогузка»
     kite: {is: 'circle', art: 'kite', lap: 22, stay: [150, 210], gap: [240, 300], side: -1},   // «Над деревней кружит коршун, тонко посвистывает»
     geese: {is: 'flock', art: 'goose', form: GEESE, v: 3.2, flap: 4, gap: [300, 420]},   // «Высоко над рекой тянется гусиный клин, его долго слышно»
+    ducks: {is: 'flock', art: 'duck', form: DUCKS, v: 6, flap: 2, low: true, gap: [240, 360]},   // «Над рекой пролетела пара уток»
+    cow: {is: 'beast', art: 'cattle', edge: true, pace: 6, stay: [60, 90], gap: [240, 360]},   // «На том берегу к воде спустилась корова, попила и ушла»
+    roe: {is: 'beast', art: 'roe', on: 'meadow', edge: true, graze: true, pace: 4, stay: [100, 150], gap: [300, 420]},   // «На лугу на том берегу пасётся косуля»
+    leaves: {is: 'leaves', n: 6, v: 1.1},   // «По воде плывут жёлтые листья»
   },
   omut: {
     elk: {is: 'beast', art: 'elk', stay: [75, 100], gap: [240, 300]},   // «На том берегу из ельника вышел лось. Долго пил и ушёл»
@@ -1834,6 +1891,7 @@ const LIFE = {
     // ястреб»; it leaves to the left, or in the sun away from it (ANCHORS.omut.dodge)
     'lilies-open': {is: 'lilies', open: true},    // «Раскрылись кувшинки»
     'lilies-close': {is: 'lilies', open: false},  // «Кувшинки закрылись»
+    hare: {is: 'beast', art: 'hare', hop: true, stay: [20, 35], gap: [240, 360]},   // «На том берегу из-за кочки выглянул заяц и ускакал»
   },
   lake: {
     geese: {is: 'flock', art: 'goose', form: GEESE, v: 3, flap: 4, gap: [300, 420]},   // «Высоко над озером идёт гусиный клин. Его слышно ещё долго после того, как он скрылся»
@@ -1842,13 +1900,17 @@ const LIFE = {
     'hawk-hover': {is: 'circle', art: 'hawk', hover: true, stay: [120, 180], gap: [240, 300]},   // «Ястреб висит на ветру над склоном, не двигаясь»
     raven: {is: 'perch', art: 'raven', stay: [60, 90], gap: [180, 240]},   // «На сухой ствол в воде сел ворон. Посидел и улетел»
     'dark-spot': {is: 'beast', art: 'spot', walk: true, stay: [80, 110], gap: [300, 360]},   // «По тому берегу бредёт что-то большое и тёмное. Медведь, наверно»
+    goldeneyes: {is: 'flock', art: 'duck', form: GOLDENEYES, v: 8, flap: 2, gap: [240, 360]},   // «Над головой со свистом крыльев пронеслась стайка уток»
+    swans: {is: 'flock', art: 'swan', form: SWANS, v: 2.4, flap: 6, gap: [300, 420]},   // «Высоко пролетели лебеди — белые, кричат, как трубы»
+    'cloud-shadow': {is: 'shade', v: 1.6, rx: 24, ry: 6, gap: [150, 240]},   // «По сопке бежит тень от облака»
   },
 };
 const LIFE_NAME = {   // a short Russian label of each (the demo's)
   log: 'бревно', 'log-fog': 'бревно из тумана', 'log-dark': 'тёмное бревно', spruce: 'ёлка с корнями', wagtail: 'бревно с трясогузкой',
   kite: 'коршун', geese: 'гусиный клин', elk: 'лось', 'elk-calf': 'лосиха с лосёнком', bear: 'медведь', hawk: 'ястреб',
   'lilies-open': 'кувшинки раскрылись', 'lilies-close': 'кувшинки закрылись', cranes: 'журавли', 'hawk-hover': 'ястреб висит',
-  raven: 'ворон', 'dark-spot': 'тёмное пятно',
+  raven: 'ворон', 'dark-spot': 'тёмное пятно', ducks: 'пара уток', cow: 'корова у воды', roe: 'косуля на лугу', leaves: 'жёлтые листья',
+  hare: 'заяц', goldeneyes: 'стайка уток', swans: 'лебеди', 'cloud-shadow': 'тень облака',
 };
 // The life of a scene: its spec, its seed and where it goes. A drift takes a lane whose rows no sign's site comes within
 // SIGN_REACH rows of, or the one with the fewest such sites (ties by the seed), so it passes no sign if it can help it
@@ -1866,11 +1928,17 @@ function lifePlan(P, seed, id, signs) {
     };
     g.lane = A.lanes.map(y => [near(y), noise(sd, y, 1), y]).sort((a, b) => a[0] - b[0] || a[1] - b[1])[0][2];
   } else if (L.is === 'beast') {
-    const xs = A.bank.x;
+    const xs = A[L.on || 'bank'].x;
     g.x = L.walk ? xs[0] + Math.floor((xs[1] - xs[0]) * noise(sd, 0, 2)) : xs[Math.floor(xs.length * noise(sd, 0, 2))];
   } else if (L.is === 'lilies') g.flowers = lilyBuds(P);
+  else if (L.is === 'leaves') {   // each leaf its row, its speed, its art and where it is when the clock starts
+    const [r0, r1] = A.leaves;
+    g.leaves = Array.from({length: L.n}, (_, i) => ({y: r0 + Math.floor((r1 - r0 + 1) * noise(sd, i, 11)), v: L.v * (.85 + .3 * noise(sd, i, 12)),
+      x0: (i + .7 * noise(sd, i, 13)) / L.n * LEAF_RUN, art: noise(sd, i, 14) < .5 ? 'leaf' : 'leaf2'}));
+  } else if (L.is === 'shade') { const [c0, c1] = A.shade.cy; g.cy = c0 + Math.floor((c1 - c0 + 1) * noise(sd, 0, 2)); }
   return g;
 }
+const LEAF_RUN = W + 30;   // px a leaf's round takes: it goes out 15 px past the right edge and comes in 15 px before the left
 // The water lilies' buds that open: all but the one in the float's quiet box (null where there are none).
 const lilyBuds = P => ANCHORS[P.name].lilies ? ANCHORS[P.name].lilies.filter(([x, y]) => !P.quiet[y * W + x]) : null;
 const lk = new Uint32Array(NMAX);   // lk[p] === fid: a pixel of life in this frame, lit as land; the sun's core paints over it, the halo does not
@@ -1901,6 +1969,7 @@ const span = (sd, i, r) => Math.round((r[0] + (r[1] - r[0]) * noise(sd, i, 99)) 
 // the clock starts; with what its drawing needs of them. Its drawing and its cues (cuesOf) both take them from here.
 const CIRCLE_OUT = 15 * LIFE_SPS, WALK_IN = 4 * LIFE_SPS, FLY_IN = 6 * LIFE_SPS;   // steps a bird of prey drifts in or off,
 // a beast walks out of the forest or back, a raven flies in to its perch or off
+const HOP_IN = 16;   // steps a hare hops out of the forest or back: four hops of two pixels
 function lifeEp(g, L, place) {
   const sd = g.sd;
   switch (L.is) {
@@ -1915,7 +1984,15 @@ function lifeEp(g, L, place) {
       const v = L.v * (.9 + .2 * noise(sd, 0, 1)) / LIFE_SPS, len = Math.ceil((W + wide + 4) / v);
       return {len, gap: span(sd, 2, L.gap), e0: Math.floor(len * (.45 + .1 * noise(sd, 0, 3))), v, w: wide};
     }
-    case 'beast': { const stay = span(sd, 1, L.stay); return {len: WALK_IN + stay + WALK_IN, gap: span(sd, 2, L.gap), e0: WALK_IN + 3, stay}; }
+    case 'beast': {   // an edge beast walks from the left edge to its place and back: as long as its pace takes it
+      const stay = span(sd, 1, L.stay), walk = L.edge ? (g.x + LIFE_ART[BEASTS[L.art].up].w + 1) * L.pace : L.hop ? HOP_IN : WALK_IN;
+      return {len: walk + stay + walk, gap: span(sd, 2, L.gap), e0: walk + 3, stay, walk};
+    }
+    case 'leaves': return {len: 1e9, gap: 0, e0: 0};   // all the hour
+    case 'shade': {   // it starts in sight, its middle at ANCHORS.shade.x
+      const v = L.v / LIFE_SPS;
+      return {len: Math.ceil((W + 2 * L.rx + 4) / v), gap: span(sd, 2, L.gap), e0: Math.floor((ANCHORS[place].shade.x + L.rx + 2) / v), v};
+    }
     case 'perch': { const stay = span(sd, 1, L.stay); return {len: FLY_IN + stay + FLY_IN, gap: span(sd, 2, L.gap), e0: FLY_IN + 3, stay}; }
   }
   return null;   // the water lilies open or close once
@@ -1972,20 +2049,32 @@ const LIVES = {
     const S = LIFE_ART[L.art], S2 = LIFE_ART[L.art + '2'], sd = g.sd, A = ANCHORS[F.P.name], fm = L.form;
     const E = lifeEp(g, L, F.P.name), v = E.v;
     if (!episode(m, E.len, E.gap, E.e0)) return;
-    const k = EP.k, e = EP.e, left = noise(sd, k, 4) < .5, gone = v * e, slope = .06 * (noise(sd, k, 6) - .5);
-    const y0 = A.sky[0] + Math.floor((A.sky[1] - A.sky[0]) * noise(sd, k, 5)) + Math.round(gone * slope);
+    const k = EP.k, e = EP.e, left = noise(sd, k, 4) < .5, gone = v * e, slope = L.low ? 0 : .06 * (noise(sd, k, 6) - .5);
+    const sky = L.low ? A.low : A.sky, y0 = sky[0] + Math.floor((sky[1] - sky[0]) * noise(sd, k, 5)) + Math.round(gone * slope);
     for (let i = 0; i < fm.length; i++) {
       const x = Math.floor(W + 1 - gone) + fm[i][0], up = Math.floor((e + 2 * L.flap * noise(sd, i, 7)) / L.flap) & 1;
       sprite(up ? S : S2, left ? x : W - x - S.w, y0 + fm[i][1], !left, 1);
     }
   },
   beast(g, L, m) {
-    const sd = g.sd, A = ANCHORS[F.P.name], walkIn = WALK_IN, E = lifeEp(g, L, F.P.name), stay = E.stay, len = E.len;
+    const sd = g.sd, A = ANCHORS[F.P.name], E = lifeEp(g, L, F.P.name), stay = E.stay, len = E.len, walkIn = E.walk;
     if (!episode(m, len, E.gap, E.e0)) return;
     const e = EP.e;   // which way it faces and walks: as the seed says each time, or the dark spot towards the middle
-    const dir = L.walk ? (g.x < W / 2 ? 1 : -1) : noise(sd, EP.k, 4) < .5 ? -1 : 1, flip = dir > 0;
-    let x = g.x, a = 1, pose = 'up';
-    if (L.walk) {   // the dark spot plods along the shore all the while, a pixel every 2.5 s, its legs stepping
+    const dir = L.walk ? (g.x < W / 2 ? 1 : -1) : noise(sd, EP.k, 4) < .5 ? -1 : 1;
+    let x = g.x, a = 1, pose = 'up', flip = dir > 0;
+    if (L.edge) {   // in the open: from the left edge along the bank, facing right, and back off it facing left
+      const step = Math.floor(e / 3) & 1 ? 'walk' : 'walk2';
+      if (e < walkIn) { x -= Math.ceil((walkIn - e) / L.pace); flip = true; pose = step; }
+      else if (e >= walkIn + stay) { x -= Math.floor((e - walkIn - stay) / L.pace); flip = false; pose = step; }
+      else pose = L.graze ? grazePose(sd, e - walkIn) : elkPose(sd, e - walkIn, 66);
+    } else if (L.hop && (e < walkIn || e >= walkIn + stay)) {   // hops out of the forest, or back into it, fading: two
+      // steps stretched out in a hop, two crouched, two pixels a hop
+      const w = e < walkIn ? e - walkIn : e - walkIn - stay;
+      x += dir * 2 * Math.floor(w / 4);
+      a = Math.ceil(4 * (1 - Math.abs(w) / walkIn)) / 4;
+      pose = mod(w, 4) < 2 ? 'walk' : 'walk2';
+    } else if (L.hop) pose = harePose(sd, e - walkIn);
+    else if (L.walk) {   // the dark spot plods along the shore all the while, a pixel every 2.5 s, its legs stepping
       x += dir * Math.floor((e - walkIn - 3) / 15);
       pose = Math.floor(e / 8) & 1 ? 'walk' : 'stand';
       a = Math.min(1, Math.ceil(4 * Math.min(e, len - e) / walkIn) / 4);
@@ -1995,7 +2084,7 @@ const LIVES = {
       a = Math.ceil(4 * (1 - Math.abs(w) / walkIn)) / 4;
       pose = Math.floor(e / 3) & 1 ? 'walk' : 'walk2';
     } else pose = L.art === 'bear' ? bearPose(sd, e - walkIn) : elkPose(sd, e - walkIn, 66);   // at the water
-    const ART = BEASTS[L.art], S = LIFE_ART[ART[pose] || ART.up], y = A.bank.y - S.feet;
+    const ART = BEASTS[L.art], S = LIFE_ART[ART[pose] || ART.up], y = A[L.on || 'bank'].y - S.feet;
     sprite(S, x, y, flip, a);
     if (L.calf) {   // the calf beside her, on the side she came from, its head up and down at its own pace
       const C2 = LIFE_ART[pose === 'walk' || pose === 'walk2' ? 'calfWalk' : elkPose(sd + 1, e - walkIn, 42) === 'down' ? 'calfDown' : 'calfUp'];
@@ -2025,15 +2114,46 @@ const LIVES = {
       else if (s === 2) sprite(LIFE_ART.lilyOpen, x - 1, y - 1, false, 1);
     }
   },
+  leaves(g, L, m) {
+    for (const f of g.leaves) {
+      const x = Math.floor(mod(f.x0 + f.v * m / LIFE_SPS, LEAF_RUN)) - 15;
+      sprite(LIFE_ART[f.art], x, f.y, false, 1, SIGN_FOG);   // on the water's face, as a drift
+    }
+  },
+  shade(g, L, m) {
+    const E = lifeEp(g, L, F.P.name);
+    if (!episode(m, E.len, E.gap, E.e0)) return;
+    const cx = Math.floor(-L.rx - 2 + E.v * EP.e), cy = g.cy, [y0, y1] = ANCHORS[F.P.name].shade.y, cls = F.P.cls, quiet = F.P.quiet;
+    for (let y = Math.max(y0, cy - L.ry); y <= Math.min(y1 - 1, cy + L.ry); y++) for (let x = Math.max(0, cx - L.rx); x <= Math.min(W - 1, cx + L.rx); x++) {
+      const p = y * W + x, d = ((x - cx) / L.rx) ** 2 + ((y - cy) / L.ry) ** 2;
+      if (d >= 1 || (d >= SHADE_CORE && ((x + y) & 1)) || (d >= SHADE_RIM && (x & 1)) || cls[p] !== LAND || quiet[p]) continue;
+      const c = U[p];
+      put(p, pack(r8((c & 255) * SHADE[0]), r8(((c >>> 8) & 255) * SHADE[1]), r8(((c >>> 16) & 255) * SHADE[2])));
+    }
+  },
 };
+const SHADE = [.84, .86, .92], SHADE_CORE = .45, SHADE_RIM = .75;   // a cloud's shadow: how much of each channel the land
+// keeps, a little blue; inside SHADE_CORE of its oval all of it, out to SHADE_RIM every other pixel, then every fourth
 const BEASTS = {elk: {up: 'elkUp', down: 'elkDown', walk: 'elkWalk', walk2: 'elkWalk2'}, cow: {up: 'cowUp', down: 'cowDown', walk: 'cowWalk', walk2: 'cowWalk2'},
                 bear: {up: 'bearUp', stand: 'bear', walk: 'bearWalk', walk2: 'bear'},
-                spot: {up: 'spot', stand: 'spot', walk: 'spot2'}};
+                spot: {up: 'spot', stand: 'spot', walk: 'spot2'},
+                cattle: {up: 'cattleUp', down: 'cattleDown', walk: 'cattleWalk', walk2: 'cattleWalk2'},
+                roe: {up: 'roeUp', down: 'roeDown', walk: 'roeWalk', walk2: 'roeWalk2'},
+                hare: {up: 'hareUp', down: 'hareDown', walk: 'hareHop', walk2: 'hareDown'}};
 function elkPose(sd, s, block) {   // an elk at the water: it looks about for a few seconds, then drinks, lifting its head now
   // and then for two or three seconds (a block of `block` steps, now and then skipped)
   if (s < 3 * LIFE_SPS) return 'up';
   const j = Math.floor(s / block), o = s - block * j, at = Math.floor(.25 * block + .5 * block * noise(sd, j, 8));
   return noise(sd, j, 9) >= .25 && o >= at && o < at + 12 + Math.floor(10 * noise(sd, j, 10)) ? 'up' : 'down';
+}
+function grazePose(sd, s) {   // a roe deer grazing: its head down, now and then up for two or three seconds to look about
+  if (s < 3 * LIFE_SPS) return 'up';
+  const j = Math.floor(s / 48), o = s - 48 * j, at = Math.floor(8 + 24 * noise(sd, j, 8));
+  return noise(sd, j, 9) < .6 && o >= at && o < at + 12 + Math.floor(6 * noise(sd, j, 10)) ? 'up' : 'down';
+}
+function harePose(sd, s) {   // a hare sitting up, its ears up; now and then it nibbles for a second or two, its ears back
+  const j = Math.floor(s / 30), o = s - 30 * j, at = Math.floor(6 + 12 * noise(sd, j, 8));
+  return noise(sd, j, 9) < .5 && o >= at && o < at + 8 + Math.floor(6 * noise(sd, j, 10)) ? 'down' : 'up';
 }
 function bearPose(sd, s) {   // a bear on the bank sniffing the air: its head lifts twice in a while, otherwise it stands
   const j = Math.floor(s / 36), o = s - 36 * j, at = 4 + Math.floor(18 * noise(sd, j, 8));
@@ -2892,7 +3012,7 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
   EVENTS: Object.freeze({strike: Object.freeze({frames: STRIKE.map(k => Math.round(k * 1000 / FPS)), ms: Math.round(EVENT_TICKS.strike * 1000 / FPS)}),
                          scare: Object.freeze({ms: Math.round(EVENT_TICKS.scare * 1000 / FPS)})}),
   SIZE: Object.freeze(Object.fromEntries(Object.entries(SIZE).map(([p, wh]) => [p, Object.freeze(wh)]))),
-  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '7'});
+  PLACES, WEATHERS, PLACE_NAME, WEATHER_NAME, version: '8'});
 })();
 // ---------- end of scenes.js ----------
 </script>
@@ -4173,11 +4293,12 @@ function lookAround(){
 // Each line: its water ('all': any), its words, the hours it may come at (the start of the hour, 6..17), the weathers
 // it fits (WEATHERS indices; a line that names none takes any but the downpour, and in fog only what is heard or is
 // close by), its months by the izba's calendar (dateOf), how often, and what the scene draws. How often: 'often',
-// 'some', 'rare' and 'season' come by chance in an hour they fit (LIFE_RARE, LIFE_FOUL, LIFE_RATE; a rare or season
-// line keeps away LIFE_GAP days after it was written); 'clock' is nature's clock, and the old man's tea and lunch: it
-// comes at one hour of its window a day (clockHour()), whenever the old man is there then and the weather fits. A line
-// comes at most once a day, and an hour has one at most. Its draws come from hashOf(), never from rnd(): the fishing
-// days stay as they were, and a reload gives the same life. S.lifeLast keeps the day each line was last written.
+// 'some', 'rare' and 'season' come by chance in an hour they fit, each line by its own chance (LIFE_DAY, LIFE_RARE; a
+// rare or season line keeps away LIFE_GAP days after it was written); 'clock' is nature's clock, and the old man's tea
+// and lunch: it comes at one hour of its window a day (clockHour()), whenever the old man is there then and the weather
+// fits. A line comes at most once a day, and an hour has one at most. Its draws come from hashOf(), never from rnd():
+// the fishing days stay as they were, and a reload gives the same life. S.lifeLast keeps the day each line was last
+// written.
 const LIFE_LINES = [
   // the river: on the water
   {at: 'river', id: 'log', f: 'some', w: '0123', draw: 'log', s: 'Мимо медленно проплыло бревно.'},
@@ -4185,7 +4306,7 @@ const LIFE_LINES = [
   {at: 'river', id: 'log-dark', f: 'rare', w: '0123', draw: 'log-dark', s: 'Проплыло старое тёмное бревно — ещё со сплава, наверно.'},
   {at: 'river', id: 'spruce', f: 'rare', w: '25', draw: 'spruce', s: 'Проплыла ёлка с корнями — где-то выше подмыло берег.'},
   {at: 'river', id: 'board', f: 'rare', w: '0123', s: 'Проплыла серая доска с ржавым гвоздём.'},
-  {at: 'river', id: 'leaves', f: 'often', w: '0123', m: '9', s: 'По воде плывут жёлтые листья.'},
+  {at: 'river', id: 'leaves', f: 'often', w: '0123', m: '9', draw: 'leaves', s: 'По воде плывут жёлтые листья.'},
   {at: 'river', id: 'wagtail-log', f: 'season', w: '0123', m: '5-8', draw: 'wagtail', s: 'Проплыло бревно, на нём сидит трясогузка.'},
   {at: 'river', id: 'foam', f: 'some', w: '25', s: 'Вдоль берега тянется полоса пены.'},
   // the river: the shingle and the boats
@@ -4197,15 +4318,15 @@ const LIFE_LINES = [
   {at: 'river', id: 'shingle-wet', f: 'some', w: '2', s: 'Галька потемнела от дождя.'},
   {at: 'river', id: 'capercaillie', f: 'season', w: '0123', h: '6-8', m: '9-10', s: 'Ниже по берегу на галечник вышел глухарь и клюёт камешки.'},
   // the river: the far bank
-  {at: 'river', id: 'cow', f: 'some', w: '0123', h: '8-16', s: 'На том берегу к воде спустилась корова, попила и ушла.'},
-  {at: 'river', id: 'roe', f: 'rare', w: '0123', h: '6-8,16-17', s: 'На лугу на том берегу пасётся косуля.'},
+  {at: 'river', id: 'cow', f: 'some', w: '0123', h: '8-16', draw: 'cow', s: 'На том берегу к воде спустилась корова, попила и ушла.'},
+  {at: 'river', id: 'roe', f: 'rare', w: '0123', h: '6-8,16-17', draw: 'roe', s: 'На лугу на том берегу пасётся косуля.'},
   {at: 'river', id: 'roe-bark', f: 'rare', w: '01234', h: '6-9,16-17', s: 'За лугом кто-то хрипло гавкнул. Не собака — косуля.'},
   {at: 'river', id: 'cow-fog', f: 'some', w: '4', h: '6-10', s: 'В тумане на том берегу мычит корова, самой не видно.'},
   {at: 'river', id: 'birch', f: 'some', w: '3', m: '9', s: 'С берёзы на том берегу летят жёлтые листья.'},
   // the river: the sky
   {at: 'river', id: 'kite', f: 'often', w: '01', h: '10-16', m: '5-8', draw: 'kite', s: 'Над деревней кружит коршун, тонко посвистывает.'},
   {at: 'river', id: 'geese', f: 'rare', w: '0123', m: '9-10', draw: 'geese', s: 'Высоко над рекой тянется гусиный клин, его долго слышно.'},
-  {at: 'river', id: 'ducks', f: 'some', w: '0123', s: 'Над рекой пролетела пара уток.'},
+  {at: 'river', id: 'ducks', f: 'some', w: '0123', draw: 'ducks', s: 'Над рекой пролетела пара уток.'},
   {at: 'river', id: 'crows', f: 'some', w: '0123', h: '16-17', m: '9-11', s: 'Через реку к лесу тянутся вороны.'},
   {at: 'river', id: 'haze', f: 'some', w: '1', h: '12-15', s: 'Над лугом на том берегу дрожит тёплый воздух.'},
   // the river: the village across, only its beasts
@@ -4219,7 +4340,7 @@ const LIFE_LINES = [
   {at: 'omut', id: 'bear', f: 'season', w: '0123', h: '6-9,16-17', draw: 'bear', s: 'На том берегу показался медведь. Понюхал воздух и не спеша ушёл в ельник.'},
   {at: 'omut', id: 'bear-track', f: 'rare', w: '01234', h: '6-8', s: 'На глине у воды свежий медвежий след.'},
   {at: 'omut', id: 'lynx', f: 'season', q: .5, w: '01234', s: 'На поваленной ели сидит рысь. Миг — и её нет.'},
-  {at: 'omut', id: 'hare', f: 'rare', w: '01234', h: '6-9', s: 'Из-за кочки выглянул заяц и ускакал.'},
+  {at: 'omut', id: 'hare', f: 'rare', w: '0123', h: '6-9', draw: 'hare', s: 'На том берегу из-за кочки выглянул заяц и ускакал.'},
   // the omut: the small neighbours
   {at: 'omut', id: 'squirrel', f: 'often', w: '01234', s: 'По поваленной ели пробежала белка.'},
   {at: 'omut', id: 'husks', f: 'some', w: '013', s: 'Сверху сыплется шелуха: белка шелушит шишку.'},
@@ -4243,7 +4364,6 @@ const LIFE_LINES = [
   {at: 'omut', id: 'cone', f: 'some', w: '01234', m: '8-10', s: 'Рядом в мох упала шишка.'},
   {at: 'omut', id: 'wind-top', f: 'often', w: '3', s: 'Наверху шумят ели, а у воды ни ветерка.'},
   {at: 'omut', id: 'creak', f: 'some', w: '3', s: 'Где-то скрипит сухое дерево.'},
-  {at: 'omut', id: 'tree-fall', f: 'rare', w: '3', s: 'Далеко в лесу упало дерево: долгий треск и глухой удар.'},
   {at: 'omut', id: 'drip', f: 'often', w: '2', s: 'С еловых лап капает.'},
   {at: 'omut', id: 'downpour', f: 'often', w: '5', s: 'Дождь шумит по лесу так, что больше ничего не слышно.'},
   {at: 'omut', id: 'fog', f: 'often', w: '4', h: '6-10', s: 'Того берега не видно, из тумана торчат верхушки елей.'},
@@ -4263,9 +4383,9 @@ const LIFE_LINES = [
   {at: 'lake', id: 'geese', f: 'some', w: '0123', m: '9-10', draw: 'geese', s: 'Высоко над озером идёт гусиный клин. Его слышно ещё долго после того, как он скрылся.'},
   {at: 'lake', id: 'cranes-far', f: 'some', w: '01234', h: '6-10', m: '8-9', s: 'Где-то за озером, на болотах, кричат журавли.'},
   {at: 'lake', id: 'cranes', f: 'rare', w: '0123', m: '9', draw: 'cranes', s: 'Высоко пролетели журавли, перекликаясь.'},
-  {at: 'lake', id: 'goldeneyes', f: 'some', w: '01234', s: 'Над головой со свистом крыльев пронеслась стайка уток.'},
+  {at: 'lake', id: 'goldeneyes', f: 'some', w: '01234', draw: 'goldeneyes', s: 'Над головой со свистом крыльев пронеслась стайка уток.'},
   {at: 'lake', id: 'ducks', f: 'some', w: '0123', s: 'Пара уток пролетела над водой и села у того берега.'},
-  {at: 'lake', id: 'swans', f: 'season', w: '0123', m: '10', s: 'Высоко пролетели лебеди — белые, кричат, как трубы.'},
+  {at: 'lake', id: 'swans', f: 'season', w: '0123', m: '9-10', draw: 'swans', s: 'Высоко пролетели лебеди — белые, кричат, как трубы.'},
   {at: 'lake', id: 'hawk', f: 'often', w: '01', h: '11-15', draw: 'hawk', s: 'Над сопкой кружит ястреб.'},
   {at: 'lake', id: 'hawk-hover', f: 'rare', w: '3', draw: 'hawk-hover', s: 'Ястреб висит на ветру над склоном, не двигаясь.'},
   // the lake: the dead trunks, the bench, the grass
@@ -4284,7 +4404,7 @@ const LIFE_LINES = [
   {at: 'lake', id: 'elk-swim', f: 'season', w: '0123', m: '9', s: 'Через озеро плывёт лось — над водой одна голова с рогами.'},
   {at: 'lake', id: 'reindeer', f: 'season', w: '0123', m: '9-11', s: 'На том берегу к воде вышли олени, три, с большими рогами.'},
   {at: 'lake', id: 'crash', f: 'rare', w: '01234', s: 'На том берегу кто-то ломится через сухостой, по воде далеко слышно.'},
-  {at: 'lake', id: 'cloud-shadow', f: 'some', w: '01', s: 'По сопке бежит тень от облака.'},
+  {at: 'lake', id: 'cloud-shadow', f: 'some', w: '1', draw: 'cloud-shadow', s: 'По сопке бежит тень от облака.'},
   {at: 'lake', id: 'fog-hill', f: 'often', w: '4', h: '6-9', s: 'Сопку до половины затянуло туманом.'},
   {at: 'lake', id: 'fog-thins', f: 'clock', w: '4', h: '10', s: 'Туман на сопке редеет.'},
   {at: 'lake', id: 'tin', f: 'some', w: '1', s: 'У того берега вода блестит, как жесть.'},
@@ -4304,16 +4424,19 @@ const LIFE_LINES = [
 ];
 const CUCKOO = ['два раза', 'три раза', 'четыре раза', 'пять раз', 'шесть раз', 'семь раз'];
 const LIFE_RARE = {season: .008, rare: .02};    // a rarer line's own chance in an hour it fits (times its q)
-const LIFE_FOUL = {often: .2, some: .06};       // and a line of foul weather only (rain, wind, fog, downpour)'s
-const LIFE_RATE = {often: .12, some: .04};      // the rest: their weights, and their sum the chance of one of them,
-const LIFE_CAP = .28;                           // up to this
+// An 'often' or 'some' line's chance over a whole day at its water, spread over the hours of its window: its chance in
+// an hour it fits is 1 - (1 - LIFE_DAY) ** (1 / those hours), so a morning line is as likely on a morning there as a line
+// of any hour on a day. The clock's hours and the other lines that come in an hour take some of it: in the lab's count
+// (docs/05-zhizn-vokrug.md, «Решено») an 'often' line comes on 64-76% of the days that fit it, a 'some' line on 18-25%.
+const LIFE_DAY = {often: .9, some: .38};
 const LIFE_GAP = 7;   // days a rare or season line keeps away after it was written
 const LIFE_TAG = 0x4c494645, LILIES_TILL = 15;   // the lilies stand open till the hour of 15:00, and close at 16:00
 const spans = (s, lo, hi) => s ? s.split(',').map(r => { const [a, b = a] = r.split('-').map(Number); return [a, b]; }) : [[lo, hi]];
 const inSpans = (x, sp) => sp.some(([a, b]) => x >= a && x <= b);
+const spanHours = sp => sp.reduce((n, [a, b]) => n + Math.max(0, Math.min(b, START + HOURS - 1) - Math.max(a, START) + 1), 0);
 const LIFE_KEY = {};
 LIFE_LINES.forEach((L, i) => { L.key = `${L.at}/${L.id}`; L.n = i; L.hrs = spans(L.h, START, START + HOURS - 1); L.mos = spans(L.m, 1, 12);
-  L.ws = [...L.w].map(Number); L.foul = L.ws.every(x => x >= 2); LIFE_KEY[L.key] = L; });
+  L.ws = [...L.w].map(Number); L.per = L.f in LIFE_DAY ? 1 - Math.pow(1 - LIFE_DAY[L.f], 1 / spanHours(L.hrs)) : 0; LIFE_KEY[L.key] = L; });
 const lifeHash = (...v) => hashOf(LIFE_TAG, S.day, ...v);
 const lifeMonth = () => dayDate(S.day).getUTCMonth() + 1;   // the izba's calendar
 const lifeWeather = t => S.D.weathers ? S.D.weathers[Math.min(t, HOURS - 1)] : S.D.weather;
@@ -4334,24 +4457,18 @@ function lifeFits(L, w, t){
   return (L.at === w || L.at === 'all') && inSpans(START + t, L.hrs) && L.ws.includes(lifeWeather(t)) && inSpans(lifeMonth(), L.mos)
     && last !== S.day && !(L.f in LIFE_RARE && Number.isFinite(last) && S.day - last < LIFE_GAP) && (!L.need || L.need());
 }
-// the line of the hour t at water w, as the hour opens: the clock's, else maybe one by chance, unless the hour before
-// had a line written here: then this one takes a breath
+// the line of the hour t at water w, as the hour opens: the clock's, else maybe one by chance. Each line that fits comes
+// by its own chance; of those that come the rarer go first (so a place with much else to say does not crowd them out),
+// and of the rest one by the hour's draw: the others may come in a later hour
 function chooseLife(w, t){
   const hr = START + t, wi = WATERS.indexOf(w), can = LIFE_LINES.filter(L => lifeFits(L, w, t));
-  const clock = can.find(L => L.f === 'clock' && hr === clockHour(L, w)), prev = lifeOf(w, t - 1);
+  const clock = can.find(L => L.f === 'clock' && hr === clockHour(L, w));
   if (clock) return clock.key;
-  if (prev && S.lifeLast[prev.key] === S.day) return '';
-  // the rarer lines first, each by its own chance, then those of a foul weather, so a place with much else to say does
-  // not crowd them out
   const own = (L, p) => lifeHash(5, t, wi, L.n) < p;
   for (const due of [can.filter(L => L.f === 'season' && own(L, LIFE_RARE.season*(L.q || 1))), can.filter(L => L.f === 'rare' && own(L, LIFE_RARE.rare)),
-                     can.filter(L => L.foul && L.f in LIFE_FOUL && own(L, LIFE_FOUL[L.f]))])
+                     can.filter(L => L.per && own(L, L.per))])
     if (due.length) return due[Math.floor(lifeHash(6, t, wi)*due.length)].key;
-  const pool = can.filter(L => !L.foul && L.f in LIFE_RATE), rate = L => LIFE_RATE[L.f];
-  const sum = pool.reduce((s, L) => s + rate(L), 0);
-  if (!pool.length || lifeHash(2, t, wi) >= Math.min(LIFE_CAP, sum)) return '';
-  let r = lifeHash(3, t, wi)*sum;
-  return (pool.find(L => (r -= rate(L)) < 0) || pool[pool.length - 1]).key;
+  return '';
 }
 const lifeOf = (w, t) => LIFE_KEY[S.life && S.life[`${w}/${t}`]] || null;
 // the hour sat out (or a drawn life's hour left): its line into the journal, under the hour's time (once)
