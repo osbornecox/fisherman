@@ -205,7 +205,7 @@
   .soundbtn span { position:relative; display:block; height:18px; padding:0 5px; background:var(--paper); box-shadow:0 0 0 2px var(--ink);
                    font-size:12px; line-height:18px; font-weight:500; }
   .soundbtn[aria-pressed="false"] span { color:var(--sub); }
-  .soundbtn[aria-pressed="false"] span::after { content:''; position:absolute; left:3px; right:3px; top:8px; height:2px; background:var(--ink); }
+  .soundbtn[aria-pressed="false"] span::after { content:''; position:absolute; left:3px; right:3px; top:9px; height:2px; background:var(--ink); }
   /* the book over the whole game: the closed cover and the frames of its opening on a dark ground, then its pages */
   .hb { position:fixed; inset:0; z-index:20; background:rgba(43,41,37,.85); display:flex; align-items:center; justify-content:center; }
   .hb[hidden], .hb [hidden] { display:none; }
@@ -239,6 +239,12 @@
   .hb-actions { flex:none; position:relative; padding:4px 16px calc(18px + var(--bot)) 22px; }
   .hb-actions .primary { display:block; width:100%; }
   @media (max-height: 800px) { .hb-actions { padding-bottom: calc(12px + var(--bot)); } }
+  /* after the last chapter, the game's sound credits in small print, as a book's imprint (hbCredits()) */
+  .hb-scroll .imprint { margin-top:28px; border-top:1px solid var(--rule); font-size:12px; line-height:1.4; color:var(--sub); }
+  .hb-scroll .imprint h2 { font-size:12px; font-weight:600; line-height:1.4; margin:10px 0 4px; }
+  .hb-scroll .imprint p { margin:0 0 6px; }
+  .hb-scroll .imprint ul { margin:0; padding:0; list-style:none; }
+  .hb-scroll .imprint a { color:inherit; }
   @media (max-width: 340px) { .hb-scroll { font-size:14px; } .hb-scroll .mark { font-size:13px; } }
 </style>
 </head>
@@ -3066,8 +3072,8 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 // A classic script, no modules and no build step; it defines window.LiveSound and nothing else. No call ever throws: an
 // error inside is one console.warn and silence for the rest of the session. Without Web Audio every call does nothing.
 // Nothing sounds, and no AudioContext is made, before unlock() is called in a user gesture.
-//   LiveSound.set({place, weather, hour, month, lit, curtain, people, signs, life, scene, seed}): what is heard
-//     now, as the scene on screen was given it; any of them, the rest kept from the last set(). place: a LiveScenes place ('home', 'shop',
+//   LiveSound.set({place, weather, hour, month, lit, curtain, people, signs, life, scene, seed, paused}): what is
+//     heard now, as the scene on screen was given it; any of them, the rest kept from the last set(). place: a LiveScenes place ('home', 'shop',
 //     'river', 'omut', 'lake', 'splash', 'story') or 'izba'; weather: a LiveScenes weather ('rain' is the drizzle,
 //     'downpour' the downpour: the game's two rains); hour 6..18; month 1..12, the izba's calendar (how much the birds
 //     sing, when the grasshoppers chirp; June when missing); lit is taken and changes nothing (an evening sounds the same
@@ -3076,7 +3082,9 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 //     17:00): the door does not close then, the village's beasts and the far motorcycle go on; signs: the hour's signs as the scene got them (only to fetch the splashes early; what sounds comes from
 //     the scene); life: the hour's life line, {key: 'omut/woodpecker'}, {key: 'omut/cuckoo-count', count: 4}, its key
 //     alone, or null; scene: the LiveScenes scene on screen (its clock and cues), null in the izba; seed: the scene's
-//     seed. A new place crossfades in 1.5 s (between the izba and the yard 1 s), a new weather in 2.5 s; a new hour (a
+//     seed; paused: true while the page holds its scene still (the game's handbook over it): the signs are silent, as
+//     under a paused scene, also with reduced motion, where the scene never plays and the module keeps the time itself
+//     (so a still scene cannot tell it); the beds and the life go on; false when it goes on. A new place crossfades in 1.5 s (between the izba and the yard 1 s), a new weather in 2.5 s; a new hour (a
 //     new scene, hour or life) keeps the bed and changes the birds over 4 s; what already sounds plays out, nothing new
 //     comes from the hour before.
 //   LiveSound.event(kind, o): what only the game knows. 'curtain': its soft swish; 'clock' with {n}: the wall clock's
@@ -3125,7 +3133,7 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 'use strict';
 if (window.LiveSound) return;
 
-const VERSION = '7';
+const VERSION = '8';
 const AC = window.AudioContext || window.webkitAudioContext;
 const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
 const MUTE_KEY = 'liveSound.muted';
@@ -3766,7 +3774,7 @@ class Engine {
   constructor(ctx, o = {}) {
     this.ctx = ctx; this.offline = !!o.offline; this.solo = o.solo ? new Set(o.solo) : null; this.files = o.files; this.base = o.base || 'sound/';
     this.bufs = {}; this.rooms = {}; this.cals = {}; this.loaded = new Map(); this.voices = new Set(); this.retired = []; this.cur = null;
-    this.cfg = {place: null, weather: 'overcast', hour: 12, month: 6, curtain: false, people: true, life: null, scene: null, seed: 0, signs: null};
+    this.cfg = {place: null, weather: 'overcast', hour: 12, month: 6, curtain: false, people: true, life: null, scene: null, seed: 0, signs: null, paused: false};
     this.birds = {next: 0, d0: 0, d1: 0, t1: 0, r: rnd('birds'), quiet: null}; this.around = [];
     this.life = null; this.marks = {sign: -Infinity, gust: -Infinity}; this.seen = new Set(); this.sync = {scene: null, off: 0, still: false};
     this.plays = o.log ? [] : null; this.sceneT0 = o.sceneT0 || 0;
@@ -3882,6 +3890,7 @@ class Engine {
       if ('month' in o && isFinite(o.month)) c.month = clamp(Math.round(o.month), 1, 12);
       if ('curtain' in o) c.curtain = !!o.curtain;
       if ('people' in o) c.people = o.people !== false;
+      if ('paused' in o) c.paused = o.paused === true;
       if ('seed' in o && isFinite(o.seed)) c.seed = Math.floor(+o.seed) | 0;
       if ('scene' in o) c.scene = o.scene && typeof o.scene.cues === 'function' ? o.scene : null;
       if ('life' in o) { const L = o.life, key = L && typeof L === 'object' ? L.key : L; c.life = key && LIFE[key] ? {key, count: L && L.count | 0} : null; }
@@ -3991,7 +4000,7 @@ class Engine {
     // an event's frames are looked for from now on every pump, not from the last pump's mark: the game starts the strike
     // and the scare at any moment, and their first frame (a third of a second in) often falls before the mark of a pump
     // that looked ahead before the event was there (the seen set keeps each frame's sound once)
-    const paused = !this.offline && !sc.playing && !reduced(), from = Math.max(this.marks.sign, st - .15), to = st + LOOK, efrom = st - .15;
+    const paused = !this.offline && (this.cfg.paused || !sc.playing && !reduced()), from = Math.max(this.marks.sign, st - .15), to = st + LOOK, efrom = st - .15;
     const gfrom = Math.max(this.marks.gust, st), gto = st + GUST_LOOK;
     let cues;
     try { cues = sc.cues(Math.min(efrom, gfrom), Math.max(to, gto)) || []; } catch (e) { cues = []; }
@@ -5301,7 +5310,8 @@ function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOU
 
 // ---------- sound ----------
 // The ambient sound of the places: LiveSound (the second <script>, sound.js, a copy from should_I_lab), its recordings
-// in sound/ (their authors and licences in sound/CREDITS.md). It follows every picture the game shows, as the scene was
+// in sound/ (their authors and licences in sound/CREDITS.md; the CC BY ones, SOUND_CREDITS, are also named at the end
+// of the handbook, hbCredits()). It follows every picture the game shows, as the scene was
 // given it (soundShow() from fill(), and the title screen's from showSplash()): the place, the weather, the hour, the
 // month by the izba's calendar, the light, the curtain in the izba, the people at the shop, the hour's signs and life
 // at a water, and the living scene itself, whose cues give the sound its moments (a sign sounds at the frame it is
@@ -5317,6 +5327,7 @@ function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOU
 // first heard, at sound/<name>.m4a?v=<its digest> (SOUND_FILES), and the service worker keeps it for offline play.
 // ---------- sound files: the recordings in sound/, put here by should_I_lab/art/anim/sound_to_game.py ----------
 const SOUND_FILES = {"barrel-1":"5ca1ace3","barrel-2":"ebe6bccf","barrel-3":"f113713f","board-1":"5a5c634b","board-2":"6f006f9b","board-3":"e1ddd471","capercaillie":"3695ed5d","chaffinch-1":"4b3d7031","chaffinch-2":"fb47fd77","clock-cuckoo":"03c5550f","clock-whirr":"2948c1ee","cow-1":"e0a6f64e","cow-2":"1cf54817","crack-1":"3ac17146","crack-2":"75582658","crack-3":"ae18f0ff","crack-4":"2eb18d05","cranes-1":"481b7f13","cranes-2":"845a6fbc","creak-1":"55dfe142","creak-2":"8e6183ad","crows":"8dbee130","cuckoo-1":"cb4bbca7","cuckoo-2":"8650b077","dog-1":"610b2142","dog-2":"e6967242","dog-near-1":"2c9119d2","dog-near-2":"15689fa2","door-1":"1e364026","door-2":"df0a723a","drip-1":"96a18146","drip-2":"8ad96578","drip-3":"c4334508","geese":"91e2e231","goldeneye":"8241a3ed","grasshoppers":"d4b5cf5f","hens-1":"df5df267","hens-2":"3dfa520c","kite":"1169923d","leaves":"cbeb3168","motorcycle":"d56fcc09","owl":"3ba13a13","pipit-1":"d81b5f4c","plip-1":"966c00fb","plip-2":"ce82be6f","plip-3":"22ba6870","plip-4":"72585abd","rain-heavy":"8349831f","rain-leaves":"1686a561","rain-water":"149f39f6","rain-water-heavy":"d2f474ca","raven-1":"ac726de2","raven-2":"047c11be","redwing-1":"e73a3fe2","reeds":"115eb25b","robin-1":"655036be","robin-2":"1f6a9f77","roe-bark":"b8a474f4","roof-downpour":"3a0b878b","roof-drizzle":"109017f1","rooster-1":"99367e3e","rooster-2":"730ede09","sip-1":"00b1d1fe","sip-2":"37a6f038","sip-3":"5600504e","skylark":"ec2f48d0","slap-1":"03c4eee4","slap-2":"6fc7af59","sparrows":"da138ac4","splash-1":"71cbed20","splash-2":"e06959fb","splash-3":"d6c26709","squirrel":"440777ee","swans":"3908e960","thrush-1":"9ee3f909","thrush-2":"f13e7104","tick-1":"2aed0285","tick-2":"4b371994","tin-1":"4b828cf3","tin-2":"3ecf9e2e","tin-3":"dc40194b","tits":"3697c713","tock-1":"5433ae91","tock-2":"54332799","warbler-1":"09f73a0b","woodpecker-1":"8398bfa2","woodpecker-2":"369b8e8e","wren-1":"1e0cbc06","yellowhammer-1":"20847bdf"};
+const SOUND_CREDITS = [{"what":"весничка","by":"Benboncan","src":"https://freesound.org/people/Benboncan/sounds/96959/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"},{"what":"обыкновенная овсянка","by":"reinsamba","src":"https://freesound.org/people/reinsamba/sounds/152224/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"},{"what":"лесной конёк","by":"YleArkisto","src":"https://freesound.org/people/YleArkisto/sounds/265059/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"},{"what":"белобровик","by":"YleArkisto","src":"https://freesound.org/people/YleArkisto/sounds/265062/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"},{"what":"ворон","by":"YleArkisto","src":"https://freesound.org/people/YleArkisto/sounds/264324/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"},{"what":"глухарь срывается","by":"YleArkisto","src":"https://freesound.org/people/YleArkisto/sounds/388973/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"},{"what":"белка цокает","by":"vincauc","src":"https://freesound.org/people/vincauc/sounds/856659/","lic":"CC BY 4.0","licUrl":"https://creativecommons.org/licenses/by/4.0/"}];
 // ---------- end of sound files ----------
 const SOUND = (() => { try {
   if (!window.LiveSound || !/^https?:$/.test(location.protocol) || LiveSound.stats().state === 'none') return null;
@@ -5358,6 +5369,16 @@ document.addEventListener('click', () => sound(L => L.unlock()));   // bubbling:
 // Safari on the iPhone sends no click for a tap on what is not a button (the picture, the journal), but its touchend
 // unlocks the sound too; a button's tap waits for its click, so that the screen it opens is the first one heard
 document.addEventListener('touchend', e => { if (!(e.target && e.target.closest && e.target.closest('button'))) sound(L => L.unlock()); }, {passive: true});
+// The service worker's sound cache (SOUND in sw.js) keeps this version's recordings only: one the game no longer has,
+// by name or by digest, goes once the page has settled (sw.js itself takes out a recording's older version when it
+// stores the newer one, but cannot know a name the game has dropped)
+const SOUND_CACHE = 'should-i-stay-sound';
+function soundPrune(){
+  if (!SOUND || !window.caches) return;
+  const stale = k => { const u = new URL(k.url), m = /\/sound\/([\w-]+)\.m4a$/.exec(u.pathname); return !m || SOUND_FILES[m[1]] !== u.searchParams.get('v'); };
+  caches.has(SOUND_CACHE).then(has => has && caches.open(SOUND_CACHE)
+    .then(c => c.keys().then(ks => Promise.all(ks.filter(stale).map(k => c.delete(k)))))).catch(() => {});
+}
 
 // ---------- the scene picture ----------
 // Two layers lie one on the other, each with a still picture (<img>) and a living scene (<canvas>): a new frame fades
@@ -5581,7 +5602,7 @@ function render(){
     g.appendChild(btn('Мастерить снасти', `1 ч · +${rub(WAGE)}`, craft, 'secondary', left < 1));
     g.appendChild(btn('Ничего не делать', '1 ч', idle, 'secondary', left < 1));
     actions.appendChild(g);
-    actions.appendChild(links(btn(`Мастерить до вечера\u00a0· +${rub(left*WAGE)}`, '', craftAll, 'link'), soundLink()));
+    actions.appendChild(links(btn(`Мастерить до вечера\u00a0·\u00a0+${rub(left*WAGE)}`, '', craftAll, 'link'), soundLink()));
   }
 
   else if (S.phase==='yard'){   // outside the izba: where to go; back inside costs no time
@@ -7286,7 +7307,18 @@ function hbHTML(){
   return `<img class="cover" alt="" src="${IMG.book.cover}"><h1>Справочник<br><span>рыболова-любителя</span></h1>`
     + `<nav class="toc" id="hb-toc" aria-label="Оглавление"><h2>Оглавление</h2>`
     + HB_TEXT.filter(c => c.n).map(c => `<button type="button" class="link" data-to="${c.id}">${c.h}</button>`).join('') + '</nav>'
-    + HB_TEXT.map(part).join('');
+    + HB_TEXT.map(part).join('') + hbCredits();
+}
+// After the last chapter, in small print as a book's imprint, the game's sound credits: not the book's text (nor in
+// docs/12-spravochnik.md). The recordings under CC BY 4.0 are named wherever they sound, with their author, source
+// and licence, as the licence asks: SOUND_CREDITS, written by should_I_lab's sound_to_game.py from its CREDITS.md.
+// The links open beside the game, never in its place
+function hbCredits(){
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const a = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+  if (typeof SOUND_CREDITS === 'undefined' || !SOUND_CREDITS.length) return '';
+  return `<section class="imprint" id="hb-sound"><h2>Звуки</h2><p>${tie(`Записи с сайта ${a('https://freesound.org/', 'Freesound')}: обрезаны, сведены в моно, отфильтрованы и выровнены по громкости. Почти все — в общественном достоянии (CC0), а эти — под лицензией CC\u00a0BY\u00a04.0:`)}</p><ul>`
+    + SOUND_CREDITS.map(c => `<li>${esc(c.what)} — ${a(c.src, c.by)}, ${a(c.licUrl, c.lic.replace(/ /g, '\u00a0'))}</li>`).join('') + '</ul></section>';
 }
 // how the book stands while it opens: the frames at a whole scale, as large as the screen allows round the closed
 // cover (64x90) with room about it, and their box (72x96) on the screen
@@ -7311,10 +7343,13 @@ function hbBuild(){
     const to = $(`hb-${b.dataset.to}`); if (to) el.scrollTo({top: Math.max(0, to.offsetTop - 12), behavior: FADE ? 'smooth' : 'auto'});
   };
 }
-// the living scene under the pages stands still while they are open, and goes on from the same time when they close
+// the living scene under the pages stands still while they are open, and goes on from the same time when they close;
+// the sound's signs are silent meanwhile (paused: with reduced motion the scene never plays, so the sound cannot tell
+// from the scene that it is held), its beds go on
 function hbStill(on){
   if (on){ hb.still = pic.live.filter(l => l && l.pause && l.playing); hb.still.forEach(l => l.pause()); }
   else { hb.still.forEach(l => l.play()); hb.still = []; }
+  sound(L => L.set({paused: on}));
 }
 // The phone's back button (Android, a swipe back on an iPhone) closes the book, not the game: opening it adds a step
 // to the browser's history at the same address, which the back button takes away (popstate), and «Закрыть» and
@@ -7440,6 +7475,7 @@ $('splashGo').onclick = () => {
 addEventListener('resize', fitSplash);
 render(); if (INTRO.has(S.phase)) showSplash();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+setTimeout(() => whenIdle(soundPrune), 3000);   // the sound cache without the recordings this version no longer has
 </script>
 </body>
 </html>

@@ -3,12 +3,14 @@
 Записи звука игры «Уйти или остаться» (папка `sound/`). Каждая вырезана из записи с [Freesound](https://freesound.org):
 обрезана, сведена в моно, отфильтрована, выровнена по громкости и сжата в AAC (`.m4a`, моно, 48 кбит/с); что сделано
 с каждой — в последнем столбце. Записи под CC0 указания автора не требуют, они названы для порядка. Записи под
-CC BY 4.0 используются с указанием автора, источника и лицензии — они в списке ниже и в таблице.
+CC BY 4.0 используются с указанием автора, источника и лицензии — они в списке ниже и в таблице, а в самой игре —
+в конце «Справочника рыболова-любителя».
 
 The recordings of the game's sound (the `sound/` folder), each cut from a recording on [Freesound](https://freesound.org):
 trimmed, mixed to mono, filtered, levelled and encoded as AAC (`.m4a`, mono, 48 kbit/s); the last column says what was
 done to each. The CC0 recordings need no credit and are listed for the record. The CC BY 4.0 recordings are used with
-their author, source and licence credited in the list below and in the table.
+their author, source and licence credited in the list below and in the table, and in the game itself at the end of
+its handbook.
 
 Без записи звучат: свист удилища, шишка в мох, шорох занавески, комар и свист рябчика — их делает код.
 Made in code, with no recording: the rod's swish, a cone falling into moss, the curtain, a mosquito, the hazel grouse.
