@@ -5205,6 +5205,10 @@ const valyaHere = () => S.day === 1 || comes('va', SHOP_P.va);   // never away o
 // the rumour that nobody catches anything has Petrovich at the water (rumorLines()): once the journal has it today, he
 // does not come to the shop that day, as the neighbour seen at a water does not
 const PE_AWAY = /Петрович (?:с утра сидит|весь день просидел) зазря/;
+// and the other way round: once the journal has seen him at the shop today (a line of his own, as the pool writes
+// them: «Петрович: «…».», «Петрович курит на крыльце.»; every piece with him has one, no other piece does), that
+// rumour on a later arrival has him at the water only in the morning, so he stays at the shop
+const PE_HERE = /^Петрович[: ]/;
 // who is at the shop in the hour from hr:00 today, by their habits (11, «Кто у магазина»); Sobol is always there
 function atShop(hr){
   const at = new Set(), dow = weekday(), wx = lifeWeather(hr - START), put = (id, yes) => { if (yes) at.add(id); };
@@ -5396,11 +5400,14 @@ function go(dest){
 }
 // the bench's talk on arrival: on a day without power the power first, then baba Nyura's rumour and baba Valya's reply.
 // On a day Valya is away (atShop()) the arrival says so, Nyura speaks of the power and the rumour has no reply; the
-// reply is drawn all the same (choice() from rnd()), so the days stay as they were
+// reply is drawn all the same (choice() from rnd()), so the days stay as they were. «Нигде не клюёт» has Petrovich at
+// the water (PE_AWAY), unless the journal has already seen him at the shop today (PE_HERE): then he sat there only in
+// the morning. Only the words differ: the rumour is the same, and so are the numbers it draws
 function rumorLines(){
   const {w, lv} = S.D.rumor[Math.min(S.t, HOURS-1)];
   const a = lv===2 && w ? `Баба Нюра: «Колька только что ${WHERE[w]} во какую рыбину взял!»`
           : lv===1 && w ? `Баба Нюра: «Говорят, ${WHERE[w]} клюёт помаленьку».`
+          : S.log.some(e => PE_HERE.test(e.text)) ? 'Баба Нюра: «Говорят, нигде не клюёт. Петрович утром зазря просидел».'
           : S.t < CHANGE_HOUR ? 'Баба Нюра: «Говорят, нигде не клюёт. Петрович с утра сидит зазря».'
                               : 'Баба Нюра: «Говорят, нигде не клюёт, Петрович весь день просидел зазря».';
   const b = choice(['Баба Валя: «Да брешут».','Баба Валя: «Ну-ну».','Баба Валя: «Сходите да проверьте».','Баба Валя молча кивает.']);
@@ -5734,9 +5741,9 @@ function trailFromLog(){
 // no rnd() or hashOf()). Its button, a small book on a paper plate in the scene's bottom left corner, is on every
 // screen of the day and the evening; it shows the closed cover on a dark ground, opens by itself in two frames (the
 // cover half open on its spine, then the title page; a tap on the cover opens it at once) and fades into its pages.
-// With reduced motion the pages come at once, the still cover at their top. «Закрыть» or Escape fade them out over
-// the screen as it was; the living scene under them stands still while they are open. The pictures are IMG.book,
-// from should_I_lab's art/tools/book.py
+// With reduced motion the pages come at once, the still cover at their top. «Закрыть», Escape or the phone's back
+// button fade them out over the screen as it was; the living scene under them stands still while they are open. The
+// pictures are IMG.book, from should_I_lab's art/tools/book.py
 // A page: its heading and paragraphs; {m} is the old man's pencil note in the margin; a chapter (n) has its pages (s)
 const HB_TEXT = [
   {id: 'pre', h: 'Вместо предисловия', p: [
@@ -5806,7 +5813,7 @@ function hbHTML(){
 // how the book stands while it opens: the frames at a whole scale, as large as the screen allows round the closed
 // cover (64x90) with room about it, and their box (72x96) on the screen
 const HB_SHUT = 400, HB_FRAME = 150, HB_FADE = 200, HB_OUT = 150;
-const hb = {open: false, step: -1, timer: 0, top: 0, still: [], built: false, pre: null, kb: false};
+const hb = {open: false, step: -1, timer: 0, top: 0, still: [], built: false, pre: null, kb: false, hist: false};
 function hbScale(){
   const w = innerWidth, h = innerHeight;
   return Math.max(3, Math.floor(Math.min((w - 48)/64, (h - 140)/90, w/72, h/96)));
@@ -5831,9 +5838,14 @@ function hbStill(on){
   if (on){ hb.still = pic.live.filter(l => l && l.pause && l.playing); hb.still.forEach(l => l.pause()); }
   else { hb.still.forEach(l => l.play()); hb.still = []; }
 }
+// The phone's back button (Android, a swipe back on an iPhone) closes the book, not the game: opening it adds a step
+// to the browser's history at the same address, which the back button takes away (popstate), and «Закрыть» and
+// Escape take it away themselves (history.back()). A step left over from a reload with the book open goes at once
+// (below). Only the browser's history: no S, no save()
 function openHandbook(){
   if (hb.open || busy || tapsLocked() || !S.D || INTRO.has(S.phase)) return;
   hb.open = true; hideToast(); hbBuild();   // the hour's toast goes: its lines are in the journal
+  try { history.pushState({hb: true}, ''); hb.hist = true; } catch (e) { hb.hist = false; }
   try { hb.kb = $('bookBtn').matches(':focus-visible'); } catch (e) { hb.kb = false; }   // opened from the keyboard
   $('wrap').inert = true; $('hb').classList.remove('out'); $('hb').hidden = false;
   if (!FADE) return hbPages();   // reduced motion: no frames and no fading, the pages at once
@@ -5863,8 +5875,10 @@ function hbPages(){
   const shown = () => { if (hb.open && hb.step === 3){ $('hbAnim').hidden = true; hbStill(true); } };
   if (FADE) hb.timer = setTimeout(shown, HB_FADE); else shown();
 }
-function closeHandbook(){
-  if (!hb.open) return;
+// back: closed by the back button, whose popstate has already taken the book's step away
+function closeHandbook(back){
+  if (!hb.open || $('hb').classList.contains('out')) return;   // closed already, or fading out
+  if (hb.hist){ hb.hist = false; if (back !== true) try { history.back(); } catch (e) {} }
   clearTimeout(hb.timer); if (hb.step === 3) hb.top = $('hbScroll').scrollTop;
   hbStill(false);
   const done = () => {
@@ -5877,11 +5891,17 @@ function closeHandbook(){
 }
 $('bookIcon').src = IMG.book.icon;
 $('bookBtn').onclick = openHandbook;
-$('hbClose').onclick = closeHandbook;
+$('hbClose').onclick = () => closeHandbook();
 $('hb').onclick = () => { if (hb.step === 0) hbTurn(); };   // a tap on the closed cover opens it at once
 // the frames are decoded before they are needed, so a frame never comes in empty
 whenIdle(() => { hb.pre = ['shut', 'half', 'open'].map(k => { const i = new Image(); i.src = IMG.book[k]; if (i.decode) i.decode().catch(() => {}); return i; }); });
 addEventListener('keydown', e => { if (hb.open && e.key === 'Escape'){ e.preventDefault(); closeHandbook(); } });
+// back to a step that is not the book's: the book closes. Back to one that is keeps it open (the book opened again
+// before the history went back from its last closing)
+addEventListener('popstate', e => { if (hb.open && !(e.state && e.state.hb)){ hb.hist = false; closeHandbook(true); } });
+// reloaded with the book open, the game starts closed on the book's step: it goes back to the game's own at once (the
+// same page, no reload), so the back button never has a step that does nothing
+try { if (history.state && history.state.hb) history.back(); } catch (e) {}
 addEventListener('resize', () => { if (hb.open){ hbSize(); hbEdges(); } });
 // ---------- end of the handbook ----------
 addEventListener('resize', () => { fitEvening(); fitLiving(); aimAll(); fitLog(); });
