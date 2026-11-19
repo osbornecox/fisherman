@@ -77,8 +77,9 @@
   .primary { min-height:54px; background:var(--ink); color:var(--paper); border:none; font-size:18px; font-weight:600; }
   .secondary { min-height:50px; background:transparent; border:2px solid var(--ink); font-size:14px; line-height:1.15; padding:4px; }
   .link { min-height:44px; background:transparent; border:none; font-size:15px; text-decoration:underline; }
-  /* the quiet link under the buttons, in the izba «Мастерить до вечера», on the evening «Начать заново»: the whole row
-     to itself; two would stand side by side in the height of one, a long one breaking into two lines in its half */
+  /* the quiet links under the buttons: in the izba «Мастерить до вечера», on the evening «Начать заново», each with
+     the sound's switch («Выключить звук») beside it, side by side in the height of one, a long one breaking into two
+     lines in its half; one alone (no sound in this browser) takes the whole row */
   .links { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; }
   .links > :only-child { grid-column: 1 / -1; }
   .links .link { line-height:1.1; padding:0 4px; }
@@ -194,6 +195,17 @@
   .bookbtn[hidden] { display:none; }
   .bookbtn span { width:34px; height:34px; background:var(--paper); box-shadow:0 0 0 2px var(--ink); display:flex; align-items:center; justify-content:center; }
   .bookbtn img { display:block; width:24px; height:28px; image-rendering:pixelated; }
+  /* the sound's switch, «звук»: a small paper plate in the scene's bottom right corner, quieter than the handbook's
+     (lower and smaller: the shop's dog stands just over it), 6 px from the edges, the tap 44 px high round it; struck
+     through while the sound is off. Outdoors (the yard, the shop, the waters) and on the two screens before the first
+     day; the izba and the evening have a link under the buttons instead (soundLink()) */
+  .soundbtn { position:absolute; right:0; bottom:0; min-width:56px; height:44px; padding:0 6px 6px 0; border:none; background:transparent; z-index:3;
+              display:flex; align-items:flex-end; justify-content:flex-end; color:var(--ink); }
+  .soundbtn[hidden] { display:none; }
+  .soundbtn span { position:relative; display:block; height:18px; padding:0 5px; background:var(--paper); box-shadow:0 0 0 2px var(--ink);
+                   font-size:12px; line-height:18px; font-weight:500; }
+  .soundbtn[aria-pressed="false"] span { color:var(--sub); }
+  .soundbtn[aria-pressed="false"] span::after { content:''; position:absolute; left:3px; right:3px; top:8px; height:2px; background:var(--ink); }
   /* the book over the whole game: the closed cover and the frames of its opening on a dark ground, then its pages */
   .hb { position:fixed; inset:0; z-index:20; background:rgba(43,41,37,.85); display:flex; align-items:center; justify-content:center; }
   .hb[hidden], .hb [hidden] { display:none; }
@@ -238,6 +250,7 @@
     <div class="hud"><div class="chip" id="hudTime"></div><div class="chip" id="hudMoney"></div></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <button type="button" class="bookbtn" id="bookBtn" aria-label="Справочник рыболова-любителя" hidden><span><img alt="" id="bookIcon"></span></button>
+    <button type="button" class="soundbtn" id="soundBtn" aria-pressed="true" hidden><span>звук</span></button>
   </div>
   <div class="panel" id="panel"></div>
   <div class="sr" id="say" role="log" aria-live="polite"></div>
@@ -3029,6 +3042,1384 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 // ---------- end of scenes.js ----------
 </script>
 <script>
+// ---------- sound.js: the living sound, put here by should_I_lab/art/anim/sound_to_game.py; change it there ----------
+// Living sound: the ambient sound of «Уйти или остаться», the lab's prototype (docs/09-zvuk.md says what sounds, where,
+// when and how loud; this file is how).
+//
+// Three layers. Each place has its bed and each weather its layer over it. A calm place is nearly quiet: a faint air,
+// and now and then a soft puff of breeze in its leaves, grass or reeds (a few seconds each, at uneven gaps; the yard's
+// longer), never a constant drone; the river's water is a soft steady noise with no bubble in it, a faint far flow
+// under it (water(): the one the author chose of five); the lake has no sound of water at all. The wind is the same
+// rustle, steadier and stronger, swelling with the gusts the scene draws. Rain is recorded: drizzle and downpour on
+// water, on leaves and grass, on the izba's roof from inside, drops off the eaves onto the ground, into the barrel, onto
+// the tin sill and the porch's boards, each from its side of the house. The rustle of leaves and reeds and the
+// grasshoppers of a sunny summer day are recordings too, played on and on as overlapping pieces from random places, so
+// they never come round the same. Over them the one-shots: recordings (birds, the village's beasts and its people's
+// door and a far motorcycle, the forest's twigs, the wall clock, the splashes) and a few made in code (the rod's swish,
+// a cone, the curtain, a mosquito, a hazel grouse when its recording is missing). The sound says nothing about the fish
+// beyond the journal: a splash sounds only with a sign the scene draws, at the frame it draws it (scene.cues of
+// scenes.js), the strike and the scare with their frames, and no bed has a plop in it. The life around the water sounds
+// in the hour the game chose its line for. Everything random comes from generators seeded by the scene's seed, the
+// place and the hour (and the buffers' own fixed seeds): no Math.random, so an hour sounds the same after a reload and a
+// check renders the same.
+//
+// A classic script, no modules and no build step; it defines window.LiveSound and nothing else. No call ever throws: an
+// error inside is one console.warn and silence for the rest of the session. Without Web Audio every call does nothing.
+// Nothing sounds, and no AudioContext is made, before unlock() is called in a user gesture.
+//   LiveSound.set({place, weather, hour, month, lit, curtain, people, signs, life, scene, seed}): what is heard
+//     now, as the scene on screen was given it; any of them, the rest kept from the last set(). place: a LiveScenes place ('home', 'shop',
+//     'river', 'omut', 'lake', 'splash', 'story') or 'izba'; weather: a LiveScenes weather ('rain' is the drizzle,
+//     'downpour' the downpour: the game's two rains); hour 6..18; month 1..12, the izba's calendar (how much the birds
+//     sing, when the grasshoppers chirp; June when missing); lit is taken and changes nothing (an evening sounds the same
+//     with and without power); curtain: true in the izba when the curtain is pulled aside (the street a little nearer and
+//     brighter); people: false at the shop when its bench is empty and its door locked (a day without power from
+//     17:00): the door does not close then, the village's beasts and the far motorcycle go on; signs: the hour's signs as the scene got them (only to fetch the splashes early; what sounds comes from
+//     the scene); life: the hour's life line, {key: 'omut/woodpecker'}, {key: 'omut/cuckoo-count', count: 4}, its key
+//     alone, or null; scene: the LiveScenes scene on screen (its clock and cues), null in the izba; seed: the scene's
+//     seed. A new place crossfades in 1.5 s (between the izba and the yard 1 s), a new weather in 2.5 s; a new hour (a
+//     new scene, hour or life) keeps the bed and changes the birds over 4 s; what already sounds plays out, nothing new
+//     comes from the hour before.
+//   LiveSound.event(kind, o): what only the game knows. 'curtain': its soft swish; 'clock' with {n}: the wall clock's
+//     works whirr and its cuckoo calls n times. 'strike' and 'scare' are heard from the scene's frames, not from this
+//     call: here they only make the module look at the scene at once. 'hear' with {f}: one of the place's own sounds
+//     (AROUND: the door, the motorcycle, a dog...) at once, for the lab's demo, which cannot wait minutes for them.
+//   LiveSound.unlock(): in a user gesture (the game calls it on every tap): makes or resumes the AudioContext; the first
+//     sound fades in over 3 s. Idempotent, and it wakes a context the system interrupted (a call, Siri).
+//   LiveSound.mute(on): remembered for the player (localStorage 'liveSound.muted'); fades out over 0.3 s and puts the
+//     context to sleep. Turning the sound on is a gesture too: mute(false) unlocks and fades in over 1 s.
+//     LiveSound.muted tells.
+//   LiveSound.heard(key) -> true once the sound of the hour's life line `key` has begun (the game then writes the line
+//     before «Смотал удочки», as a drawn one).
+//   LiveSound.preload(place) -> a promise of true once the place's recordings are decoded, false if some cannot be; it
+//     never rejects. Unlocked only: before that there is no context to decode them in.
+//   LiveSound.files: name -> URL, an ArrayBuffer of an encoded file (the demo's embedded ones), a function (ctx, rnd)
+//     -> AudioBuffer, or null (there is no such file: nothing is fetched); a name not in it is fetched from
+//     LiveSound.base + name + '.m4a' (base 'sound/', next to the page, unless the page sets another). A file that cannot
+//     be had is made in code if the module can make it (the hazel grouse's whistles), or comes from sound-stubs.js if the
+//     page loaded it (window.LiveSoundStubs: the lab's rough stand-ins), or is silent. LiveSound.NAMES lists every
+//     recording the module may ask for.
+//   LiveSound.render({seconds, sampleRate, set, timeline, solo, sceneT0}) -> a promise of {buffer, plays, nodes}: the
+//     same sound rendered in an OfflineAudioContext, for the checks and the demo. set as for set(); timeline: [{at, set}
+//     or {at, event, o}] in seconds; solo: the tags to keep ('bed', 'weather', 'insects', 'water': the river's,
+//     'birds', 'around', 'life', 'signs', 'events', 'clock'); the scene's clock is sceneT0 + the render's. plays lists
+//     every one-shot: {at, name, tag, db; src: a source of drops' id}.
+//   LiveSound.stats() -> {state, voices, nodes, loaded, scapes}; with LiveSound.debug = true also log, the last 200 one-shots
+//     ({at: ctx time, wall: when it is heard by performance.now(), name, tag, x}). LiveSound.version.
+// Levels: every continuous layer is given its loudness in LUFS, BS.1770 on the mono sum (L + R) / 2 as the lab's checks
+// and ffmpeg's ebur128 measure it. A noise made in code is measured once through its own filters (calib: the same
+// biquads Web Audio runs, then the K weighting), a recording once decoded (its body through the layer's filters), and
+// each gets the gain that puts it at its level. Every one-shot recording is measured once decoded too (its loudest
+// 400 ms, K-weighted: its momentary loudness) and played at the momentary loudness its sound is given, whatever level
+// the file was prepared at, but never with its peak over -6 dBFS in either channel (VOICE_PEAK): a click (a plip, a
+// twig) would need a peak near full scale for its level, so it plays quieter, and of a sound's variants the ones the cap
+// leaves more than 3 dB short are not taken while another can come nearer. The output goes through a soft clip that
+// leaves everything under -6 dBFS untouched and never lets a sample over -3.1 dBFS (a DynamicsCompressorNode was not
+// used: Chrome adds about 4 dB of makeup gain to all of it).
+// Cost: per place one scape of about 20-40 nodes (noise sources, biquads, gains, one ConvolverNode, and the pieces of
+// the recorded beds playing: two or three nodes each, two at a time per bed), crossfaded with the next; at most 8
+// one-shots at once; no ScriptProcessorNode, no AudioWorklet. The beds' slow changes are buffers of smooth random curves
+// played very slowly into the gains, so the main thread only wakes every 200 ms to schedule the one-shots, the puffs and
+// the recorded beds' next pieces half a second or more ahead (and the gusts 3 s ahead).
+
+(() => {
+'use strict';
+if (window.LiveSound) return;
+
+const VERSION = '7';
+const AC = window.AudioContext || window.webkitAudioContext;
+const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+const MUTE_KEY = 'liveSound.muted';
+const PLACES = ['home', 'shop', 'river', 'omut', 'lake', 'splash', 'story', 'izba'];
+const WEATHERS = ['overcast', 'sun', 'rain', 'wind', 'fog', 'downpour'];
+const WATERS = new Set(['river', 'omut', 'lake']);
+const TICK = .2, LOOK = .5, GUST_LOOK = 3;   // s: the pump's period, how far ahead it schedules one-shots, and gusts
+const MARGIN = .02;     // s a sound comes after its frame: never before it
+const VOICES = 8, BIRD_VOICES = 4, VOICE_PEAK = .5;   // one-shots at once; a one-shot's highest peak in either channel (-6 dBFS)
+const PAN_COMP = 3.01;  // dB: a centred mono voice is 3 dB down on the mono sum (L + R) / 2 of its equal-power pan
+
+// ---------- small things ----------
+const dB = x => Math.pow(10, x / 20);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const panOf = x => clamp(.8 * (x / 130 - .5), -.4, .4);   // a column of the 130 px picture: at most 0.4 either way
+const sumOf = p => { const a = (p + 1) * Math.PI / 4; return (Math.cos(a) + Math.sin(a)) / 2; };   // a mono voice's share of the mono sum at pan p
+function hash(...v) {   // FNV-1a over numbers (as 32-bit integers) and strings, mixed
+  let h = 0x811c9dc5;
+  for (const x of v) {
+    const s = String(typeof x === 'number' ? x | 0 : x);
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12;
+  }
+  return h >>> 0;
+}
+function rnd(...seed) {   // a seeded generator in [0, 1) (mulberry32), with u(a, b), int(a, b) and pick(list)
+  let a = hash(...seed);
+  const f = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  f.u = (lo, hi) => lo + (hi - lo) * f();
+  f.int = (lo, hi) => lo + Math.floor((hi - lo + 1) * f());
+  f.pick = list => list[Math.floor(f() * list.length)];
+  return f;
+}
+
+// ---------- what sounds where ----------
+const ROOM = {izba: [.3, 0, 0], home: [.6, .02, 0], shop: [.6, .02, 0], river: [.9, .03, 0], omut: [1.2, .01, 1],   // the echo:
+  lake: [2, .2, 0], splash: [.9, .05, 0], story: [.9, .05, 0]};   // its length, its delay and if it is dark (the spruce wall)
+const DOWNPOUR_DB = -6;   // every one-shot in the downpour: the rain covers it
+const CALM = new Set(['overcast', 'sun']);   // the weathers with puffs of breeze
+// The recordings, by sound: how many variants ('name-1'...; 0: one file named as the sound).
+const FILES = {splash: 3, slap: 2, sip: 3, plip: 4, chaffinch: 2, robin: 2, thrush: 2, warbler: 1, wren: 1, yellowhammer: 1,
+  skylark: 0, pipit: 1, redwing: 1, sparrows: 0, hens: 2, rooster: 2, cow: 2, dog: 2, 'dog-near': 2, door: 2, motorcycle: 0,
+  'roe-bark': 0, kite: 0, geese: 0, cranes: 2, swans: 0, crows: 0, raven: 2, goldeneye: 0, woodpecker: 2, 'hazel-grouse': 0,
+  tits: 0, cuckoo: 2, owl: 0, capercaillie: 0, squirrel: 0, elk: 0, crack: 4, creak: 2, tick: 2, tock: 2, 'clock-cuckoo': 0,
+  'clock-whirr': 0,
+  // the recorded beds: pieces of them play on and on (stream below)
+  'rain-water': 0, 'rain-water-heavy': 0, 'rain-leaves': 0, 'rain-heavy': 0, 'roof-drizzle': 0, 'roof-downpour': 0,
+  drip: 3, barrel: 3, tin: 3, board: 3, leaves: 0, reeds: 0, grasshoppers: 0};
+const variants = s => FILES[s] ? Array.from({length: FILES[s]}, (_, i) => `${s}-${i + 1}`) : [s];
+// Signs: the sound of each, near the near bank and at the far edge of the water (LUFS, momentary), docs/09-zvuk.md. Three
+// dB under v2's: the beds under them are quieter now, and a splash need not stand 14 LU over a murmur.
+const SIGN_SOUND = {'splash/shore': {f: 'splash', near: -27, far: -31}, 'splash/under': {f: 'slap', near: -33, far: -36},
+  'splash/calm': {f: 'sip', near: -37, far: -39}, boil: {f: 'plip', near: -35, far: -37}};
+const WATER_Y = {river: [88, 140], omut: [86, 150], lake: [86, 152]};   // the rows of the water, far edge to near bank
+// The levels of the signs, the strike and the scare are the river's: over the stiller waters a little quieter.
+const WATER_DB = {river: 0, omut: -3, lake: -2};
+const FLOAT_X = {river: 66, omut: 30, lake: 60}, ROD_X = {river: 84, omut: 42, lake: 74};   // the float, the rod's middle
+// Birds: each place its own (weight, the hours, how far: 'far' always far), and how much at an hour, in a weather, a
+// month. Rarer than v2's: a song every 8 s on average at density 1 (v2: 2.5 s), the yellowhammer seldom but at the omut,
+// whose forest is near; the sparrows are the village's alone (AROUND).
+const BIRDS = {
+  home: [['warbler', 3], ['chaffinch', 2], ['pipit', 1.5], ['thrush', 1.5, [6, 9, 16, 18]], ['robin', 1, [16, 18]],
+         ['skylark', 1, [6, 15], 'far'], ['yellowhammer', .4, 0, 'far']],
+  river: [['skylark', 3, [6, 16], 'far'], ['thrush', 1, [16, 18], 'far'], ['chaffinch', .5, 0, 'far'], ['yellowhammer', .3, 0, 'far']],
+  omut: [['robin', 2], ['wren', 1.5], ['chaffinch', 1.5], ['yellowhammer', 1.5], ['thrush', 1.2], ['redwing', 1, [16, 18]]],
+  lake: [['thrush', 1, 0, 'far'], ['warbler', 1, 0, 'far']],
+  shop: [['chaffinch', 1]],
+  story: [['skylark', 1, 0, 'far'], ['chaffinch', 1, 0, 'far']],
+};
+BIRDS.izba = BIRDS.splash = BIRDS.home;
+const BIRD_PLACE = {home: 1, izba: 1, splash: .8, river: .5, omut: .9, lake: .3, shop: .4, story: .3};
+const BIRD_HOUR = {6: 1, 7: .9, 8: .7, 9: .5, 10: .35, 11: .25, 12: .25, 13: .25, 14: .25, 15: .3, 16: .45, 17: .55, 18: .45};
+const BIRD_WEATHER = {overcast: 1, sun: 1, rain: .4, wind: .4, fog: .5, downpour: 0};
+const BIRD_MONTH = m => m <= 6 ? 1 : m === 7 ? .7 : m === 8 ? .35 : m === 9 ? .2 : .15;
+const BIRD_EVERY = 8;   // s between two songs at density 1, on average
+const BIRD_LUFS = [-31, -35, -40];   // a song near, at mid distance, far (momentary: a song's loudest 400 ms)
+// What sounds round a place by itself, at uneven times: the village's beasts (far from the yard and the river, near at
+// the shop), the shop's door, a motorcycle far off (the village is the one place with people's sounds, never voices),
+// the forest's twigs at the omut. every: [a, b] s between two; hours: when; lufs: momentary; x: where (columns of the
+// picture), dist 0 near .. 1 far; wx: how many times the wait in a weather (0: not at all; else WX_WAIT); fade: [in, out]
+// s on the sound (a pass); pass: it moves across; vs: only these variants; lp: a lowpass of its own.
+const AROUND = {
+  home: [{f: 'rooster', hours: [6, 9], every: [200, 480], lufs: -36, x: [4, 30], dist: .9},
+         {f: 'cow', hours: [8, 17], every: [240, 600], lufs: -37, x: [4, 40], dist: .9},
+         {f: 'dog', every: [300, 800], lufs: -38, x: [4, 40], dist: .9},
+         {f: 'hens', hours: [7, 18], every: [180, 420], lufs: -40, x: [4, 40], dist: .9, lp: 2000}],
+  river: [{f: 'hens', hours: [7, 18], every: [240, 600], lufs: -42, x: [6, 54], dist: 1, lp: 1500},
+          {f: 'rooster', hours: [6, 8], every: [300, 600], lufs: -38, x: [6, 54], dist: .95},
+          {f: 'cow', hours: [8, 17], every: [300, 700], lufs: -39, x: [6, 54], dist: .95},
+          {f: 'dog', every: [400, 900], lufs: -40, x: [6, 54], dist: .95}],
+  omut: [{f: 'crack', every: [40, 120], lufs: -38, x: [0, 130], dist: .8, vs: ['crack-1', 'crack-2', 'crack-4'], wx: {downpour: 0, rain: 2}}],
+  shop: [{f: 'sparrows', every: [7, 14], lufs: -34, x: [60, 100], dist: .3, wx: {fog: 3, rain: 2, downpour: 0}},
+         {f: 'hens', every: [25, 70], lufs: -31, x: [85, 125], dist: .25},
+         {f: 'dog-near', every: [90, 240], lufs: -31, x: [90, 120], dist: .3},
+         {f: 'cow', hours: [7, 18], every: [120, 300], lufs: -33, x: [0, 30], dist: .6},
+         {f: 'rooster', hours: [6, 9], every: [90, 200], lufs: -30, x: [90, 125], dist: .5},
+         // the door closes softly, a rag tied on it (the author's second listening: no spring, no slam); only while
+         // the shop is open: not with people: false, when the bench is empty and the door locked
+         {f: 'door', hours: [8, 18], every: [60, 200], lufs: -32, x: [70, 95], dist: .3, people: true},
+         {f: 'motorcycle', hours: [8, 19], every: [360, 900], lufs: -37, x: [0, 130], dist: .9, fade: [3, 4], pass: true, wx: {downpour: 0, fog: 2}}],
+  story: [{f: 'rooster', once: [4, 8], lufs: -33, x: [50, 80], dist: .9}],
+};
+// the izba hears the yard's through the wall (Scape.wall), the hens farther still
+AROUND.izba = AROUND.home.map(a => a.f === 'hens' ? {...a, lufs: a.lufs - 4} : a);
+const WX_WAIT = {fog: 2, rain: 1.5, downpour: 3};
+// The life lines that sound (docs/09-zvuk.md «Жизнь вокруг воды»): the file, how it falls in its hour, how loud (LUFS,
+// momentary), where (x of the picture; random when missing) and how far (0 near .. 1 far: duller and more echo). at:
+// 'once' (2-6 s into the hour, again 3-6 min later if the hour stays), 'only' (once in the hour), [a, b] (2-6 s in, then
+// every a to b s), 'drawn' (with the scene's drawing of it: its cues; a drawn fly-by with `pass` or `calls` sounds as the
+// flock crosses, Life.flyBy), 'gusts' (on every second or third gust). fly: [in, out] s of fade on each sound (the
+// fly-bys: they come and go softly). vs: only these variants. The village across the river sounds as far off in its
+// lines as it does by itself (AROUND.river): the same loudness and distance.
+const LIFE = {
+  'river/rooster': {f: 'rooster', at: 'once', lufs: -38, x: 20, dist: .95, fogLp: 2500},
+  'river/dog': {f: 'dog', at: 'only', lufs: -40, x: 26, dist: .95},
+  'river/cow-fog': {f: 'cow', at: [40, 90], lufs: -39, x: 40, dist: .95, lp: 1800},
+  'river/roe-bark': {f: 'roe-bark', at: 'only', lufs: -33, x: 96, dist: .85},
+  'river/kite': {f: 'kite', at: 'drawn', every: [15, 40], lufs: -31, dist: .6},
+  'river/geese': {f: 'geese', at: 'drawn', flock: true, tail: [30, 40], lufs: -27, dist: .7},
+  'river/crows': {f: 'crows', at: [10, 25], total: [60, 180], lufs: -34, dist: .85},
+  'omut/elk-moan': {f: 'elk', at: [60, 120], lufs: -33, dist: .9},
+  'omut/crack-fog': {f: 'crack', at: [60, 120], burst: [3, 6, 10, 20], lufs: -32, x: 65, dist: .8},
+  'omut/squirrel-chatter': {f: 'squirrel', at: [20, 40], lufs: -31, dist: .3},
+  'omut/hazel-grouse': {f: 'hazel-grouse', at: [20, 50], lufs: -32, dist: .5},
+  'omut/woodpecker': {f: 'woodpecker', at: [10, 30], lufs: -30, dist: .5},
+  'omut/tits': {f: 'tits', at: 'once', pass: [20, 40], lufs: -33, dist: .4, fly: [1, 1.5]},
+  'omut/capercaillie': {f: 'capercaillie', at: 'only', pass: [1.6, 1.8], lufs: -36, dist: .6, fly: [.35, 1]},
+  'omut/hush': {hush: true},
+  'omut/owl': {f: 'owl', at: 'only', lufs: -31, dist: .6},
+  'omut/cuckoo': {f: 'cuckoo', at: [40, 90], calls: [8, 20], lufs: -32, dist: .8},
+  'omut/cuckoo-count': {f: 'cuckoo', at: 'only', calls: 'count', lufs: -31, dist: .7},
+  'omut/geese': {f: 'geese', at: 'only', swell: [12, 20, 30, 15], lufs: -29, dist: .7, lp: 2500},
+  'omut/bough': {f: 'crack', at: 'once', lufs: -30, dist: .5},
+  'omut/cone': {f: 'cone', at: 'once', lufs: -35, dist: 0},
+  'omut/creak': {f: 'creak', at: 'gusts', lufs: -32, dist: .5},
+  'omut/mosquito': {f: 'mosquito', at: [20, 60], buzz: true, lufs: -33, dist: 0},
+  'lake/geese': {f: 'geese', at: 'drawn', flock: true, tail: [30, 40], lufs: -27, dist: .75, send: 4},
+  'lake/cranes-far': {f: 'cranes', at: [30, 90], lufs: -34, dist: 1},
+  'lake/cranes': {f: 'cranes', at: 'drawn', flock: true, tail: [15, 25], lufs: -29, dist: .65},
+  'lake/goldeneyes': {f: 'goldeneye', at: 'drawn', pass: [1.5, 2], lufs: -33, dist: .2, fly: [.4, .6]},
+  'lake/swans': {f: 'swans', at: 'drawn', calls: [3, 5], spread: [10, 20], lufs: -32, dist: .7, fly: [.4, .8]},
+  'lake/woodpecker': {f: 'woodpecker', at: [15, 40], lufs: -31, x: 112, dist: .8, send: 4},
+  'lake/grasshoppers': {layer: 'insects', lufs: -39},
+  'lake/crash': {f: 'crack', at: [60, 120], burst: [5, 10, 4, 8], lufs: -33, x: 65, dist: 1},
+  'all/raven': {f: 'raven', at: 'only', pass: [2, 3], calls: [1, 2], lufs: -31, dist: .3, fly: [.12, .5]},
+};
+const lifeFiles = key => { const L = LIFE[key]; return !L || !L.f ? [] : L.vs || variants(L.f); };
+// The recorded beds and drops each place may play, in any weather: fetched with the place.
+const REC = {
+  river: ['rain-water', 'rain-water-heavy', 'rain-heavy', 'reeds', 'grasshoppers', 'drip'],
+  omut: ['rain-leaves', 'rain-heavy', 'rain-water', 'rain-water-heavy', 'reeds', 'leaves', 'grasshoppers', 'drip'],
+  lake: ['rain-water', 'rain-water-heavy', 'rain-leaves', 'rain-heavy', 'reeds', 'grasshoppers'],
+  home: ['rain-leaves', 'rain-heavy', 'leaves', 'reeds', 'grasshoppers', 'drip', 'barrel'],
+  izba: ['roof-drizzle', 'roof-downpour', 'leaves', 'reeds', 'drip', 'barrel', 'tin', 'board'],
+  shop: ['rain-leaves', 'rain-heavy', 'rain-water', 'leaves', 'grasshoppers'],
+  splash: ['rain-leaves', 'rain-heavy', 'reeds', 'grasshoppers'],
+  story: ['rain-leaves', 'rain-heavy', 'reeds', 'grasshoppers'],
+};
+// What each place may play, fetched when the place is first needed (a life line's files when the game picks it).
+const WATER_SET = ['splash', 'slap', 'sip', 'plip'].flatMap(variants);
+const placeFiles = p => {
+  const names = new Set();
+  (BIRDS[p] || []).forEach(b => variants(b[0]).forEach(n => names.add(n)));
+  (AROUND[p] || []).forEach(v => (v.vs || variants(v.f)).forEach(n => names.add(n)));
+  (REC[p] || []).forEach(s => variants(s).forEach(n => names.add(n)));
+  if (WATERS.has(p)) [...WATER_SET, 'swish'].forEach(n => names.add(n));
+  if (p === 'izba') [...['tick', 'tock', 'clock-cuckoo', 'clock-whirr'].flatMap(variants), 'curtain'].forEach(n => names.add(n));
+  return [...names];
+};
+
+// ---------- buffers made in code ----------
+// A seamless loop of len s on ch channels: fill(x, r, sr) writes len + 0.25 s, and the last 0.25 s is crossfaded into
+// the first (equal power), so the loop's seam is two neighbouring samples of the same noise. Normalized to RMS 0.2.
+function loopBuf(ctx, len, ch, seed, fill) {
+  const sr = ctx.sampleRate, n = Math.round(len * sr), f = Math.round(.25 * sr), b = ctx.createBuffer(ch, n, sr), r = rnd('loop', seed);
+  for (let c = 0; c < ch; c++) {
+    const x = new Float32Array(n + f), y = b.getChannelData(c);
+    fill(x, r, sr);
+    y.set(x.subarray(0, n));
+    for (let i = 0; i < f; i++) { const a = Math.PI / 2 * i / f; y[i] = x[i] * Math.sin(a) + x[n + i] * Math.cos(a); }
+    let s = 0; for (let i = 0; i < n; i++) s += y[i] * y[i];
+    const k = s > 0 ? .2 / Math.sqrt(s / n) : 0; for (let i = 0; i < n; i++) y[i] *= k;
+  }
+  return b;
+}
+const NOISE = {
+  white: [7.3, (x, r) => { for (let i = 0; i < x.length; i++) x[i] = 2 * r() - 1; }],
+  pink: [9.1, (x, r) => {   // Paul Kellet's filter
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const w = 2 * r() - 1;
+      b0 = .99886 * b0 + w * .0555179; b1 = .99332 * b1 + w * .0750759; b2 = .969 * b2 + w * .153852; b3 = .8665 * b3 + w * .3104856;
+      b4 = .55 * b4 + w * .5329522; b5 = -.7616 * b5 - w * .016898; x[i] = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * .5362; b6 = w * .115926;
+    }
+  }],
+};
+function impulse(ctx, [dur, pre, dark], seed) {   // a room's echo: decaying noise that darkens as it decays, -60 dB at dur
+  const sr = ctx.sampleRate, n = Math.round((pre + dur) * sr), b = ctx.createBuffer(2, n, sr), r = rnd('room', seed);
+  for (let c = 0; c < 2; c++) {
+    const y = b.getChannelData(c), i0 = Math.round(pre * sr);
+    let lp = 0, e = 0;
+    for (let i = i0; i < n; i++) {
+      const t = (i - i0) / sr, cut = dark ? 600 + 5000 * Math.exp(-2.5 * t / dur) : 1500 + 9000 * Math.exp(-1.5 * t / dur);
+      lp += (1 - Math.exp(-6.2832 * cut / sr)) * (2 * r() - 1 - lp);
+      y[i] = lp * Math.exp(-6.9 * t / dur) * Math.min(1, .05 + t / .004);
+      e += y[i] * y[i];
+    }
+    const k = Math.sqrt(.5 / e); for (let i = i0; i < n; i++) y[i] *= k;
+  }
+  return b;
+}
+const WALK_N = 2048, RATE_WALK = .04;   // the walks' samples; how far a noise's speed wanders, +-4%: on noise nothing to hear
+function walkBuf(ctx, specs, seed) {   // each channel a smooth random curve that loops, scaled to its depth (see Scape.walk):
+  // every harmonic of the loop up to its `cyc`-th, at random amplitudes and phases, so the curve is a band-limited random
+  // walk with no shorter period of its own; they fall as 1 / k (a slow walk: no fast one stands out) or, for a flutter
+  // (cyc over 24), as 1 / sqrt(k)
+  const b = ctx.createBuffer(specs.length, WALK_N, ctx.sampleRate), r = rnd('walk', seed);
+  specs.forEach((s, c) => {
+    const ks = s.cyc <= 24 ? Array.from({length: Math.max(4, s.cyc)}, (_, k) => k + 1)   // all of them, or 1-6 and 18 more up to cyc
+      : [1, 2, 3, 4, 5, 6, ...Array.from({length: 18}, () => 7 + Math.floor(r() * (s.cyc - 6)))];
+    const y = b.getChannelData(c), h = ks.map(k => [k, 6.2832 * r(), Math.sqrt(-Math.log(1 - r() * .999)) / (s.cyc > 24 ? Math.sqrt(k) : k)]);
+    let mx = 0;
+    for (let i = 0; i < WALK_N; i++) { let v = 0; for (const [k, p, a] of h) v += a * Math.cos(6.2832 * k * i / WALK_N + p); y[i] = v; mx = Math.max(mx, Math.abs(v)); }
+    for (let i = 0; i < WALK_N; i++) y[i] *= s.depth / mx;
+  });
+  return b;
+}
+// One-shots made in code (0 bytes), mono: (ctx, r) -> AudioBuffer.
+function mono(ctx, sec, f) { const b = ctx.createBuffer(1, Math.round(sec * ctx.sampleRate), ctx.sampleRate); f(b.getChannelData(0), ctx.sampleRate); return b; }
+function onePole(x, sr, hz, hp) { const a = 1 - Math.exp(-6.2832 * hz / sr); let y = 0; for (let i = 0; i < x.length; i++) { y += a * (x[i] - y); x[i] = hp ? x[i] - y : y; } }
+const SYNTH = {
+  swish: (c, r) => mono(c, .32, (x, sr) => {   // the rod cutting the air: a band of noise sweeping up and back
+    let b1 = 0, b2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const t = i / x.length, f = 500 + 2600 * Math.sin(Math.PI * Math.min(1, t * 1.4)), w = 6.2832 * f / sr, q = 2.5;
+      const al = Math.sin(w) / (2 * q), y = (al * (2 * r() - 1) + 2 * Math.cos(w) * b1 - (1 - al) * b2) / (1 + al);   // a resonator
+      b2 = b1; b1 = y; x[i] = y * Math.sin(Math.PI * Math.pow(t, .7));
+    }
+  }),
+  cone: (c, r) => mono(c, .25, (x, sr) => {   // a cone into moss: a soft dull knock and a rustle, no ring
+    for (let i = 0; i < x.length; i++) { const t = i / sr; x[i] = (2 * r() - 1) * Math.exp(-t / .03) + .6 * Math.sin(6.2832 * 140 * t) * Math.exp(-t / .02); }
+    onePole(x, sr, 500); onePole(x, sr, 700);
+  }),
+  curtain: (c, r) => mono(c, .7, (x, sr) => {   // fabric drawn along: a soft irregular rustle
+    let g = 0;
+    for (let i = 0; i < x.length; i++) { const t = i / x.length; if (i % 64 === 0) g = .5 + .5 * r(); x[i] = (2 * r() - 1) * g * Math.sin(Math.PI * t); }
+    onePole(x, sr, 3500); onePole(x, sr, 600, true);
+  }),
+  mosquito: (c, r) => mono(c, 2.6, (x, sr) => {   // a thin whine that comes up to the ear and goes: a buzzing wing tone
+    let ph = 0; const f0 = 520 + 80 * r();
+    for (let i = 0; i < x.length; i++) {
+      const t = i / sr, f = f0 * (1 + .03 * Math.sin(6.2832 * 3.1 * t) + .015 * Math.sin(6.2832 * 11 * t));
+      ph += 6.2832 * f / sr; const s = Math.sin(ph), env = Math.pow(Math.sin(Math.PI * t / 2.6), 2);
+      x[i] = (.6 * s + .3 * Math.sin(2 * ph) + .2 * Math.sin(3 * ph) * (s > 0 ? 1 : .5)) * env;
+    }
+  }),
+  'hazel-grouse': (c, r) => mono(c, 2.2, (x, sr) => {   // stand-in when its recording is missing: thin high whistles «тии-тии-тиуу ти-ти»
+    const notes = [[0, .32, 7600, 7400], [.42, .3, 7700, 7500], [.85, .45, 7900, 6800], [1.45, .1, 7300, 7300], [1.62, .1, 7200, 7200]];
+    for (const [t0, d, f0, f1] of notes) {
+      let ph = 0; const i0 = Math.round(t0 * sr), n = Math.round(d * sr);
+      for (let j = 0; j < n && i0 + j < x.length; j++) { const u = j / n; ph += 6.2832 * (f0 + (f1 - f0) * u) / sr; x[i0 + j] += Math.sin(ph) * Math.sin(Math.PI * u) * .8; }
+    }
+  }),
+};
+
+// ---------- loudness (BS.1770: K weighting) ----------
+function kStages(sr) {   // the K filter's two biquads for any rate, as libebur128 derives them: [b0, b1, b2, a1, a2]
+  let K = Math.tan(Math.PI * 1681.974450955533 / sr), Q = .7071752369554196;
+  const Vh = Math.pow(10, 3.999843853973347 / 20), Vb = Math.pow(Vh, .4996667741545416), a0 = 1 + K / Q + K * K;
+  const s1 = [(Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
+  K = Math.tan(Math.PI * 38.13547087602444 / sr); Q = .5003270373238773;
+  const d = 1 + K / Q + K * K;
+  return [s1, [1, -2, 1, 2 * (K * K - 1) / d, (1 - K / Q + K * K) / d]];
+}
+function biquad(type, hz, q, sr) {   // Web Audio's BiquadFilterNode, as its spec computes it: lowpass and highpass take Q in
+  // dB, bandpass a plain Q
+  const w = 2 * Math.PI * Math.min(hz, sr * .49) / sr, c = Math.cos(w), s = Math.sin(w);
+  const al = type === 'bandpass' ? s / (2 * q) : s / (2 * Math.pow(10, q / 20)), a0 = 1 + al;
+  if (type === 'lowpass') return [(1 - c) / 2 / a0, (1 - c) / a0, (1 - c) / 2 / a0, -2 * c / a0, (1 - al) / a0];
+  if (type === 'highpass') return [(1 + c) / 2 / a0, -(1 + c) / a0, (1 + c) / 2 / a0, -2 * c / a0, (1 - al) / a0];
+  return [al / a0, 0, -al / a0, -2 * c / a0, (1 - al) / a0];
+}
+// The loudness (LUFS) of a sound through filters at gain 1: 4 s of x (from i0) through the biquads and the K weighting;
+// `share` is the part of its power that reaches the mono sum (1/2 for a noise whose two channels differ).
+function calib(x, sr, filters, i0, share) {
+  const n = Math.min(x.length - i0, Math.round(4 * sr)), y = new Float64Array(n);
+  for (let i = 0; i < n; i++) y[i] = x[i0 + i];
+  for (const [b0, b1, b2, a1, a2] of [...filters.map(([t, hz, q]) => biquad(t, hz, q, sr)), ...kStages(sr)]) {
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    for (let i = 0; i < n; i++) { const v = b0 * y[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = y[i]; y2 = y1; y1 = v; y[i] = v; }
+  }
+  let p = 0; const s0 = Math.min(n - 1, Math.round(.3 * sr));   // past the filters' settling
+  for (let i = s0; i < n; i++) p += y[i] * y[i];
+  return -.691 + 10 * Math.log10(Math.max(1e-20, share * p / Math.max(1, n - s0)));
+}
+function measure(b) {   // {m: the loudest momentary loudness (400 ms window, every 10 ms, silence round a shorter sound),
+  // st: the loudest short-term (3 s), pk: its peak, skip: s to skip at the start, all before the first sample over -60
+  // dBFS and within 40 dB of the peak, less 2 ms: AAC pads files unevenly, and a take's quiet air before its sound (the
+  // soft slap's 40 ms) would put the sound that much after its frame}
+  const sr = b.sampleRate, n = b.length, z = new Float64Array(n), S = kStages(sr);
+  let first = n, pk = 0;
+  for (let c = 0; c < b.numberOfChannels; c++) { const x = b.getChannelData(c); for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(x[i])); }
+  const floor = Math.max(.001, pk * .01);
+  for (let c = 0; c < b.numberOfChannels; c++) {
+    const x = b.getChannelData(c);
+    for (let i = 0; i < n; i++) if (Math.abs(x[i]) > floor) { first = Math.min(first, i); break; }
+    const p1 = [0, 0, 0, 0], p2 = [0, 0, 0, 0], [f1, f2] = S;   // the two stages, each [x1, x2, y1, y2]
+    for (let i = 0; i < n; i++) {
+      const v = x[i], u = f1[0] * v + f1[1] * p1[0] + f1[2] * p1[1] - f1[3] * p1[2] - f1[4] * p1[3];
+      p1[1] = p1[0]; p1[0] = v; p1[3] = p1[2]; p1[2] = u;
+      const w = f2[0] * u + f2[1] * p2[0] + f2[2] * p2[1] - f2[3] * p2[2] - f2[4] * p2[3];
+      p2[1] = p2[0]; p2[0] = u; p2[3] = p2[2]; p2[2] = w;
+      z[i] += w * w;
+    }
+  }
+  const cum = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) cum[i + 1] = cum[i] + z[i];
+  const loudest = (sec, hop) => {   // the loudest window of sec s, stepped by hop s; a sound shorter than it is one window
+    const win = Math.round(sec * sr), h = Math.max(1, Math.round(hop * sr));
+    let best = cum[Math.min(n, win)];
+    for (let i = h; i + win <= n; i += h) best = Math.max(best, cum[i + win] - cum[i]);
+    return best > 0 ? -.691 + 10 * Math.log10(best / win) : -70;
+  };
+  return {m: loudest(.4, .01), st: loudest(3, .1), pk, skip: Math.max(0, (first - .002 * sr) / sr)};
+}
+
+// ---------- a scape: the continuous layers of a place in a weather, and the buses its one-shots go through ----------
+// layers -> mix -> fade (fade-in) -> kill (fade-out, once) -> the engine's bus. One-shots go to dry and, through their
+// send, to the room's echo (verb -> wet); in the izba the street's go through the wall (a lowpass).
+// Fades are value curves on their own gains, scheduled once each, so no automation is ever cancelled.
+const UP = Float32Array.from({length: 33}, (_, i) => Math.sin(Math.PI / 2 * i / 32));
+const DOWN = Float32Array.from(UP).reverse();
+const WALL = [[900, -16], [1300, -14]];   // the izba's street through the wall and the glass: its lowpass and dB, the
+// curtain drawn and pulled aside (v2: 1200 Hz and -12 dB; the author heard the street too near)
+// What makes one scape differ from another: the place and the weather (also its key, which seeds its random numbers)
+const scapeId = c => `${c.place}/${c.weather}`;
+class Scape {
+  constructor(E, cfg, at, fade) {
+    const c = this.ctx = E.ctx;
+    this.E = E; this.place = cfg.place; this.weather = cfg.weather; this.key = `${cfg.place}/${cfg.weather}`; this.id = scapeId(cfg); this.t0 = at;
+    this.nodes = []; this.srcs = []; this.walks = []; this.shared = {}; this.gusts = []; this.gustT = at; this.lastGust = []; this.dead = false;
+    this.streams = []; this.puffs = null; this.drips = []; this.pieces = new Set();
+    this.wi = WEATHERS.indexOf(cfg.weather); this.windy = cfg.weather === 'wind'; this.seed = cfg.seed; this.r = rnd('scape', cfg.seed, cfg.place, cfg.weather);
+    this.fade = this.g(0); this.kill = this.g(1); this.fade.connect(this.kill); this.kill.connect(E.bus);
+    this.fade.gain.setValueCurveAtTime(UP, at, Math.max(.05, fade));
+    this.mix = this.g(1); this.mix.connect(this.fade);
+    this.mute = null;   // the solo's sink (out), made when a render leaves a tag out
+    this.dry = this.g(1); this.dry.connect(this.fade);
+    this.verb = this.node(c.createConvolver()); this.verb.normalize = false; this.verb.buffer = E.room(this.place);
+    this.wet = this.g(1); this.verb.connect(this.wet); this.wet.connect(this.fade);
+    this.wall = null;
+    if (this.place === 'izba') {   // the street through the wall and the glass: lowpassed and quieter
+      this.wall = this.node(c.createBiquadFilter()); this.wall.type = 'lowpass'; this.wall.Q.value = .5;
+      this.wallG = this.g(1); this.wall.connect(this.wallG); this.wallG.connect(this.mix);
+      this.curtain(cfg.curtain, at, true);
+    }
+    if (this.place === 'omut') {   // the birds' own buses, for «В ельнике разом умолкли птицы»
+      this.birdDry = this.g(1); this.birdVerb = this.g(1); this.birdDry.connect(this.dry); this.birdVerb.connect(this.verb);
+    } else { this.birdDry = this.wall || this.dry; this.birdVerb = this.wall || this.verb; }   // the izba's through the wall
+    this.gustPan = this.windy ? this.node(c.createStereoPanner()) : null;
+    if (this.gustPan) { this.gustPan.connect(this.wall || this.mix); this.gustPan.pan.setValueAtTime(-.4, at); }
+    RECIPES[this.place](this, cfg);
+    if (this.walks.length) {   // the slow random walks: one buffer, a channel each, played once in 80-140 s
+      const b = walkBuf(c, this.walks, hash(cfg.seed, this.key)), s = this.node(c.createBufferSource()), sp = this.node(c.createChannelSplitter(this.walks.length));
+      s.buffer = b; s.loop = true; s.playbackRate.value = WALK_N / (c.sampleRate * (80 + 60 * this.r())); s.connect(sp);
+      this.walks.forEach((w, i) => sp.connect(w.param, i));
+      s.start(at, this.r() * b.duration); this.srcs.push(s);
+    }
+    this.update(cfg, at, true);
+  }
+  node(n) { this.nodes.push(n); return n; }
+  g(v) { const n = this.node(this.ctx.createGain()); n.gain.value = v; return n; }
+  f(type, hz, q) { const n = this.node(this.ctx.createBiquadFilter()); n.type = type; n.frequency.value = hz; n.Q.value = q == null ? .7 : q; return n; }
+  pan(p) { const n = this.node(this.ctx.createStereoPanner()); n.pan.value = p; return n; }
+  src(name, rate) {   // a looping noise at speed `rate`, from a random point; one source per noise and speed in a scape, shared
+    // by the layers that ask for it (two at different speeds never line up)
+    const k = name + '@' + rate;
+    if (this.shared[k]) return this.shared[k];
+    const b = this.E.noise(name), s = this.node(this.ctx.createBufferSource());
+    s.buffer = b; s.loop = true; s.playbackRate.value = rate; s.start(this.t0, this.r() * b.duration); this.srcs.push(s);
+    this.walk(s.playbackRate, RATE_WALK * rate, 4);   // its speed wanders a little, so its loop never comes round in step
+    return this.shared[k] = s;
+  }
+  // Where a layer of `tag` goes: the mix, or in the izba the wall for the street ('bed', 'weather') and the mix for the
+  // rain on the house itself ('house'); the solo's sink for a tag a render leaves out. The grasshoppers ('insects') and
+  // the river's water ('water') are the bed's, unless a render asks for them alone.
+  out(tag) {
+    const solo = this.E.solo, as = tag === 'house' ? 'weather' : (tag === 'insects' || tag === 'water') && !(solo && solo.has(tag)) ? 'bed' : tag;
+    if (solo && !solo.has(as)) return this.mute || (this.mute = this.ctx.createGain());   // never connected
+    return this.wall && (tag === 'bed' || tag === 'weather' || tag === 'insects') ? this.wall : this.mix;
+  }
+  walk(param, depth, cyc) { if (depth > 0) this.walks.push({param, depth, cyc: cyc || 10}); }   // param +- depth, slowly
+  // A layer made in code: noise (o.also: more noises into the same filters) -> its filters -> its gain (o.pan: a panner),
+  // at `lufs`, walking by o.walk of itself, its fastest change about once in 80 / o.cyc s; with o.gust a gust path
+  // besides; o.puff: through the puffs' envelope (silent between puffs).
+  layer(tag, name, rate, filters, lufs, o = {}) {
+    const also = [].concat(o.also || []), s = this.src(name, rate);
+    const cal = this.E.cal(name, filters) + 10 * Math.log10(1 + also.length), lin = dB(lufs - cal);
+    const g = this.g(lin), fs = filters.map(([t, hz, q]) => this.f(t, hz, q));
+    s.connect(fs[0]);
+    for (const a of also) a.connect(fs[0]);
+    for (let i = 1; i < fs.length; i++) fs[i - 1].connect(fs[i]);
+    const n = fs[fs.length - 1], dst = this.out(tag);
+    n.connect(g);
+    let tail = g;
+    if (o.puff) tail = this.puffed(g);
+    if (o.pan != null) { const p = this.pan(o.pan); tail.connect(p); p.connect(dst); } else tail.connect(dst);
+    this.walk(g.gain, lin * (o.walk == null ? .35 : o.walk), o.cyc);
+    if (o.gust) this.gusty(n, dst, lin);
+    return g;
+  }
+  gusty(n, dst, lin) {   // a gust path: the same sound, panned with the gust, silent between gusts
+    if (!this.gustPan) return;
+    const gg = this.g(0); n.connect(gg); gg.connect(dst === this.mute ? dst : this.gustPan);
+    gg.gain.setValueAtTime(0, this.t0);
+    this.gusts.push({param: gg.gain, peak: lin});
+  }
+  puffed(g) {   // g through the puffs' envelope and their pan: a puff now from one side, now from the other; the yard's
+    // longer (the author: «порывы ветра они обычно дольше идут»)
+    if (!this.puffs) this.puffs = {layers: [], next: this.t0 + this.r.u(1.5, 6), r: rnd('puffs', this.seed, this.key), weak: this.weather === 'fog',
+      long: this.place === 'home'};
+    const env = this.g(0), p = this.pan(0); g.connect(env); env.connect(p);
+    this.puffs.layers.push({env: env.gain, pan: p.pan});
+    return p;
+  }
+  // A recorded bed: pieces of the recording `name` from random places, each 5-9 s, crossfaded over 1.5 s (equal power),
+  // each from a side (+-o.width), at `lufs` through o.filters; o.puff, o.gust as for a layer; o.walk its slow walk. The
+  // pieces start once the file is decoded (pumpStreams), so the scape need not wait for it.
+  stream(tag, name, lufs, o = {}) {
+    const T = {name, lufs, filters: o.filters || [], width: o.width == null ? .3 : o.width, next: 0, r: rnd('stream', this.seed, this.key, name), cal: null, side: 1};
+    T.in = this.g(1);
+    const fs = T.filters.map(([t, hz, q]) => this.f(t, hz, q));
+    let n = T.in; for (const f of fs) { n.connect(f); n = f; }
+    T.lvl = this.g(0); n.connect(T.lvl);
+    const w = this.g(1); T.lvl.connect(w); this.walk(w.gain, o.walk == null ? .25 : o.walk, o.cyc || 8);
+    let tail = w;
+    if (o.puff) tail = this.puffed(w);
+    if (o.env) { T.env = this.g(0); tail.connect(T.env); tail = T.env; }   // switched on and off by the hour (the grasshoppers)
+    const dst = this.out(tag);
+    tail.connect(dst);
+    if (o.gust) { T.gustN = n; T.gustDst = dst; T.gusty = true; }
+    this.streams.push(T);
+    return T;
+  }
+  drip(names, o) {   // a source of drops: o.every [a, b] s between two (now and then two close together), or o.beat: a
+    // drip that keeps its own time, every beat s (its own, drawn from o.beat [a, b]) +- o.jitter, now and then a beat missed
+    const D = {names, r: rnd('drips', this.seed, this.key, names[0], this.drips.length), next: this.t0 + this.r.u(.5, 3), id: this.drips.length, ...o};
+    if (o.beat) D.period = D.r.u(...o.beat);
+    this.drips.push(D);
+  }
+  curtain(open, at, now) {   // the izba's street: nearer and brighter with the curtain aside
+    if (!this.wall) return;
+    const [hz, d] = WALL[open ? 1 : 0], v = dB(d);
+    if (now) { this.wall.frequency.setValueAtTime(hz, at); this.wallG.gain.setValueAtTime(v, at); }
+    else { this.wall.frequency.setTargetAtTime(hz, at, .15); this.wallG.gain.setTargetAtTime(v, at, .15); }
+  }
+  update(cfg, at, first) {   // what an hour changes in the scape: the grasshoppers of a sunny summer day, the curtain
+    const T = this.insects;
+    if (T) {
+      const m = cfg.month, season = m === 6 ? -3 : m === 7 || m === 8 ? 0 : m === 9 ? -8 : null;
+      const day = cfg.weather === 'sun' && cfg.hour >= 10 && cfg.hour <= 17 && season != null;
+      const v = this.lifeInsects ? dB(LIFE['lake/grasshoppers'].lufs - T.lufs) : day ? dB(season) : 0;
+      T.env.gain.setTargetAtTime(v, at, first ? .01 : 1.3);
+    }
+    if (this.place === 'izba') this.curtain(cfg.curtain, at);
+  }
+  addGust(c, at) {   // a gust's middle crosses the picture at ctx time `at`
+    if (!this.gusts.length) return;
+    this.lastGust.push({at, peak: c.peak, half: c.ms / 2000, v: c.v || 13});
+    if (this.lastGust.length > 6) this.lastGust.shift();
+  }
+  pumpGusts(until) {   // the gust gains and the pan, on a 0.25 s grid up to `until`: each gust lifts its layers for 1-2 s
+    // before its middle (+3.7 dB at the crest of the weakest gust, +6 of the strongest) and lets them go over 2-3 s after;
+    // the pan follows the strongest gust's middle across. The grid stays 2 s behind the gusts known (GUST_LOOK - 1), so
+    // a gust's rise is never cut
+    if (!this.gusts.length) return;
+    for (let t = this.gustT + .25; t <= until; t += .25) {
+      let e = 0, x = null;
+      for (const G of this.lastGust) {
+        const rise = clamp(G.half, 1, 2), fall = clamp(G.half + .5, 2, 3), u = t < G.at ? (t - G.at) / rise : (t - G.at) / fall;
+        const v = u <= -1 || u >= 1 ? 0 : G.peak * (.5 + .5 * Math.cos(Math.PI * u));
+        if (v > e) { e = v; x = 65 + G.v * (t - G.at); }
+      }
+      for (const L of this.gusts) L.param.linearRampToValueAtTime(L.peak * (dB(6 * Math.pow(e, .6)) - 1), t);
+      if (x != null) this.gustPan.pan.linearRampToValueAtTime(panOf(clamp(x, 0, 130)), t);
+      this.gustT = t;
+    }
+  }
+  retire(at, dur) {   // fades out once; disposed by the engine after
+    if (this.end != null) return;
+    this.kill.gain.setValueCurveAtTime(DOWN, at, Math.max(.05, dur)); this.end = at + dur;
+  }
+  dispose() {
+    if (this.dead) return;
+    this.dead = true;
+    for (const s of this.srcs) { try { s.stop(); } catch (e) { /* not started */ } }
+    for (const p of this.pieces) { try { p.src.stop(); } catch (e) { /* not started */ } p.nodes.forEach(n => n.disconnect()); }
+    for (const n of this.nodes) n.disconnect();
+    this.nodes = this.srcs = this.walks = this.gusts = this.streams = this.drips = []; this.pieces = new Set();
+  }
+}
+
+// ---------- the recipes: what each place sounds like in each weather ----------
+// Levels in LUFS of each layer alone (the mono sum), docs/09-zvuk.md «Громкость». Tags: 'bed' the place, 'weather',
+// 'house' the rain on the izba itself, 'insects' the grasshoppers.
+const bp = (hz, q) => ['bandpass', hz, q], lp = (hz, q) => ['lowpass', hz, q == null ? .5 : q], hp = (hz, q) => ['highpass', hz, q == null ? .5 : q];
+function air(S, lufs) {   // the faintest air, so a calm place is never dead silence: no low end at all (nothing under 300 Hz
+  // to hum), far under everything else
+  S.layer('bed', 'pink', .97, [hp(350), hp(350), lp(4000)], lufs == null ? -60 : lufs, {walk: .3});
+}
+// The river's water. The author, after his second listening (19 November): «река мне не нравится, булькание какое-то.
+// При этом лёгкий мягкий шум на фоне подходит, если убрать булькание». The bubbling was v3's murmur grains (320 a second
+// of small decaying tones whose pitch rose, which is just how a bubble sounds); the soft noise under them (pink noise
+// round 520 Hz) is what he liked. Of the five variants he heard then (v5), he chose b, on 19 November: «по реке вариант
+// Б, но мягкий шум реки чуть тише»: the soft noise, now 2 dB under v5's b (L - 4), and under it a very faint far flow,
+// darker (260-700 Hz, L - 8.5); in calm the reeds at the water's edge are never quite still: a steady whisper (-52)
+// between their puffs. No grain, no bubble, no plop. L: v3's water in that weather (calm and wind -41, drizzle and fog
+// -43, downpour -50); in fog the water is darker (1.2 kHz lowpass). The soft noise is v3's flow a little higher up
+// (highpassed at 240 Hz, not 180), so the power under 300 Hz stays under -50 dB: a hum is what v2 was taken apart for.
+// far: the same river far below the title screen and the backstory, 11 dB under (L -52, in the downpour -60, as v3's
+// murmur there was) and duller (1.2 kHz lowpass), without the reeds at its edge.
+function water(S, c, far) {
+  const w = c.weather, L = far ? (w === 'downpour' ? -60 : -52) : w === 'downpour' ? -50 : w === 'rain' || w === 'fog' ? -43 : -41;
+  const top = far || w === 'fog' ? [lp(1200)] : [];
+  S.layer('water', 'pink', 1, [hp(240), hp(240), bp(520, .9), ...top], L - 4, {also: S.src('pink', .917), walk: .35, cyc: 12});   // the soft noise
+  S.layer('water', 'pink', 1.06, [hp(260), hp(260), lp(700), lp(700), ...top], L - 8.5, {also: null, walk: .3, cyc: 6});   // far off
+  if (!far && CALM.has(w)) S.stream('bed', 'reeds', -52, {filters: [hp(500)], width: .4, walk: .5, cyc: 10});
+}
+function wind(S, lufs, gust) {   // wind over open water: an airy rush, no low end (v2's took in 300 Hz and under)
+  S.layer('weather', 'pink', 1, [hp(320), hp(320), bp(1100, .5)], lufs, {gust, walk: .45, cyc: 14});
+}
+const rustle = (S, name, lufs, o = {}) => S.stream(o.tag || 'bed', name, lufs, {filters: o.filters, puff: o.puff, gust: o.gust, walk: o.walk});
+function insects(S, lufs) {   // grasshoppers at `lufs`, on only when the hour asks (update): sun, 10-17, June to September,
+  // or the lake's line «В сухой траве стрекочут кузнечики» at its own level
+  S.insects = S.stream('insects', 'grasshoppers', lufs, {env: true, filters: [hp(2000, 0)], width: .35, walk: .6, cyc: 20});   // swelling and ebbing
+}
+function rainDrops(S, names, o) { S.drip(names, {tag: 'weather', ...o}); }
+const RECIPES = {
+  river(S, c) {
+    const w = c.weather;
+    air(S);
+    water(S, c);
+    if (CALM.has(w)) rustle(S, 'reeds', -43, {puff: true});   // the river's reeds
+    if (w !== 'downpour' && w !== 'fog') insects(S, -47);
+    if (w === 'rain') {   // drizzle on the water, now and then a drop on the boats' upturned bottoms (the eaves' drops, dull);
+      // 2 dB under v3's: without v3's grains under them, at -46 five drops in ten minutes stood out of the water (v3: one)
+      S.stream('weather', 'rain-water', -40);
+      rainDrops(S, variants('drip'), {every: [3, 8], lufs: -48, x: [96, 124], lp: 1800, dist: .5});
+    }
+    if (w === 'downpour') { S.stream('weather', 'rain-water-heavy', -32); S.stream('weather', 'rain-heavy', -38); }   // the water nearly gone
+    if (w === 'wind') { rustle(S, 'reeds', -38, {tag: 'weather', gust: 5, walk: .4}); wind(S, -45, 5); }
+  },
+  omut(S, c) {
+    const w = c.weather;
+    air(S, -62);
+    if (CALM.has(w)) rustle(S, 'reeds', -47, {puff: true});   // the omut's reeds, sheltered by the spruce wall
+    if (w !== 'downpour' && w !== 'fog') insects(S, -52);   // in its sunny glade only
+    if (w === 'rain') {   // «С еловых лап капает»: dull drops on needles and moss, no ring of water
+      S.stream('weather', 'rain-leaves', -40); S.stream('weather', 'rain-water', -47);
+      rainDrops(S, variants('drip'), {every: [2.5, 7], lufs: -44, x: [0, 130], lp: 1300, dist: .3});
+    }
+    if (w === 'downpour') { S.stream('weather', 'rain-heavy', -31); S.stream('weather', 'rain-water-heavy', -37); }
+    if (w === 'wind') rustle(S, 'leaves', -40, {tag: 'weather', gust: 6, walk: .4, filters: [hp(250), lp(1800)]});   // «Наверху шумят ели, а у воды ни ветерка»
+  },
+  lake(S, c) {   // no sound of water at all: the author, after his second listening, «шум волн у озера убери вообще»
+    // (v3 had a soft wave at the shore every 7-14 s, in the wind every 2.5-4.5 s)
+    const w = c.weather;
+    air(S);
+    if (CALM.has(w)) rustle(S, 'reeds', -45, {puff: true});   // the dry sedge, now and then just heard
+    if (w !== 'downpour' && w !== 'fog') insects(S, -45);
+    if (w === 'rain') { S.stream('weather', 'rain-leaves', -42, {filters: [hp(1200)]}); S.stream('weather', 'rain-water', -42); }   // «Дождь шуршит по сухой траве»
+    if (w === 'downpour') { S.stream('weather', 'rain-water-heavy', -32); S.stream('weather', 'rain-heavy', -38); }
+    if (w === 'wind') { rustle(S, 'reeds', -37, {tag: 'weather', gust: 5, walk: .4}); wind(S, -43, 5); }
+  },
+  home(S, c) { yard(S, c); },
+  izba(S, c) {   // the yard through the wall, the rain on the house itself, the clock; no room tone (v2's was the izba's hum)
+    const w = c.weather;
+    yard(S, c, true);
+    if (w === 'rain') {   // a soft hiss on the roof, and the drops round the house, each source from its side with its own
+      // rhythm and pitch (the author, 19 November: «звук капель сейчас один, а нужно несколько разных, с разных сторон
+      // избы ... и можно их чуть потише»), spread across the picture from left to right: onto the ground at the far
+      // corner (far left, further and lower), off the eaves onto the ground (left), onto the tin sill under the window
+      // (near, in the middle, a drip that keeps its time), onto the porch's boards (right of it, further, seldom) and
+      // into the barrel under the drainpipe (right). Each drop 4-7 dB under v3's two, all of them together about 2 dB under
+      S.stream('house', 'roof-drizzle', -42);
+      rainDrops(S, variants('drip'), {tag: 'house', every: [2.5, 7], lufs: -49, x: [18, 36], lp: 2200, dist: .35});
+      rainDrops(S, variants('barrel'), {tag: 'house', every: [3, 8], lufs: -48, x: [104, 118], lp: 2500, dist: .25});
+      rainDrops(S, variants('tin'), {tag: 'house', beat: [3, 4.2], jitter: .07, lufs: -50, x: [60, 70], lp: 3500, dist: .05});
+      rainDrops(S, variants('board'), {tag: 'house', every: [6, 15], lufs: -50, x: [80, 92], lp: 2000, dist: .55});
+      rainDrops(S, variants('drip'), {tag: 'house', every: [5, 12], lufs: -52, x: [0, 10], lp: 1500, dist: .7, rate: .86});
+    }
+    if (w === 'downpour') S.stream('house', 'roof-downpour', -33);   // the downpour drums on the roof
+    S.clock = {next: S.t0 + .3, i: 0, r: rnd('clock', c.seed)};
+  },
+  shop(S, c) {
+    const w = c.weather;
+    air(S);
+    if (CALM.has(w)) rustle(S, 'leaves', -47, {puff: true});
+    if (w !== 'downpour' && w !== 'fog') insects(S, -50);
+    if (w === 'rain') { S.stream('weather', 'rain-leaves', -42); S.stream('weather', 'rain-water', -47); }   // and into the puddle
+    if (w === 'downpour') S.stream('weather', 'rain-heavy', -32);
+    if (w === 'wind') rustle(S, 'leaves', -40, {tag: 'weather', gust: 5, walk: .4});
+  },
+  splash(S, c) { hill(S, c); },
+  story(S, c) { hill(S, c); },
+};
+function yard(S, c, indoors) {   // the slope with its meadow and the forest's edge: the birches' leaves and the grass in puffs of
+  // breeze, stronger in the wind; the weather (from indoors without the rain and the grasshoppers: the house has its own)
+  const w = c.weather;
+  if (!indoors) air(S);
+  // in calm the yard's rustle 6 and 5 dB under v3's, in its longer puffs (the author, after his second listening:
+  // «шелест листвы потише ещё и подлиннее»): a puff's crest comes out 3-4 dB under v3's, for a longer puff holds its
+  // crest where v3's only touched it; the izba hears the street through the wall as before
+  if (CALM.has(w)) { rustle(S, 'leaves', indoors ? -43 : -49, {puff: true}); rustle(S, 'reeds', indoors ? -47 : -52, {puff: true}); }
+  if (w === 'wind') { rustle(S, 'leaves', -37, {tag: 'weather', gust: 6, walk: .4}); rustle(S, 'reeds', -41, {tag: 'weather', gust: 5, walk: .4}); }
+  if (indoors) return;
+  if (w !== 'downpour' && w !== 'fog') insects(S, -45);
+  if (w === 'rain') {
+    S.stream('weather', 'rain-leaves', -40);
+    rainDrops(S, variants('drip'), {every: [2, 6], lufs: -42, x: [80, 110], dist: .3});
+    rainDrops(S, variants('barrel'), {every: [3, 8], lufs: -41, x: [95, 120], dist: .3});
+  }
+  if (w === 'downpour') S.stream('weather', 'rain-heavy', -31);
+}
+function hill(S, c) {   // the title screen and the backstory (the game keeps both overcast): the river far below, the slope's grass
+  const w = c.weather;
+  air(S);
+  water(S, c, true);
+  if (CALM.has(w)) rustle(S, 'reeds', -46, {puff: true});
+  if (w !== 'downpour' && w !== 'fog') insects(S, -49);
+  if (w === 'rain') S.stream('weather', 'rain-leaves', -42, {filters: [lp(5000)]});
+  if (w === 'downpour') S.stream('weather', 'rain-heavy', -33);
+  if (w === 'wind') rustle(S, 'reeds', -39, {tag: 'weather', gust: 5, walk: .4});
+}
+
+// ---------- the engine: one per AudioContext (the page's, or an OfflineAudioContext for a render) ----------
+class Engine {
+  constructor(ctx, o = {}) {
+    this.ctx = ctx; this.offline = !!o.offline; this.solo = o.solo ? new Set(o.solo) : null; this.files = o.files; this.base = o.base || 'sound/';
+    this.bufs = {}; this.rooms = {}; this.cals = {}; this.loaded = new Map(); this.voices = new Set(); this.retired = []; this.cur = null;
+    this.cfg = {place: null, weather: 'overcast', hour: 12, month: 6, curtain: false, people: true, life: null, scene: null, seed: 0, signs: null};
+    this.birds = {next: 0, d0: 0, d1: 0, t1: 0, r: rnd('birds'), quiet: null}; this.around = [];
+    this.life = null; this.marks = {sign: -Infinity, gust: -Infinity}; this.seen = new Set(); this.sync = {scene: null, off: 0, still: false};
+    this.plays = o.log ? [] : null; this.sceneT0 = o.sceneT0 || 0;
+    this.bus = ctx.createGain();
+    const clip = ctx.createWaveShaper(), k = new Float32Array(4097);   // identity under -6 dBFS, a soft knee to -3.1 above
+    for (let i = 0; i < k.length; i++) { const x = 2 * i / (k.length - 1) - 1, a = Math.abs(x); k[i] = Math.sign(x) * (a <= .5 ? a : .5 + .2 * Math.tanh((a - .5) / .2)); }
+    clip.curve = k; clip.oversample = 'none';
+    this.master = ctx.createGain(); this.master.gain.value = o.offline ? 1 : 0;
+    this.bus.connect(clip); clip.connect(this.master); this.master.connect(ctx.destination);
+  }
+  noise(name) { const N = NOISE[name]; return this.bufs[name] || (this.bufs[name] = loopBuf(this.ctx, N[0], 2, name, N[1])); }
+  cal(name, filters) {   // a noise's loudness through filters at gain 1 (its two channels differ: half reaches the mono sum)
+    const k = name + JSON.stringify(filters);
+    return this.cals[k] != null ? this.cals[k] : this.cals[k] = calib(this.noise(name).getChannelData(0), this.ctx.sampleRate, filters, 0, .5);
+  }
+  room(p) { return this.rooms[p] || (this.rooms[p] = impulse(this.ctx, ROOM[p], p)); }
+  // ----- recordings -----
+  load(name) {   // a promise of the decoded entry {b, m, st, pk, skip}, or of null; once per name
+    if (this.loaded.has(name)) return this.loaded.get(name).p;
+    const e = {name, b: null, m: -70, st: -70, pk: 1, skip: 0, p: null};
+    this.loaded.set(name, e);
+    const files = this.files || {}, own = Object.prototype.hasOwnProperty.call(files, name), v = own ? files[name] : null;
+    const made = f => { try { return f(this.ctx, rnd('file', name)); } catch (err) { return null; } };
+    const stub = () => { const S = window.LiveSoundStubs; return S && typeof S[name] === 'function' ? made(S[name]) : SYNTH[name] ? made(SYNTH[name]) : null; };
+    const decode = ab => new Promise(ok => {
+      try { const p = this.ctx.decodeAudioData(ab.slice(0), ok, () => ok(null)); if (p && p.then) p.then(ok, () => ok(null)); } catch (err) { ok(null); }
+    });
+    const url = u => typeof fetch === 'function' ? fetch(u).then(r => r.ok ? r.arrayBuffer() : null).then(ab => ab ? decode(ab) : null, () => null) : Promise.resolve(null);
+    const get = !own ? (SYNTH[name] && !Object.prototype.hasOwnProperty.call(FILES, name) ? Promise.resolve(made(SYNTH[name]))   // made in code
+        : url(`${this.base}${name}.m4a`))
+      : typeof v === 'function' ? Promise.resolve(made(v))
+      : v instanceof ArrayBuffer ? decode(v)
+      : typeof v === 'string' ? url(v)
+      : Promise.resolve(null);   // null: there is no such file
+    e.p = get.then(b => b || stub()).then(b => {
+      if (!b || !b.length) return null;
+      const m = measure(b); e.b = b; e.m = m.m; e.st = m.st; e.pk = m.pk; e.skip = m.skip; return e;
+    }, () => null);
+    return e.p;
+  }
+  want(names) { return Promise.all(names.map(n => this.load(n))).then(es => es.every(Boolean)); }
+  keep(places) {   // let go of the decoded recordings no place in `places` needs (nor the hour's life line); a render keeps all
+    if (this.offline) return;
+    const need = new Set(places.flatMap(placeFiles));
+    if (this.cfg.life) lifeFiles(this.cfg.life.key).forEach(n => need.add(n));
+    for (const n of [...this.loaded.keys()]) if (!need.has(n) && this.loaded.get(n).b) this.loaded.delete(n);
+  }
+  entry(names) { return names.map(n => this.loaded.get(n)).filter(e => e && e.b); }   // the loaded ones among `names`
+  // ----- one-shots -----
+  // shot(names, o): one of the files `names` (the loaded ones) at ctx time o.at, at o.lufs (momentary), from column o.x
+  // (or o.pan; o.panTo over o.panFor s), o.dist away (0..1: duller, more echo), o.r the generator of its variant and
+  // spread; o.fade [in, out]: it comes and goes softly; o.dest a bus of its own instead of the scape's (then no pan or
+  // send of its own). Returns the voice, or null if it does not sound.
+  shot(names, o) {
+    const S = o.S || this.cur, tag = o.tag;
+    if (!S || S.dead || (this.solo && !this.solo.has(tag === 'house' ? 'weather' : tag))) return null;
+    const es = this.entry(typeof names === 'string' ? [names] : names);
+    if (!es.length) return null;
+    const r = o.r || rnd('shot', o.at * 1000);
+    let n = 0; for (const v of this.voices) if (v.end > o.at && (!o.bird || v.bird)) n++;
+    if (n >= (o.bird ? BIRD_VOICES : VOICES)) return null;
+    const c = this.ctx, dist = o.dist || 0, send = o.send == null ? -20 + 16 * dist : o.send - 20 + 16 * dist;
+    const lufs = o.lufs + (S.weather === 'downpour' ? DOWNPOUR_DB : 0) + (o.spread == null ? 2 : o.spread) * (2 * r() - 1);
+    // its gain: its loudest 400 ms at `lufs`, but its peak never over VOICE_PEAK (a click of a plip or a crack would need a
+    // peak near full scale for that much; it plays quieter instead: no sound is ever sharp and loud). A variant the cap
+    // leaves more than 3 dB short is not taken while another can come nearer (a thin twig is no dry bough).
+    const p0 = o.pan != null ? o.pan : panOf(o.x == null ? 65 : o.x), side = p => Math.max(Math.cos((p + 1) * Math.PI / 4), Math.sin((p + 1) * Math.PI / 4));
+    const louder = o.dest ? side(.4) : Math.max(side(p0), o.panTo != null ? side(o.panTo) : 0);   // its louder channel's share
+    const sendLin = o.dest ? 0 : dB(send), want = x => dB(lufs - x.m + PAN_COMP) / Math.sqrt(1 + sendLin * sendLin / 2);
+    const cap = x => VOICE_PEAK / ((x.pk || 1) * louder), short = x => Math.max(0, 20 * Math.log10(want(x) / cap(x)));
+    const least = Math.min(...es.map(short)), ok = es.filter(x => short(x) <= Math.max(3, least));
+    const e = ok[Math.floor(r() * ok.length)], lin = Math.min(want(e), cap(e));
+    const rate = (o.rate || 1) * (1 + (o.bird ? .02 : .03) * (2 * r() - 1));
+    const src = c.createBufferSource(), g = c.createGain(), nodes = [src, g];
+    const t0 = Math.max(o.at, c.currentTime), len = (e.b.duration - e.skip) / rate;
+    src.buffer = e.b; src.playbackRate.value = rate;
+    if (o.fade) {   // it comes in and goes out softly (a fly-by, a far motorcycle)
+      const fi = Math.min(o.fade[0], len * .45), fo = Math.min(o.fade[1], len * .5);
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(lin, t0 + fi);
+      g.gain.setValueAtTime(lin, t0 + len - fo); g.gain.linearRampToValueAtTime(0, t0 + len);
+    } else g.gain.value = lin;
+    let tail = src;
+    const cut = o.lp || (dist > 0 ? 16000 * Math.pow(3500 / 16000, dist) : 0);
+    if (cut && cut < c.sampleRate / 2.2) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; f.Q.value = .5; nodes.push(f); src.connect(f); tail = f; }
+    tail.connect(g);
+    if (o.dest) g.connect(o.dest);
+    else {
+      const p = c.createStereoPanner(); nodes.push(p); g.connect(p);
+      p.pan.setValueAtTime(p0, o.at);
+      if (o.panTo != null) p.pan.linearRampToValueAtTime(o.panTo, o.at + (o.panFor || e.b.duration));
+      const to = o.bird ? S.birdDry : S.wall && o.wall ? S.wall : S.dry;
+      p.connect(to);
+      if (sendLin > 0) { const s = c.createGain(); s.gain.value = sendLin; nodes.push(s); p.connect(s); s.connect(o.bird ? S.birdVerb : S.wall && o.wall ? S.wall : S.verb); }
+    }
+    const v = {at: o.at, tag, end: o.at + len + .1, bird: !!o.bird, nodes, src};
+    src.onended = () => { for (const x of nodes) x.disconnect(); this.voices.delete(v); };
+    src.start(t0, e.skip);
+    this.voices.add(v);
+    if (this.plays) this.plays.push(v.log = {at: +o.at.toFixed(4), name: e.name, tag, db: +lufs.toFixed(1), x: o.x, pan: o.pan, ...(o.src != null ? {src: o.src} : {})});
+    if (this.trace) {   // LiveSound.debug: when it will be heard, by the page's clock
+      this.trace.push(v.trace = {at: o.at, wall: performance.now() + 1000 * (t0 - c.currentTime + outLatency(c)), name: e.name, tag, x: o.x});
+      if (this.trace.length > 200) this.trace.shift();
+    }
+    return v;
+  }
+  // ----- what is heard -----
+  set(o, now) {
+    const c = this.cfg, was = {...c};
+    if (o && typeof o === 'object') {
+      if ('place' in o && PLACES.includes(o.place)) c.place = o.place;
+      if ('weather' in o && WEATHERS.includes(o.weather)) c.weather = o.weather;
+      if ('hour' in o && isFinite(o.hour)) c.hour = clamp(Math.round(o.hour), 6, 18);
+      if ('month' in o && isFinite(o.month)) c.month = clamp(Math.round(o.month), 1, 12);
+      if ('curtain' in o) c.curtain = !!o.curtain;
+      if ('people' in o) c.people = o.people !== false;
+      if ('seed' in o && isFinite(o.seed)) c.seed = Math.floor(+o.seed) | 0;
+      if ('scene' in o) c.scene = o.scene && typeof o.scene.cues === 'function' ? o.scene : null;
+      if ('life' in o) { const L = o.life, key = L && typeof L === 'object' ? L.key : L; c.life = key && LIFE[key] ? {key, count: L && L.count | 0} : null; }
+      if ('signs' in o) c.signs = Array.isArray(o.signs) ? o.signs : null;
+    }
+    if (!c.place) return;
+    const place = c.place !== was.place, weather = c.weather !== was.weather;
+    if (!this.scape(now)) this.cur && this.cur.update(c, now);
+    if (place) { this.want(placeFiles(c.place)); this.keep([c.place, was.place].filter(Boolean)); }
+    const hour = place || c.hour !== was.hour || c.scene !== was.scene || (c.life && c.life.key) !== (was.life && was.life.key) || (c.life && c.life.count) !== (was.life && was.life.count) || c.seed !== was.seed;
+    // what was scheduled ahead for frames the scene on screen will not draw now is not heard: on a new hour (or place,
+    // scene, life) the signs', the events' and the life's sounds not yet begun; when only the signs change, theirs
+    const signs = JSON.stringify(c.signs) !== JSON.stringify(was.signs);
+    if (hour || signs) this.ahead(now, hour ? ['signs', 'events', 'life'] : ['signs']);
+    if (hour) this.newHour(now, place || weather);
+    if (c.scene && c.scene === was.scene && (hour || signs)) {   // the same scene goes on: its cues from now, none twice
+      const st = this.sceneNow(c.scene, now);
+      if (st != null) this.marks.sign = st - MARGIN;
+    }
+    if (c.life) this.want(lifeFiles(c.life.key));
+  }
+  ahead(now, tags) {   // stops the one-shots of these tags that have not begun by now (so they never sound)
+    for (const v of this.voices) {
+      if (!(v.at > now + .001) || !tags.includes(v.tag)) continue;
+      try { v.src.stop(now); } catch (e) { /* already stopped */ }
+      v.end = now;
+      if (v.log) v.log.cancelled = true;
+      if (v.trace && this.trace) { const i = this.trace.indexOf(v.trace); if (i >= 0) this.trace.splice(i, 1); }
+    }
+  }
+  scape(now) {   // the scape the settings ask for, crossfaded in over the last (1.5 s for a new place, 1 s between the izba and
+    // the yard, 2.5 s for a new weather); never sooner than 0.25 s after the last one
+    // (then the pump makes it), so a page that switches fast does not pile up scapes. True if it made one.
+    const c = this.cfg, S = this.cur;
+    if (S && S.id === scapeId(c)) { this.later = false; return false; }
+    if (S && now - S.t0 < .25) { this.later = true; return false; }
+    const dur = !S ? .05 : S.place !== c.place ? (c.place === 'izba' || S.place === 'izba') && (c.place === 'home' || S.place === 'home') ? 1 : 1.5
+      : 2.5;
+    if (S) { S.retire(now, dur); this.retired.push(S); }
+    this.cur = new Scape(this, c, now, dur); this.later = false;
+    if (this.life && this.life.L.layer) { this.cur.lifeInsects = true; this.cur.update(c, now); }
+    return true;
+  }
+  newHour(now, fresh) {   // the birds change over 4 s, the life of the hour starts anew, the cues come from the scene given
+    const c = this.cfg, B = this.birds;
+    B.d0 = this.density(now); B.d1 = BIRD_PLACE[c.place] * BIRD_HOUR[c.hour] * BIRD_WEATHER[c.weather] * BIRD_MONTH(c.month) *
+      (c.weather === 'sun' && c.hour >= 11 && c.hour <= 15 ? .8 : 1);
+    B.t0 = now; B.t1 = fresh ? now : now + 4; B.r = rnd('birds', c.seed, c.place, c.hour); B.next = now + B.r.u(.3, 3);
+    if (B.quiet) { this.birdLevel(now, 1, 1); B.quiet = null; }
+    this.around = (AROUND[c.place] || []).map((v, i) => {   // the first of each anywhere in its interval, 3 s in at the
+      // soonest (the story's one rooster 4-8 s): an hour is often shorter than a rare sound's wait, and a motorcycle in
+      // the first minute of every hour would not be rare
+      const r = rnd('around', c.seed, c.place, c.hour, i);
+      return {v, r, next: now + (v.once ? r.u(...v.once) : r.u(3, v.every[1]))};
+    });
+    if (this.life) this.life.end(now);
+    this.life = c.life ? new Life(this, c.life, now) : null;
+    if (this.cur) { this.cur.lifeInsects = !!(this.life && this.life.L.layer); this.cur.update(c, now); }
+    this.sync = {scene: null, off: 0, still: false}; this.marks = {sign: -Infinity, gust: this.marks.gust}; this.seen.clear();
+  }
+  density(now) { const B = this.birds; return now >= B.t1 ? B.d1 : B.d0 + (B.d1 - B.d0) * (now - B.t0) / Math.max(.01, B.t1 - B.t0); }
+  birdLevel(at, v, sec) {   // the birds' buses, for «птицы разом умолкли»
+    const S = this.cur;
+    if (!S || S.birdDry === S.dry) return;
+    for (const g of [S.birdDry, S.birdVerb]) g.gain.setTargetAtTime(v, at, sec / 4);
+  }
+  // ----- the scene's clock -----
+  // The scene's clock is in ticks, behind the true time by up to a tick: the largest (scene time - ctx time) seen lately
+  // is the true offset (it decays 1 ms a pump, so it follows a drift). A scene that does not play: the module's own clock
+  // from its last time. A jump of more than 0.25 s (at(), a pause ended) starts the marks over.
+  sceneNow(sc, now) {
+    if (this.offline) return this.sceneT0 + now;
+    const y = this.sync;
+    let t;
+    try { t = +sc.time; } catch (e) { return null; }
+    if (!isFinite(t)) return null;
+    const playing = !!sc.playing, o = t - now;
+    if (y.scene !== sc || y.still !== !playing || (playing && Math.abs(o - y.off) > .25)) {
+      if (y.scene === sc) this.marks = {sign: -Infinity, gust: -Infinity};
+      y.scene = sc; y.still = !playing; y.off = o;
+    } else if (playing) y.off = Math.max(o, y.off - .001);
+    return now + y.off;
+  }
+  ctxAt(st, sceneT, now) { return now + (sceneT - st) + MARGIN; }   // the ctx time of a frame at sceneT (st: the scene now)
+  // ----- the pump: every TICK s, schedules what comes in the next LOOK s -----
+  pump(now) {
+    for (let i = this.retired.length - 1; i >= 0; i--) if (this.retired[i].end + .3 < now && !this.offline) { this.retired[i].dispose(); this.retired.splice(i, 1); }
+    if (this.later) this.scape(now);
+    const S = this.cur, c = this.cfg;
+    if (!S) return;
+    const until = now + LOOK, sc = c.scene;
+    const lat = this.offline ? 0 : outLatency(this.ctx);
+    if (sc) {
+      const st = this.sceneNow(sc, now);
+      if (st != null) this.pumpCues(sc, st, now - lat);
+    } else if (S.windy && window.LiveScenes && typeof LiveScenes.gusts === 'function') {   // the izba: the gusts by our clock
+      const from = Math.max(this.marks.gust, now), to = now + GUST_LOOK;
+      if (to > from) { for (const g of LiveScenes.gusts(from, to)) S.addGust(g, g.t); this.marks.gust = to; }
+    }
+    S.pumpGusts(now + GUST_LOOK - 2.2);
+    for (const R of this.retired) if (!R.dead && R.end > now) this.pumpStreams(R, now, until);   // a fading scape's beds play out its fade
+    this.pumpStreams(S, now, until); this.pumpPuffs(S, now, until); this.pumpDrips(S, now, until);
+    this.pumpClock(S, now, until); this.pumpBirds(S, now, until); this.pumpAround(S, now, until);
+    if (this.life) this.life.pump(now, until);
+  }
+  pumpCues(sc, st, now) {
+    // an event's frames are looked for from now on every pump, not from the last pump's mark: the game starts the strike
+    // and the scare at any moment, and their first frame (a third of a second in) often falls before the mark of a pump
+    // that looked ahead before the event was there (the seen set keeps each frame's sound once)
+    const paused = !this.offline && !sc.playing && !reduced(), from = Math.max(this.marks.sign, st - .15), to = st + LOOK, efrom = st - .15;
+    const gfrom = Math.max(this.marks.gust, st), gto = st + GUST_LOOK;
+    let cues;
+    try { cues = sc.cues(Math.min(efrom, gfrom), Math.max(to, gto)) || []; } catch (e) { cues = []; }
+    for (const q of cues) {
+      if (q.wall) {   // an event shown by the wall clock over a still frame
+        const k = `${q.type}:${q.id}:${q.frame || q.burst}`;
+        if (!this.seen.has(k)) { this.seen.add(k); this.onCue(q, now + Math.max(0, q.in) + MARGIN); }
+        continue;
+      }
+      if (q.type === 'gust') { if (q.t >= gfrom && q.t < gto) { this.cur.addGust(q, this.ctxAt(st, q.t, now)); if (this.life) this.life.gust(q, this.ctxAt(st, q.t, now)); } continue; }
+      if (q.type === 'strike' || q.type === 'scare') {
+        const k = `${q.type}:${q.id}:${q.frame || q.burst}`;
+        if (q.t < efrom || q.t >= to || this.seen.has(k)) continue;
+        this.seen.add(k);
+      } else if (q.t < from || q.t >= to) continue;
+      else if (paused && q.type === 'sign') continue;   // a paused scene's signs are silent; the bed goes on
+      this.onCue(q, Math.max(now, this.ctxAt(st, q.t, now)));
+    }
+    this.marks.sign = to; this.marks.gust = gto;
+    if (this.seen.size > 64) this.seen = new Set([...this.seen].slice(-32));
+  }
+  onCue(q, at) {
+    const c = this.cfg, place = c.place, r = rnd('cue', c.seed, q.type, q.id, q.k, q.step, q.frame || q.burst || 0, Math.round(q.t * 12 || 0));
+    const wd = WATER_DB[place] || 0;
+    if (q.type === 'sign') {
+      const s = SIGN_SOUND[q.id];
+      if (!s) return;
+      const [y0, y1] = WATER_Y[place] || [88, 150], near = clamp((q.y - y0) / (y1 - y0), 0, 1);
+      const lufs = wd + s.far + (s.near - s.far) * near - (q.id === 'boil' && q.step > 0 ? 3 : 0);
+      this.shot(variants(s.f), {at, lufs, x: q.x, dist: .7 * (1 - near), lp: 4000 + 12000 * near, r, tag: 'signs'});
+    } else if (q.type === 'strike' && q.frame === 1) {   // the rod's swish, the line's plip at the float, then drops off it
+      const fx = FLOAT_X[place] || 65;
+      this.shot('swish', {at, lufs: wd - 30, x: ROD_X[place] || 80, r, tag: 'events', send: -6});
+      this.shot(variants('plip'), {at, lufs: wd - 37, x: fx, r, tag: 'events', dist: .2});
+      for (let i = 0, n = r.int(2, 3), t = at + .3; i < n; i++, t += r.u(.06, .12)) this.shot(variants('plip'), {at: t, lufs: wd - 41, x: fx + r.u(-2, 2), r, tag: 'events', dist: .2});
+    } else if (q.type === 'scare') {   // the fry's bursts: 4 plips over 80 ms, then 3 quieter
+      const xs = q.xs || [65];
+      xs.forEach((x, i) => this.shot(variants('plip'), {at: at + (q.burst === 1 ? i * .027 : i * .03), lufs: wd + (q.burst === 1 ? -35 : -38), x, r, tag: 'events', dist: .15}));
+    } else if (q.type === 'life' && this.life) this.life.cue(q, at);
+  }
+  pumpStreams(S, now, until) {   // the recorded beds' next pieces: each 5-9 s from a random place, crossfaded 1.5 s
+    for (const T of S.streams) {
+      const e = this.loaded.get(T.name);
+      if (!e || !e.b) continue;   // not decoded yet: it starts when it is
+      if (T.cal == null) {   // its body's loudness through its filters, once: the level it then gets
+        const b = e.b, i0 = Math.round((e.skip + .3) * b.sampleRate), k = T.name + JSON.stringify(T.filters);
+        T.cal = this.cals[k] != null ? this.cals[k] : this.cals[k] = calib(b.getChannelData(0), b.sampleRate, T.filters, Math.min(i0, Math.max(0, b.length - b.sampleRate)), 1);
+        T.lvl.gain.setValueAtTime(dB(T.lufs - T.cal), Math.max(now, S.t0));
+        if (T.gusty) S.gusty(T.gustN, T.gustDst, dB(T.lufs - T.cal));   // its gust path, at its own level
+        T.next = Math.max(now, S.t0);
+      }
+      const dur = e.b.duration, X = 1.5;
+      while (T.next < until + 1 && !(S.end != null && T.next > S.end)) {
+        const at = Math.max(T.next, now), r = T.r, len = Math.min(r.u(5, 9), dur - e.skip - .6);
+        if (len < 2 * X) { T.next = Infinity; break; }
+        const off = e.skip + .3 + r() * Math.max(0, dur - e.skip - .6 - len), p = T.side * T.width * r.u(.4, 1), k = 1 / sumOf(p);
+        T.side = -T.side;
+        const c = this.ctx, src = c.createBufferSource(), g = c.createGain(), pn = c.createStereoPanner();
+        src.buffer = e.b; src.playbackRate.value = 1 + .03 * (2 * r() - 1);
+        const up = Float32Array.from(UP, v => v * k), down = Float32Array.from(DOWN, v => v * k);
+        g.gain.value = 0; g.gain.setValueCurveAtTime(up, at, X); g.gain.setValueCurveAtTime(down, at + len - X, X);
+        pn.pan.value = p; src.connect(g); g.connect(pn); pn.connect(T.in);
+        const piece = {src, nodes: [src, g, pn]};
+        src.onended = () => { piece.nodes.forEach(n => n.disconnect()); S.pieces.delete(piece); };
+        src.start(at, off, len * src.playbackRate.value + .05); S.pieces.add(piece);
+        T.next = at + len - X;
+      }
+    }
+  }
+  pumpPuffs(S, now, until) {   // the puffs of breeze in calm weather: each rises over 1-2.5 s, holds a moment and falls over 2-4 s,
+    // at uneven gaps (3-22 s, now and then two close together); in fog seldom and weak. The yard's are longer (P.long:
+    // the author heard its puffs too short): they rise over 2.5-5 s, hold 1.5-5 s with a soft sway or two in it (1.5-3.5 dB
+    // down), fall over 3.5-7 s, at gaps of 8-35 s (now and then 1-4 s): 7.5-17 s a puff, v3's 3-8.7
+    const P = S.puffs;
+    if (!P) return;
+    while (P.next < until) {
+      const at = Math.max(P.next, now), r = P.r;
+      if (P.long) {
+        const rise = r.u(2.5, 5), hold = r.u(1.5, 5), fall = r.u(3.5, 7), len = rise + hold + fall, pk = r.u(.45, 1), sway = r.u(.15, .33), humps = r.int(1, 2);
+        const a = rise / len, b = (rise + hold) / len;
+        const curve = Float32Array.from({length: 96}, (_, i) => { const u = i / 95; return pk * (u < a ? .5 - .5 * Math.cos(Math.PI * u / a)
+          : u < b ? 1 - sway * (.5 - .5 * Math.cos(2 * Math.PI * humps * (u - a) / (b - a))) : .5 + .5 * Math.cos(Math.PI * (u - b) / (1 - b))); });
+        const pan = r.u(-.35, .35);
+        for (const L of P.layers) { L.pan.setValueAtTime(pan, at); L.env.setValueCurveAtTime(curve, at, len); }
+        P.next = at + len + .05 + (r() < .15 ? r.u(1, 4) : r.u(8, 35));
+        continue;
+      }
+      const rise = r.u(1, 2.5), hold = r.u(.3, 2.2), fall = r.u(1.8, 4), len = rise + hold + fall, pk = P.weak ? r.u(.25, .5) : r.u(.45, 1);
+      const a = rise / len, b = (rise + hold) / len;
+      const curve = Float32Array.from({length: 64}, (_, i) => { const u = i / 63; return pk * (u < a ? .5 - .5 * Math.cos(Math.PI * u / a) : u < b ? 1 : .5 + .5 * Math.cos(Math.PI * (u - b) / (1 - b))); });
+      const pan = r.u(-.35, .35);
+      for (const L of P.layers) { L.pan.setValueAtTime(pan, at); L.env.setValueCurveAtTime(curve, at, len); }
+      P.next = at + len + .05 + (P.weak ? r.u(25, 60) : r() < .2 ? r.u(.5, 2.5) : r.u(3, 22));
+    }
+  }
+  pumpDrips(S, now, until) {   // drops off the eaves, into the barrel, onto the tin sill and the boards, off the spruce
+    // boughs, on the boats: each source one at a time, at its own pitch (D.rate)
+    for (const D of S.drips) {
+      while (D.next < until) {
+        const at = Math.max(D.next, now), r = D.r;
+        D.next = at + (D.period ? D.period * (1 + r.u(-D.jitter, D.jitter)) * (r() < .1 ? 2 : 1) : r.u(...D.every) * (r() < .15 ? .3 : 1));
+        this.shot(D.names, {at, lufs: D.lufs, x: r.u(...D.x), dist: D.dist, lp: D.lp, r, tag: D.tag, send: -6, spread: 3, rate: D.rate, src: D.id});
+      }
+    }
+  }
+  pumpClock(S, now, until) {   // the ходики: a Маяк cuckoo clock's pendulum swings in 0.857 s (its repair manual), a beat every
+    // 0.43 s, the tick and the tock a little unequal (0.420 and 0.437 s) and the tock a shade softer and lower; each
+    // beat -44 LUFS momentary (v2: -36, and a beat every 0.5 s)
+    const K = S.clock;
+    if (!K) return;
+    while (K.next < until) {
+      const at = Math.max(K.next, now), tick = K.i++ % 2 === 0;
+      K.next = at + (tick ? .420 : .437) + K.r.u(-.002, .002);
+      this.shot(variants(tick ? 'tick' : 'tock'), {at, lufs: tick ? -44 : -45.5, pan: -.05, r: K.r, tag: 'clock', spread: .5, rate: tick ? 1 : .97, send: -4, lp: 5000});
+    }
+  }
+  pumpBirds(S, now, until) {
+    const c = this.cfg, B = this.birds, list = BIRDS[c.place];
+    if (!list) return;
+    while (B.next < until) {
+      const at = Math.max(B.next, now), d = this.density(at), r = B.r;
+      B.next = at + Math.min(30, d > .005 ? -Math.log(1 - r()) * BIRD_EVERY / d : 1);   // looked at again within 30 s, should the hour change
+      if (d <= .005 || (B.quiet && at >= B.quiet[0] && at < B.quiet[1])) continue;
+      // who sings at this hour, by weight; if that bird is still singing (its song and two seconds more), this turn is
+      // silent: the chorus never doubles one recording a moment after itself, and a rare bird stays rare (v2 drew again
+      // among the free ones, so the yellowhammer sang whenever the skylark was busy)
+      const busy = B.busy || (B.busy = {});
+      const ok = list.filter(([s, , h]) => !h || (c.hour >= h[0] && c.hour <= h[1]) || (h.length > 2 && c.hour >= h[2] && c.hour <= h[3]));
+      let w = 0; for (const b of ok) w += b[1];
+      let u = r() * w, b = ok[0];
+      for (const x of ok) if ((u -= x[1]) < 0) { b = x; break; }
+      if (!b || busy[b[0]] > at) continue;
+      const far = b[3] === 'far' || c.place === 'lake' || c.place === 'story', q = r(), k = far ? 2 : q < .15 ? 0 : q < .45 ? 1 : 2;
+      const v = this.shot(variants(b[0]), {at, lufs: BIRD_LUFS[k], pan: r.u(-.4, .4), dist: [.1, .5, .9][k], r, tag: 'birds', bird: true, wall: true});
+      if (v) busy[b[0]] = v.end + 2;
+    }
+  }
+  pumpAround(S, now, until) {
+    const c = this.cfg;
+    for (const A of this.around) {
+      const v = A.v;
+      while (A.next < until) {
+        const at = Math.max(A.next, now), k = (v.wx && c.weather in v.wx ? v.wx : WX_WAIT)[c.weather] ?? 1;
+        A.next = v.once ? Infinity : at + A.r.u(...v.every) * (k || 1);
+        if (k === 0) continue;
+        if (v.hours && (c.hour < v.hours[0] || c.hour > v.hours[1])) continue;
+        if (v.people && c.people === false) continue;   // the shop locked: its door stays shut
+        this.aroundShot(v, at, A.r);
+      }
+    }
+  }
+  aroundShot(v, at, r) {
+    const x = r.u(...v.x), dir = r() < .5 ? 1 : -1;
+    return this.shot(v.vs || variants(v.f), {at, lufs: v.lufs, x: v.pass ? undefined : x, pan: v.pass ? -.35 * dir : undefined, panTo: v.pass ? .35 * dir : undefined,
+      dist: v.dist, lp: v.lp, fade: v.fade, r, tag: 'around', wall: true});
+  }
+  event(kind, o, now) {
+    const S = this.cur;
+    if (!S) return;
+    const r = rnd('event', kind, now * 1000);
+    if (kind === 'curtain' && S.place === 'izba') this.shot('curtain', {at: now + .02, lufs: -34, x: 70, r, tag: 'events', send: -4});
+    else if (kind === 'clock' && S.place === 'izba') {   // the works whirr, then the cuckoo calls the hour
+      const n = clamp(o && o.n | 0, 1, 12), w = now + r.u(.5, 1);
+      this.shot('clock-whirr', {at: w, lufs: -37, pan: -.05, r, tag: 'clock', send: -2});
+      for (let i = 0; i < n; i++) this.shot('clock-cuckoo', {at: w + .8 + i * r.u(1, 1.1), lufs: -34, pan: -.05, r, tag: 'clock', send: -2, spread: .5});
+    } else if (kind === 'hear') {   // the demo: one of the place's own sounds now
+      const v = (AROUND[S.place] || []).find(a => a.f === (o && o.f));
+      if (v) this.aroundShot(v, now + .05, r);
+    } else if (kind === 'strike' || kind === 'scare') this.pump(now);
+  }
+  stats() {
+    let nodes = 0; for (const S of [this.cur, ...this.retired]) if (S && !S.dead) nodes += S.nodes.length + 3 * S.pieces.size;
+    let loaded = 0; for (const e of this.loaded.values()) if (e.b) loaded++;
+    return {nodes, voices: this.voices.size, loaded, scapes: (this.cur ? 1 : 0) + this.retired.filter(S => !S.dead).length};
+  }
+}
+const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function outLatency(c) { try { return (c.outputLatency || c.baseLatency || 0); } catch (e) { return 0; } }
+
+// ---------- the life of the hour ----------
+// The sound of the hour's life line, as LIFE says: its one-shots scheduled from the hour's start (2-6 s in for the
+// first), or with the scene's cues for the drawn ones and the gusts. A flock (geese, cranes) and the geese unseen over
+// the omut get a bus of their own: its envelope (in with the flock, out over the long tail after it), its pan moving
+// with the flock, its distance; their calls are the file again and again, overlapping a little.
+class Life {
+  constructor(E, life, t0) {
+    const L = LIFE[life.key];
+    this.E = E; this.key = life.key; this.count = life.count; this.L = L; this.t0 = t0; this.r = rnd('life', E.cfg.seed, life.key, E.cfg.hour);
+    this.heardAt = Infinity; this.done = false; this.flocks = []; this.calls = null;
+    this.next = L.at === 'drawn' || L.at === 'gusts' || !L.at ? Infinity : t0 + this.r.u(2, 6);
+    this.until = L.total ? t0 + this.r.u(...L.total) : Infinity;
+    if (L.hush) {   // the omut's birds fall silent 3-6 s in, over 1.5 s; 25-40 s later they come back over 4 s
+      const a = t0 + this.r.u(3, 6), b = a + 1.5 + this.r.u(25, 40);
+      E.birds.quiet = [a, b + 2]; E.birdLevel(a, 0, 1.5); E.birdLevel(b, 1, 4); this.heardAt = a;
+    }
+    if (L.layer) this.heardAt = t0 + 1;   // the grasshoppers: the insects layer of the scape, the whole hour
+  }
+  heard(now) { return now >= this.heardAt; }
+  mark(at) { if (at < this.heardAt) this.heardAt = at; }
+  end(now) {   // a new hour: what sounds plays out, nothing new comes
+    this.done = true; this.calls = null;
+    for (const F of this.flocks) if (F.end > now) this.flockOut(F, now, 1.5);
+  }
+  pump(now, until) {
+    const L = this.L;
+    while (!this.done && this.next < until) {
+      const at = Math.max(this.next, now);
+      this.play(at);
+      if (L.at === 'only') { this.done = true; break; }
+      this.next = at + (L.at === 'once' ? this.r.u(180, 360) : this.r.u(L.at[0], L.at[1]));
+      if (this.next > this.until) this.done = true;
+    }
+    const K = this.calls;
+    if (K && K.next < until && K.next < K.end) {   // the kite whistles now and then while it is in the sky
+      const at = Math.max(K.next, now);
+      this.one(at, {x: K.x});
+      K.next = at + this.r.u(...L.every);
+    }
+    for (const F of this.flocks.slice()) {
+      while (F.next < until && F.next < F.end) {   // the flock's calls: the file again, overlapping a little
+        const at = Math.max(F.next, now), v = this.E.shot(variants(L.f), {at, lufs: L.lufs - 2.5, dest: F.head, r: this.r, tag: 'life', S: F.S});   // they overlap
+        if (v) this.mark(at);
+        F.next = at + (v ? (v.end - at) * this.r.u(.55, .8) : 4);
+      }
+      // let its bus go once silent (not in a render: there the pump runs through the whole time before a sample is made)
+      if (!this.E.offline && (now > F.end + 2 || F.S.dead)) { F.nodes.forEach(n => n.disconnect()); this.flocks.splice(this.flocks.indexOf(F), 1); }
+    }
+  }
+  one(at, o = {}) {   // a single sound of the line, at its place or o's
+    const L = this.L, fog = this.E.cfg.weather === 'fog';
+    const v = this.E.shot(L.vs || variants(L.f), {at, lufs: L.lufs + (o.db || 0), x: o.x != null ? o.x : L.x != null ? L.x : this.r.u(10, 120),
+      dist: L.dist, send: L.send, lp: L.lp || (fog && L.fogLp) || 0, r: this.r, tag: 'life', pan: o.pan, panTo: o.panTo, panFor: o.panFor, fade: L.fly});
+    if (v) this.mark(at);
+    return v;
+  }
+  play(at) {
+    const L = this.L, r = this.r;
+    if (L.calls && !L.pass) {   // a series: the cuckoo's «ку-ку» about a second apart (exactly the count of its line; no two in
+      // one 400 ms), the swans' calls spread over 10-20 s, which overlap, so each is 3 dB quieter
+      const n = L.calls === 'count' ? clamp(this.count || 4, 1, 20) : r.int(L.calls[0], L.calls[1]), x = L.x != null ? L.x : r.u(10, 120);
+      const gap = L.spread ? r.u(...L.spread) / n : 0, db = gap ? -3 : 0;
+      for (let i = 0, t = at; i < n; i++, t += gap ? gap * r.u(.7, 1.3) : r.u(.95, 1.15)) this.one(t, {x: x + r.u(-3, 3), db});
+    } else if (L.burst) {   // cracks: n of them over a few seconds, round one place, each quieter by as many as share 400 ms
+      const n = r.int(L.burst[0], L.burst[1]), len = r.u(L.burst[2], L.burst[3]), db = -10 * Math.log10(Math.max(1, n * Math.min(1, .4 / len)));
+      for (let i = 0; i < n; i++) this.one(at + len * i / n + r.u(0, .4 * len / n), {x: L.x + r.u(-8, 8), db});
+    } else if (L.pass) {   // goes by over the head or along the forest, from one side to the other
+      const dur = r.u(...L.pass), dir = r() < .5 ? 1 : -1, n = L.calls ? r.int(L.calls[0], L.calls[1]) : 1;
+      for (let i = 0; i < n; i++) this.one(at + i * dur / n, {pan: .4 * dir * (2 * i / n - 1), panTo: .4 * dir, panFor: dur * (1 - i / n)});
+    } else if (L.swell) {   // geese unseen over the forest: they come up, hold and go
+      const [up, h0, h1, down] = L.swell, hold = r.u(h0, h1), F = this.flock(at, r.u(-.3, .3), r() < .5 ? .3 : -.3, up + hold + down);
+      F.in.gain.setValueCurveAtTime(Float32Array.from(UP, v => v * v), at, up);
+      F.end = Infinity; this.flockOut(F, at + up + hold, down);
+    } else if (L.buzz) {   // a mosquito passes the ear
+      const s = r() < .5 ? 1 : -1; this.one(at, {pan: -.35 * s, panTo: .35 * s, panFor: 2.6});
+    } else this.one(at);
+  }
+  flock(at, p0, p1, len) {   // its bus: [lowpass ->] in (comes up) -> out (goes, over its tail) -> pan -> dry, and a send to the echo
+    const E = this.E, S = E.cur, c = E.ctx, L = this.L, inG = c.createGain(), outG = c.createGain(), p = c.createStereoPanner(), s = c.createGain();
+    inG.gain.value = 0; p.pan.setValueAtTime(p0, at); p.pan.linearRampToValueAtTime(p1, at + len);
+    s.gain.value = dB(-20 + 16 * L.dist + (L.send || 0));
+    const nodes = [inG, outG, p, s];
+    let head = inG;
+    if (L.lp || L.dist > .5) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = L.lp || 16000 * Math.pow(3500 / 16000, L.dist); f.Q.value = .5; f.connect(inG); head = f; nodes.push(f); }
+    inG.connect(outG); outG.connect(p); p.connect(S.dry); p.connect(s); s.connect(S.verb);
+    const F = {head, in: inG, out: outG, nodes, S, next: at + this.r.u(0, 1.5), end: at + len, k: -1, gone: false};
+    this.flocks.push(F);
+    return F;
+  }
+  flockOut(F, at, sec) {   // it goes over `sec`: slowly at first (half the level halfway), heard a long while; once
+    if (F.gone) return;
+    F.gone = true;
+    F.out.gain.setValueCurveAtTime(Float32Array.from({length: 48}, (_, i) => Math.pow(Math.cos(Math.PI / 2 * i / 47), 2)), at, Math.max(.1, sec));
+    F.end = Math.min(F.end, at + sec);
+  }
+  cue(q, at) {   // the drawn life of the line comes or goes
+    const L = this.L;
+    if (L.at !== 'drawn' || this.done || this.key.split('/')[1] !== q.id) return;
+    if (q.what === 'in') {
+      if (L.every) { this.calls = {next: at + (q.k === 0 ? this.r.u(2, 6) : this.r.u(9, 14)), end: at + q.ms / 1000, x: q.x0}; return; }
+      if (L.pass || L.calls) { this.flyBy(q, at); return; }
+      const F = this.flock(at, panOf(q.x0), panOf(q.x1), q.ms / 1000), up = q.k === 0 ? 4 : 7;   // far honking that comes in
+      F.in.gain.setValueCurveAtTime(Float32Array.from(UP, v => v * v), at, up);
+      F.end = Infinity; F.k = q.k; F.next = at + this.r.u(.2, 1);
+    } else {
+      if (L.every) { if (this.calls) this.calls.end = Math.min(this.calls.end, at); return; }
+      for (const F of this.flocks) if (F.k === q.k && F.end === Infinity) { F.end = at + 1e6; this.flockOut(F, at, this.r.u(...L.tail)); }   // heard long after
+    }
+  }
+  flyBy(q, at) {   // a drawn flock's sound as it crosses: its middle goes from x0 to x1 in ms. The ducks' wings rush past
+    // as it crosses the middle of the picture (at once if it has); the swans call 3-5 times while it is in sight
+    const L = this.L, r = this.r, len = q.ms / 1000, xAt = t => q.x0 + (q.x1 - q.x0) * clamp((t - at) / len, 0, 1);
+    if (L.pass) {
+      const dur = r.u(...L.pass), f = q.x0 === q.x1 ? 0 : clamp((q.x0 - 65) / (q.x0 - q.x1), 0, 1), t = Math.max(at + .1, at + f * len - dur / 2);
+      this.one(t, {pan: panOf(xAt(t)), panTo: panOf(xAt(t + dur)), panFor: dur});
+      return;
+    }
+    const n = r.int(L.calls[0], L.calls[1]), gap = Math.max(1, Math.min(r.u(...L.spread), len - 2)) / n;
+    for (let i = 0, t = at + r.u(.5, 2); i < n && t < at + len; i++, t += gap * r.u(.7, 1.3)) this.one(t, {x: xAt(t), db: -3});
+  }
+  gust(q, at) { if (this.L.at === 'gusts' && !this.done && this.r() < .42) this.one(at - .3); }   // a dry tree creaks on every second or third gust
+}
+
+// ---------- the page's sound: one context, unlocked by a gesture ----------
+let ctx = null, E = null, dead = false, muted = false, timer = 0, sleeping = 0, files = {}, base = 'sound/', debug = false;
+const pending = {};   // set() before unlock(): what to build once there is a context
+try { muted = localStorage.getItem(MUTE_KEY) === '1'; } catch (e) { /* no storage: not muted */ }
+function fail(e) {
+  if (dead) return;
+  dead = true;
+  try { console.warn('LiveSound: ' + (e && e.message || e) + '; silent from now on'); } catch (x) { /* nothing to say it with */ }
+  try { clearInterval(timer); if (E) E.master.gain.setTargetAtTime(0, ctx.currentTime, .02); if (ctx) setTimeout(() => { try { ctx.close(); } catch (x) { /* gone */ } }, 100); } catch (x) { /* gone */ }
+}
+const guard = (f, dflt) => function () { if (dead) return dflt; try { return f.apply(null, arguments); } catch (e) { fail(e); return dflt; } };
+const shown = () => typeof document === 'undefined' || !document.hidden;
+function running() { return ctx && E && !muted && shown(); }
+function startPump() {
+  if (timer || dead) return;
+  timer = setInterval(guard(() => { if (running() && ctx.state === 'running') E.pump(ctx.currentTime); else { clearInterval(timer); timer = 0; } }), TICK * 1000);
+}
+function fadeTo(v, sec) { if (E) E.master.gain.setTargetAtTime(v, ctx.currentTime, sec / 3); }
+function wake(sec) {   // resume and fade in
+  if (!running()) return;
+  clearTimeout(sleeping); sleeping = 0;
+  const go = () => { if (running()) { fadeTo(1, sec); E.pump(ctx.currentTime); startPump(); } };
+  if (ctx.state !== 'running') { const p = ctx.resume(); if (p && p.then) p.then(guard(go), () => {}); } else go();
+}
+function sleep(sec) {   // fade out and suspend
+  if (!ctx || !E) return;
+  fadeTo(0, sec); clearInterval(timer); timer = 0;
+  clearTimeout(sleeping);
+  sleeping = setTimeout(guard(() => { sleeping = 0; if (!running() && ctx.state === 'running') ctx.suspend(); }), sec * 1000 + 30);
+}
+const unlock = guard(() => {
+  if (!AC || muted) return;
+  if (!ctx) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'ambient'; } catch (e) { /* not there */ }
+    try { ctx = new AC({latencyHint: 'playback', sampleRate: 32000}); } catch (e) { ctx = new AC({latencyHint: 'playback'}); }
+    E = new Engine(ctx, {files, base}); if (debug) E.trace = [];
+    if (pending.o) { E.set(pending.o, ctx.currentTime); pending.o = null; }
+    wake(3);   // the first sound fades in over 3 s
+    warm();
+    return;
+  }
+  if (ctx.state !== 'running' || !timer) wake(1);
+});
+function warm() {   // the noises and rooms not made yet, one an idle moment, so a later place does not wait for them
+  const todo = [...Object.keys(NOISE).map(n => () => E.noise(n)), ...Object.keys(ROOM).map(p => () => E.room(p))];
+  const idle = f => typeof requestIdleCallback === 'function' ? requestIdleCallback(f, {timeout: 3000}) : setTimeout(f, 200);
+  const next = guard(() => { if (dead || !todo.length) return; todo.shift()(); idle(next); });
+  idle(next);
+}
+function visible() { if (document.hidden) sleep(.15); else if (ctx && !muted) wake(1); }
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', guard(visible));
+  window.addEventListener('pagehide', guard(() => sleep(.15)));
+}
+const LiveSound = {
+  set: guard(o => {
+    if (!o || typeof o !== 'object') return;
+    if (!E) { pending.o = {...(pending.o || {}), ...o}; return; }
+    E.set(o, ctx.currentTime);
+    if (running() && ctx.state === 'running') E.pump(ctx.currentTime);
+  }),
+  event: guard((kind, o) => { if (E && running()) E.event(String(kind), o, ctx.currentTime); }),
+  unlock,
+  mute: guard(on => {
+    on = !!on;
+    try { localStorage.setItem(MUTE_KEY, on ? '1' : '0'); } catch (e) { /* not remembered */ }
+    if (on === muted) { if (!on) unlock(); return; }
+    muted = on;
+    if (on) sleep(.3); else if (!ctx) unlock(); else wake(1);
+  }),
+  get muted() { return muted; },
+  heard: guard(key => !!(E && E.life && E.life.key === key && E.life.heard(ctx.currentTime)), false),
+  preload: guard(place => E && PLACES.includes(place) ? E.want(placeFiles(place)).then(ok => ok, () => false) : Promise.resolve(false), Promise.resolve(false)),
+  get files() { return files; },
+  set files(f) {   // new files: those that could not be had are asked for again
+    if (!f || typeof f !== 'object') return;
+    files = f;
+    if (E) { E.files = f; for (const [n, e] of [...E.loaded]) if (!e.b) E.loaded.delete(n); }
+  },
+  get base() { return base; },
+  set base(b) {   // where a name not in files is fetched from: base + name + '.m4a'
+    if (typeof b !== 'string') return;
+    base = b;
+    if (E) { E.base = b; for (const [n, e] of [...E.loaded]) if (!e.b) E.loaded.delete(n); }
+  },
+  render: guard(o => render(o || {}).catch(e => { console.warn('LiveSound.render: ' + (e && e.message || e)); return null; }), Promise.resolve(null)),
+  stats: guard(() => {
+    const s = E ? E.stats() : {nodes: 0, voices: 0, loaded: 0, scapes: 0};
+    return {state: dead ? 'failed' : ctx ? ctx.state : AC ? 'locked' : 'none', ...s, ...(E && E.trace ? {log: E.trace.slice()} : {})};
+  }, {state: 'failed', nodes: 0, voices: 0, loaded: 0, scapes: 0}),
+  get debug() { return debug; },
+  set debug(on) { debug = !!on; if (E) E.trace = debug ? E.trace || [] : null; },   // stats().log: the last 200 one-shots
+  version: VERSION,
+  PLACES: Object.freeze(PLACES.slice()), WEATHERS: Object.freeze(WEATHERS.slice()), LIFE: Object.freeze(Object.keys(LIFE)),
+  AROUND: Object.freeze(Object.fromEntries(Object.entries(AROUND).map(([p, l]) => [p, Object.freeze(l.map(a => a.f))]))),
+  NAMES: Object.freeze(Object.keys(FILES).flatMap(variants)),
+};
+// ---------- the offline render: the same engine in an OfflineAudioContext, pumped through the whole time first ----------
+async function render(o) {
+  if (!OAC) return null;
+  const sr = o.sampleRate || 32000, sec = o.seconds || 30, c = new OAC(2, Math.ceil(sec * sr), sr);
+  const R = new Engine(c, {offline: true, solo: o.solo, files: o.files || files, base: o.base || base, log: true, sceneT0: o.sceneT0 || 0});
+  const steps = [{at: 0, set: o.set || {}}, ...(o.timeline || [])].sort((a, b) => a.at - b.at);
+  const names = new Set();
+  for (const s of steps) {
+    const p = s.set && s.set.place; if (p) placeFiles(p).forEach(n => names.add(n));
+    const L = s.set && s.set.life, k = L && typeof L === 'object' ? L.key : L; if (k) lifeFiles(k).forEach(n => names.add(n));
+  }
+  ['swish', 'cone', 'curtain', 'mosquito', 'hazel-grouse'].forEach(n => names.add(n));
+  await R.want([...names]);
+  let i = 0;
+  for (let t = 0; t < sec; t = +(t + TICK).toFixed(6)) {
+    while (i < steps.length && steps[i].at <= t + 1e-9) {
+      const s = steps[i++];
+      if (s.set) R.set(s.set, s.at); else if (s.event) R.event(s.event, s.o, s.at);
+    }
+    R.pump(t);
+  }
+  const buffer = await c.startRendering();
+  return {buffer, plays: R.plays, nodes: R.stats()};
+}
+window.LiveSound = Object.freeze(LiveSound);
+})();
+// ---------- end of sound.js ----------
+</script>
+<script>
 // the outdoor places, one clean picture each (the overcast scene): the living scenes engine paints the weather on it
 const IMG = {"home": "data:image/png;base64,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", "shop": "data:image/png;base64,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", "river": "data:image/png;base64,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", "omut": "data:image/png;base64,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", "lake": "data:image/png;base64,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"};
 // the title screen (full phone screen), the backstory, and the izba from inside with the curtain pulled aside:
@@ -3908,6 +5299,66 @@ function btn(label, sub, onclick, cls='secondary', disabled=false){
 // the weather at the current hour: the morning's until 11:00, then maybe the next one
 function nowWeather(){ return S.D.weathers ? S.D.weathers[Math.min(S.t || 0, HOURS-1)] : S.D.weather; }
 
+// ---------- sound ----------
+// The ambient sound of the places: LiveSound (the second <script>, sound.js, a copy from should_I_lab), its recordings
+// in sound/ (their authors and licences in sound/CREDITS.md). It follows every picture the game shows, as the scene was
+// given it (soundShow() from fill(), and the title screen's from showSplash()): the place, the weather, the hour, the
+// month by the izba's calendar, the light, the curtain in the izba, the people at the shop, the hour's signs and life
+// at a water, and the living scene itself, whose cues give the sound its moments (a sign sounds at the frame it is
+// drawn, the wind rises with the gusts drawn). The game tells it only what no picture shows: the strike and the scare
+// as the scene starts them (oneShot()), the curtain, and the wall clock when an hour has passed at home with the player
+// (soundClock()). It says nothing of the fish beyond the journal, as the scene does not. Nothing in the game waits for
+// it, and the only thing it asks is heard(): a life line whose sound has begun is written before «Смотал удочки», as a
+// drawn one is. There is no sound before the player's first tap (a click anywhere, after the tap's own handler, so the
+// first sound is the screen the tap opened), none in a page opened from a file (fetch() cannot read the recordings
+// there) and none without Web Audio; in those two the switch is hidden. The module catches its own errors and falls
+// silent; a recording that cannot be had is silence. The switch («звук», #soundBtn) mutes it; the module remembers the
+// choice (localStorage, under its own key), and «Начать заново» keeps it. A recording is fetched when its place is
+// first heard, at sound/<name>.m4a?v=<its digest> (SOUND_FILES), and the service worker keeps it for offline play.
+// ---------- sound files: the recordings in sound/, put here by should_I_lab/art/anim/sound_to_game.py ----------
+const SOUND_FILES = {"barrel-1":"5ca1ace3","barrel-2":"ebe6bccf","barrel-3":"f113713f","board-1":"5a5c634b","board-2":"6f006f9b","board-3":"e1ddd471","capercaillie":"3695ed5d","chaffinch-1":"4b3d7031","chaffinch-2":"fb47fd77","clock-cuckoo":"03c5550f","clock-whirr":"2948c1ee","cow-1":"e0a6f64e","cow-2":"1cf54817","crack-1":"3ac17146","crack-2":"75582658","crack-3":"ae18f0ff","crack-4":"2eb18d05","cranes-1":"481b7f13","cranes-2":"845a6fbc","creak-1":"55dfe142","creak-2":"8e6183ad","crows":"8dbee130","cuckoo-1":"cb4bbca7","cuckoo-2":"8650b077","dog-1":"610b2142","dog-2":"e6967242","dog-near-1":"2c9119d2","dog-near-2":"15689fa2","door-1":"1e364026","door-2":"df0a723a","drip-1":"96a18146","drip-2":"8ad96578","drip-3":"c4334508","geese":"91e2e231","goldeneye":"8241a3ed","grasshoppers":"d4b5cf5f","hens-1":"df5df267","hens-2":"3dfa520c","kite":"1169923d","leaves":"cbeb3168","motorcycle":"d56fcc09","owl":"3ba13a13","pipit-1":"d81b5f4c","plip-1":"966c00fb","plip-2":"ce82be6f","plip-3":"22ba6870","plip-4":"72585abd","rain-heavy":"8349831f","rain-leaves":"1686a561","rain-water":"149f39f6","rain-water-heavy":"d2f474ca","raven-1":"ac726de2","raven-2":"047c11be","redwing-1":"e73a3fe2","reeds":"115eb25b","robin-1":"655036be","robin-2":"1f6a9f77","roe-bark":"b8a474f4","roof-downpour":"3a0b878b","roof-drizzle":"109017f1","rooster-1":"99367e3e","rooster-2":"730ede09","sip-1":"00b1d1fe","sip-2":"37a6f038","sip-3":"5600504e","skylark":"ec2f48d0","slap-1":"03c4eee4","slap-2":"6fc7af59","sparrows":"da138ac4","splash-1":"71cbed20","splash-2":"e06959fb","splash-3":"d6c26709","squirrel":"440777ee","swans":"3908e960","thrush-1":"9ee3f909","thrush-2":"f13e7104","tick-1":"2aed0285","tick-2":"4b371994","tin-1":"4b828cf3","tin-2":"3ecf9e2e","tin-3":"dc40194b","tits":"3697c713","tock-1":"5433ae91","tock-2":"54332799","warbler-1":"09f73a0b","woodpecker-1":"8398bfa2","woodpecker-2":"369b8e8e","wren-1":"1e0cbc06","yellowhammer-1":"20847bdf"};
+// ---------- end of sound files ----------
+const SOUND = (() => { try {
+  if (!window.LiveSound || !/^https?:$/.test(location.protocol) || LiveSound.stats().state === 'none') return null;
+  LiveSound.files = Object.fromEntries(LiveSound.NAMES.map(n => [n, SOUND_FILES[n] ? `sound/${n}.m4a?v=${SOUND_FILES[n]}` : null]));
+  return LiveSound;
+} catch (e) { return null; } })();
+function sound(f){ if (SOUND) try { f(SOUND); } catch (e) { /* the sound never stops the game */ } }
+// what the sound of a picture at hour t is given: the scene's options as they are, the month and the curtain
+function soundOf(place, t, o){
+  return Object.assign({place, hour: START + Math.min(t, HOURS), month: lifeMonth(), lit: true, curtain: false, people: true,
+    signs: [], life: null, seed: sceneSeed(place, t)}, o);
+}
+// [what a picture is heard as, its living scene] (no scene in the izba: its window has no cues, the sound takes the
+// gusts from LiveScenes.gusts)
+function soundShow([snd, scene] = []){ if (snd) sound(L => L.set(Object.assign({}, snd, {scene: scene || null}))); }
+// the wall clock strikes the hour that has just passed at home with the player: its cuckoo calls it by the dial
+function soundClock(){ sound(L => L.event('clock', {n: (START + S.t) % 12 || 12})); }
+const soundHeard = key => { try { return !!SOUND && SOUND.heard(key) === true; } catch (e) { return false; } };
+// The switch is on every screen of the day and the evening, and on the backstory and the yard before the first day.
+// Outdoors it is the plate «звук» in the scene's bottom right corner (#soundBtn, struck through while the sound is
+// off), below the shop's dog and clear of the hud, the handbook's button and the old man with his rod. In the izba
+// that corner holds the wall clock's weights on a short phone, and on the evening the clock itself, so there it is a
+// quiet link beside «Мастерить до вечера» or «Начать заново» (soundLink()): the two share the row, so the screen is no
+// taller. While the evening asks whether to start again, the link gives way to the question
+const SOUND_PLATE = new Set(['intro', 'living', 'yard', 'shop', 'water']);
+function soundSwitch(){
+  const b = $('soundBtn');
+  b.hidden = !SOUND || !SOUND_PLATE.has(S.phase);
+  b.setAttribute('aria-pressed', String(!!SOUND && !SOUND.muted));
+}
+$('soundBtn').onclick = () => { sound(L => L.mute(!L.muted)); soundSwitch(); };
+const soundWord = () => SOUND && SOUND.muted ? 'Включить звук' : 'Выключить звук';
+function soundLink(){   // the link, or nothing where there is no sound to switch
+  if (!SOUND) return null;
+  const b = btn(soundWord(), '', () => { sound(L => L.mute(!L.muted)); b.textContent = soundWord(); }, 'link');
+  return b;
+}
+document.addEventListener('click', () => sound(L => L.unlock()));   // bubbling: after the tap's own handler
+// Safari on the iPhone sends no click for a tap on what is not a button (the picture, the journal), but its touchend
+// unlocks the sound too; a button's tap waits for its click, so that the screen it opens is the first one heard
+document.addEventListener('touchend', e => { if (!(e.target && e.target.closest && e.target.closest('button'))) sound(L => L.unlock()); }, {passive: true});
+
 // ---------- the scene picture ----------
 // Two layers lie one on the other, each with a still picture (<img>) and a living scene (<canvas>): a new frame fades
 // in over the one shown, then its layer is the one shown. The outdoor places are living scenes, and so are the
@@ -3923,7 +5374,7 @@ const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba p
 // of the fishing is in them: no signs, no life; the day without power never comes on the first day.
 const INTRO = new Set(['intro', 'living']), INTRO_HOUR = START;
 const introScene = place => ({place, weather: WEATHERS[INTRO_WEATHER], hour: INTRO_HOUR, src: IMG[place], lit: true, seed: sceneSeed(place, 0)});
-const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true};
+const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true, sound: null};   // sound: what the last frame gave it
 const layer = i => $(i ? 'bg2' : 'bg');
 // A drawn picture that must keep its rows down to f.keep in sight (the evening's kerosene lamp on the sill) gives up
 // its top, not its bottom, on a scene too short for them. Placed again whenever the scene may have changed its height:
@@ -3944,8 +5395,11 @@ function fill(i, f, alt, t){
   if (f.live || f.izba){
     img.hidden = true; img.removeAttribute('src'); img.alt = '';
     cv.hidden = false; cv.setAttribute('aria-label', alt);
-    return (pic.live[i] = f.izba ? izbaLive(cv, f.izba, t) : LiveScenes.create(cv, Object.assign({t}, f.live))).ready();
+    pic.live[i] = f.izba ? izbaLive(cv, f.izba, t) : LiveScenes.create(cv, Object.assign({t}, f.live));
+    soundShow(pic.sound = [f.snd, f.live ? pic.live[i] : null]);   // the sound goes with the picture coming in
+    return pic.live[i].ready();
   }
+  soundShow(pic.sound = [f.snd, null]);
   cv.hidden = true; img.hidden = false; img.alt = alt; img.src = f.url;
   return img.decode ? img.decode() : Promise.resolve();
 }
@@ -3980,12 +5434,13 @@ function endFade(){
 // the scene at hour t, in the weather of that hour: its key and how it is shown; outdoors a living scene, the izba a
 // drawn picture with a living window (and its plain picture if drawing fails)
 function frame(img, t){
-  if (INTRO.has(S.phase)){ const live = introScene(img); return {key: `intro/${img}/${live.weather}/${live.hour}`, live}; }
+  if (INTRO.has(S.phase)){ const live = introScene(img); return {key: `intro/${img}/${live.weather}/${live.hour}`, live, snd: introSound(live)}; }
   const w = WEATHERS[S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
   const np = S.noPower === true;   // a day without power: no lights outdoors at 18:00, the kerosene lamp in the izba
   if (img in IZBA){   // the izba at this hour of this day, the evening at 18:00 with the lamp (or the kerosene lamp) on
     const open = IZBA[img], keep = img === 'izbaEvening' && np ? KERO_KEEP : 0;
-    return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w]};
+    return {key: `${img}/${w}/${h}/${S.day}/${np}`, top: true, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w],
+      snd: soundOf('izba', t, {weather: w, lit: !np, curtain: open})};
   }
   if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed,
     // and the hour's life if the scene draws it; on the omut the lilies stand open in the summer hours after they opened.
@@ -3995,10 +5450,14 @@ function frame(img, t){
     const L = water ? lifeOf(img, t) : null, kind = L && L.draw || '', lilies = water && img === 'omut' && liliesOpen(t);
     const people = !(img === 'shop' && benchEmpty(t));
     return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}/${kind}/${lilies}/${people}`,
-      live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np, seed, signs, life: kind ? {kind} : null, lilies, people}};
+      live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np, seed, signs, life: kind ? {kind} : null, lilies, people},
+      // the sound hears the hour's life line by its key, drawn or not (only those of sound.js's LIFE sound)
+      snd: soundOf(img, t, {weather: w, lit: !np, people, signs, life: L ? {key: L.key, count: L.id === 'cuckoo-count' ? cuckooCount() : 0} : null})};
   }
   return null;
 }
+// the title screen, the backstory and the yard before the first day sound as they are drawn: overcast at 6:00
+const introSound = live => soundOf(live.place, 0, {weather: live.weather});
 // the scenes' number for a day, an hour and a place: the same game shows the same sites of its signs after a reload
 function sceneSeed(place, t){
   let x = S.sceneSeed | 0;
@@ -4016,8 +5475,8 @@ function setScene(img){
   const key = sceneKey = f.key;
   if (f.live){ showPicture(f, alt); return; }
   const keep = f.keep;
-  sceneReady = f.draw().then(izba => { if (sceneKey === key) showPicture({key, izba, top, keep}, alt); },
-                             () => { if (sceneKey === key) showPicture({key, url: f.plain, top, keep}, alt); });
+  sceneReady = f.draw().then(izba => { if (sceneKey === key) showPicture({key, izba, top, keep, snd: f.snd}, alt); },
+                             () => { if (sceneKey === key) showPicture({key, url: f.plain, top, keep, snd: f.snd}, alt); });
 }
 // After a screen is shown, the izba's frames the next taps will need are drawn in idle time, one at a time, so they
 // are ready to fade in. The living scenes need none of this: the engine draws them at once.
@@ -4095,9 +5554,10 @@ function render(){
   if (S.phase !== shownPhase){ shownPhase = S.phase; if (window.scrollTo) scrollTo(0, 0); }   // a new screen starts at the top
   document.querySelector('.hud').style.visibility = INTRO.has(S.phase) ? 'hidden' : '';
   $('bookBtn').hidden = !S.D || INTRO.has(S.phase);   // the handbook's button: every screen of the day and the evening
+  soundSwitch();
   const add = html => { const d=document.createElement('div'); d.innerHTML=html; while(d.firstChild) P.appendChild(d.firstChild); };
   const actions = document.createElement('div'); actions.className='actions';
-  const links = (...bs) => { const l = document.createElement('div'); l.className = 'links'; bs.forEach(b => l.appendChild(b)); return l; };
+  const links = (...bs) => { const l = document.createElement('div'); l.className = 'links'; bs.forEach(b => b && l.appendChild(b)); return l; };
 
   if (S.phase==='intro'){   // the backstory, once, before the very first day
     setScene('story');
@@ -4121,7 +5581,7 @@ function render(){
     g.appendChild(btn('Мастерить снасти', `1 ч · +${rub(WAGE)}`, craft, 'secondary', left < 1));
     g.appendChild(btn('Ничего не делать', '1 ч', idle, 'secondary', left < 1));
     actions.appendChild(g);
-    actions.appendChild(links(btn(`Мастерить до вечера\u00a0· +${rub(left*WAGE)}`, '', craftAll, 'link')));
+    actions.appendChild(links(btn(`Мастерить до вечера\u00a0· +${rub(left*WAGE)}`, '', craftAll, 'link'), soundLink()));
   }
 
   else if (S.phase==='yard'){   // outside the izba: where to go; back inside costs no time
@@ -4153,7 +5613,7 @@ function render(){
     setScene('izbaEvening');   // nowWeather() is the last hour's weather: the evening comes with S.t = HOURS
     add(eveningHTML());
     actions.appendChild(btn('Лечь спать', '', nextDay, 'primary'));
-    if (!askRestart) actions.appendChild(links(btn('Начать заново', '', ()=>{ askRestart = true; render(); }, 'link')));
+    if (!askRestart) actions.appendChild(links(btn('Начать заново', '', ()=>{ askRestart = true; render(); }, 'link'), soundLink()));
     else {   // the second tap: the whole game is wiped; the question stays with the buttons, in sight
       const q = document.createElement('div'); q.className = 'note'; q.textContent = 'Начать всё заново? Дни и деньги не сохранятся.';
       actions.appendChild(q);
@@ -4370,7 +5830,7 @@ const LIFE_LINES = [
   {at: 'omut', id: 'hawk', f: 'some', w: '01', h: '11-15', draw: 'hawk', s: 'В просвете над омутом кружит ястреб.'},
   {at: 'omut', id: 'cuckoo', f: 'often', w: '01234', m: '5-7', s: 'Где-то кукует кукушка.'},
   {at: 'omut', id: 'cuckoo-count', f: 'rare', w: '01234', m: '5-7',   // how many times, by the day
-    s: () => `Кукушка прокуковала ${CUCKOO[Math.floor(lifeHash(4)*CUCKOO.length)]} и умолкла.`},
+    s: () => `Кукушка прокуковала ${CUCKOO[cuckooCount() - 2]} и умолкла.`},
   {at: 'omut', id: 'geese', f: 'rare', w: '01234', m: '9-10', s: 'Высоко пролетели гуси, только голоса над лесом.'},
   // the omut: the forest
   {at: 'omut', id: 'bough', f: 'some', w: '01234', s: 'В лесу с треском сломался сук.'},
@@ -4436,6 +5896,7 @@ const LIFE_LINES = [
   {at: 'all', id: 'lunch', f: 'clock', w: '01234', h: '12-13', s: 'Перекусил: хлеб, варёное яйцо, луковица.', need: () => !(S.purchases || []).some(p => p.id === 'bread' && p.gone)},
 ];
 const CUCKOO = ['два раза', 'три раза', 'четыре раза', 'пять раз', 'шесть раз', 'семь раз'];
+const cuckooCount = () => 2 + Math.floor(lifeHash(4)*CUCKOO.length);   // the day's count, 2..7: the line's words and its calls
 const LIFE_RARE = {season: .008, rare: .02};    // a rarer line's own chance in an hour it fits (times its q)
 // An 'often' or 'some' line's chance over a whole day at its water, spread over the hours of its window: its chance in
 // an hour it fits is 1 - (1 - LIFE_DAY) ** (1 / those hours), so a morning line is as likely on a morning there as a line
@@ -5344,8 +6805,8 @@ function seeWeather(inside){
   if (S.seen === w) return;
   S.seen = w; logAdd(S.t, `<b>${inside ? WEATHER_HOME[w] : step ? CHANGE_TEXT[`${ws[CHANGE_HOUR - 1]}-${w}`] : WEATHER_TEXT[w]}</b>`);
 }
-function openCurtain(){ if (busy) return; S.curtain = true; logAdd(S.t, 'Открыл занавеску.'); seeWeather(true); save(); render(); }
-function closeCurtain(){ if (busy) return; S.curtain = false; logAdd(S.t, 'Задёрнул занавеску.'); save(); render(); }
+function openCurtain(){ if (busy) return; S.curtain = true; logAdd(S.t, 'Открыл занавеску.'); seeWeather(true); sound(L => L.event('curtain')); save(); render(); }
+function closeCurtain(){ if (busy) return; S.curtain = false; logAdd(S.t, 'Задёрнул занавеску.'); sound(L => L.event('curtain')); save(); render(); }
 function goOut(){ if (busy) return; S.phase = 'yard'; logAdd(S.t, 'Вышел во двор.'); seeWeather(false); yardLine(); save(); render(); }
 function backInside(){ if (busy) return; S.phase = 'izba'; logAdd(S.t, 'Зашёл в избу.'); save(); render(); }
 // 18:00 caught him away from home: the only way is back to the izba for the evening
@@ -5370,8 +6831,8 @@ function homeHour(paid){
     homeHourLines(S.t).forEach(id => homeWrite(S.t + 1, id));
   }
   advance(1, true);
-  if (S.t >= HOURS) return endDay();
-  save(); render();
+  if (S.t >= HOURS){ endDay(); soundClock(); return; }
+  save(); render(); soundClock();
 }
 function craft(){ homeHour(true); }
 function idle(){ homeHour(false); }
@@ -5380,14 +6841,15 @@ function craftAll(){
   const r = remaining(), pay = r*WAGE;
   S.money += pay; S.earnWork += pay;
   S.trail.push({k: 'craft', t: S.t, n: r}); logHome(S.t, `Мастерил снасти до вечера, +${rub(pay)}`);   // its hours go into the day's way (S.trail)
-  advance(r, true); endDay();
+  advance(r, true); endDay(); soundClock();
 }
 // from a water or the village straight back to the izba; the day goes on there. A life the scene has drawn in this
-// hour has been seen: its line goes into the journal before he goes (one that is not drawn was not, and is not written)
+// hour has been seen, and one whose sound has begun has been heard: its line goes into the journal before he goes
+// (one neither drawn nor heard was not, and is not written)
 function walkHome(){
   if (busy) return;
   if (S.t >= HOURS) return comeHome();   // the day is already over
-  if (WATERS.includes(S.loc)){ const L = lifeOf(S.loc, S.t); if (L && L.draw) writeLife(S.loc, S.t); }
+  if (WATERS.includes(S.loc)){ const L = lifeOf(S.loc, S.t); if (L && (L.draw || soundHeard(L.key))) writeLife(S.loc, S.t); }
   logAdd(S.t, WATERS.includes(S.loc) ? 'Смотал удочки, пошёл домой.' : 'Пошёл домой.');
   S.loc = 'home'; S.phase = 'izba'; S.dry = 0; S.hoursHere = 0;
   save(); render();
@@ -5457,7 +6919,10 @@ function oneShot(kind){
   try {
     if (pic.fading){ if (!pic.fading.started) return Promise.resolve(false); endFade(); }
     const live = pic.live[pic.front];
-    return live ? live.event(kind).catch(() => false) : Promise.resolve(false);
+    if (!live) return Promise.resolve(false);
+    const p = live.event(kind).catch(() => false);
+    sound(L => L.event(kind));   // its sound comes with the scene's frames of it (scene.cues), not from this call
+    return p;
   } catch (e) { return Promise.resolve(false); }
 }
 // the journal on screen takes the lines written since it was drawn; the rest of the screen stays as it is
@@ -5953,7 +7418,7 @@ function fitSplash(){   // the scene where the picture is: covering the frame, c
 }
 function endSplash(){
   $('splash').hidden = true; $('splash').classList.remove('live'); $('splashCanvas').hidden = true;
-  if (splashLive){ splashLive.destroy(); splashLive = null; }
+  if (splashLive){ splashLive.destroy(); splashLive = null; soundShow(pic.sound); }   // the sound of the picture under it
 }
 function showSplash(){
   const kb = !!document.activeElement && $('panel').contains(document.activeElement);
@@ -5961,6 +7426,7 @@ function showSplash(){
   $('splashImg').src = IMG.splash; $('splashGo').disabled = false; $('splash').hidden = false;
   const cv = $('splashCanvas'); cv.hidden = false; $('splash').classList.add('live'); fitSplash();
   const sc = splashLive = LiveScenes.create(cv, introScene('splash'));
+  soundShow([introSound(introScene('splash')), sc]);
   sc.ready().then(ok => { if (!ok && splashLive === sc){ $('splash').classList.remove('live'); cv.hidden = true; } });
   tapLock = performance.now() + TAP_LOCK;
   if (kb) $('splashGo').focus({preventScroll: true});
