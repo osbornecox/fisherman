@@ -4582,6 +4582,9 @@ const GLASS = [41,37,89,105], RIVER = 78, RW = 6;                  // the window
 // of the hour's light: seen from the lamp-lit room the dusk outside is darker than the room, in fog too
 const ROOM_SHARE = [.55,.78], ROOM_NEAR = [.88,.95], ROOM_REACH = [12,26], ROOM_CLOSED = .85, ROOM_WEATHER = {rain:.95, downpour:.88};
 const VIEW_LAMP = {overcast:.6, sun:.6, rain:.6, wind:.6, fog:.5, downpour:.6};   // the fog, a pale veil, gets less
+// the morning izba lifted, the room and the view alike (daytime.py's MORNING_LIFT): the hour's sky, land and glow times
+// this, so the window stays as much brighter than the room, whose share still goes by the hour's own light
+const MORNING_LIFT = {6:1.45, 7:1.30, 8:1.145, 9:1.075, 10:1.01};
 const BULB_LIT = [255,238,190], BULB_WARM = [1.10,.98,.80], SHADE_GLOW = [236,172,104];
 const LAMP_X = 77, LAMP_HW = 12;   // izba.py's lampshade: its cord and bulb at x 77, the fabric x 65..89 (between the chips)
 // a day without power: izba.py's kerosene lamp on the sill burns instead of the bulb: a flame of two pixels over the
@@ -4646,11 +4649,13 @@ async function izbaPixels(open, weather, h, day, noPower = false){
   text(CAL_L + ((CAL_W - (num.length*6 - 1)) >> 1), CAL_T + 7, num, DIGITS, col);
   text(CAL_L + ((CAL_W - (wd.length*4 - 1)) >> 1), CAL_T + 16, wd, FONT3, col);
   // the light of the hour: the view outside as at the waters, the room after the window
-  const L = dayLight(h), src = d.slice(), bulb = h >= LIT_FROM && !noPower;   // the bulb lights the room itself
+  const L0 = dayLight(h), src = d.slice(), bulb = h >= LIT_FROM && !noPower;   // the bulb lights the room itself
+  const lightK = Math.max(0, Math.min(1, ((L0.land[0] + L0.land[1] + L0.land[2])/3 - .55)/.45));   // 0 at dawn and dusk, 1 at noon
+  // in the morning the hour's light lifted for the whole izba (MORNING_LIFT), after lightK
+  const up = MORNING_LIFT[h] || 1, L = up === 1 ? L0 : {...L0, sky: L0.sky.map(v => v*up), land: L0.land.map(v => v*up), glow: L0.glow.map(v => v*up)};
   // the view's light: the hour's, darker while the bulb is on (VIEW_LAMP)
   const vk = VIEW_LAMP[weather], V = bulb ? {...L, sky: L.sky.map(v => v*vk), land: L.land.map(v => v*vk), glow: L.glow.map(v => v*vk)} : L;
   const river = lerp3(V.land, V.sky, .6);
-  const lightK = Math.max(0, Math.min(1, ((L.land[0] + L.land[1] + L.land[2])/3 - .55)/.45));   // 0 at dawn and dusk, 1 at noon
   const gain = ROOM_GAIN[weather] || [0,0,0], room = L.land.map((k,i) => k*(1 + gain[i]*lightK));
   const glass = room.map(k => k*(1 + (CURTAIN_GAIN[weather] || 0)*lightK)), [gx0, gy0, gx1, gy1] = GLASS;
   const span = ([a, b]) => a + (b - a)*lightK, near = span(ROOM_NEAR), reach = span(ROOM_REACH), wk = ROOM_WEATHER[weather] || 1;
@@ -5427,10 +5432,11 @@ function soundPrune(){
 const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600;
 const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba pictures: is the curtain pulled aside
 // The three screens before the first day are living scenes in one weather, overcast as the whole first day is
-// (INTRO_WEATHER), at its first hour: the title screen ('splash', over the game; showSplash()), the backstory's
-// village from the hill ('story', phase 'intro') and the yard (how the days go here, 'home', phase 'living'). Nothing
-// of the fishing is in them: no signs, no life; the day without power never comes on the first day.
-const INTRO = new Set(['intro', 'living']), INTRO_HOUR = START;
+// (INTRO_WEATHER), in the light of a grey late morning, 11:00 (INTRO_HOUR; the author, 19 November 2026: at 6:00 they
+// were too dark): the title screen ('splash', over the game; showSplash()), the backstory's village from the hill
+// ('story', phase 'intro') and the yard (how the days go here, 'home', phase 'living'). Nothing of the fishing is in
+// them: no signs, no life; the day without power never comes on the first day. Their sound keeps its own hour (introSound).
+const INTRO = new Set(['intro', 'living']), INTRO_HOUR = 11;
 const introScene = place => ({place, weather: WEATHERS[INTRO_WEATHER], hour: INTRO_HOUR, src: IMG[place], lit: true, seed: sceneSeed(place, 0)});
 const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true, sound: null};   // sound: what the last frame gave it
 const layer = i => $(i ? 'bg2' : 'bg');
@@ -5524,7 +5530,8 @@ function frame(img, t){
   }
   return null;
 }
-// the title screen, the backstory and the yard before the first day sound as they are drawn: overcast at 6:00
+// the title screen, the backstory and the yard before the first day sound overcast, at the first hour, 6:00, as the
+// author heard them on 19 November 2026 (its morning birds), though they are drawn at INTRO_HOUR
 const introSound = live => soundOf(live.place, 0, {weather: live.weather});
 // the scenes' number for a day, an hour and a place: the same game shows the same sites of its signs after a reload
 function sceneSeed(place, t){
