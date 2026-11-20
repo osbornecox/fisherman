@@ -39,13 +39,14 @@
   .wrap.fit .scene { aspect-ratio: auto;
     height: min(calc(min(100vw, 430px) * 160 / 130), max(calc(min(100vw, 430px) * .8), calc(100vh - var(--top) - var(--bot) - var(--reserve))));
     height: min(calc(min(100vw, 430px) * 160 / 130), max(calc(min(100vw, 430px) * .8), calc(100dvh - var(--top) - var(--bot) - var(--reserve)))); }
-  /* the scene's two layers, one fading in over the other; each holds a still picture or a living scene: a canvas
-     scaled to the width, standing as high as aim() puts it, as the picture's object-fit: cover does */
+  /* the scene's three layers, a new frame fading in over the ones shown (showPicture()); each holds a still picture or
+     a living scene: a canvas scaled to the width, standing as high as aim() puts it, as the picture's object-fit: cover does */
   .scene .layer { position:absolute; inset:0; }
+  #bg2, #bg3 { opacity:0; }
   .scene .layer img { position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; object-position:center top; image-rendering: pixelated; }
   .scene .layer canvas { position:absolute; left:0; top:0; width:100%; height:auto; display:block; image-rendering: pixelated; }
   .scene .layer [hidden] { display:none; }
-  .hud { position:absolute; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:8px; z-index:3; }
+  .hud { position:absolute; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:8px; z-index:4; }
   .chip { background: var(--paper); padding:6px 10px; font-size:16px; font-weight:600; box-shadow: 0 0 0 2px var(--ink); }
   .chip small { display:block; font-size:12px; font-weight:400; margin-top:2px; color:var(--sub); }
   /* the hour: the font's digits are 9.56px wide but «1» only 6.72px, so «10:00» is the widest; the box holds it, and
@@ -56,7 +57,7 @@
      the chips are a little tighter there */
   @media (max-width: 340px) { .chip { padding:6px 7px; font-size:15px; } }
   .toast { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); background:var(--paper); box-shadow:0 0 0 2px var(--ink);
-           padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; z-index:3; }
+           padding:10px 14px; font-size:18px; font-weight:600; opacity:0; transition:opacity .25s; pointer-events:none; text-align:center; white-space:nowrap; z-index:4; }
   .toast.show { opacity:1; }
   .panel { flex:1 1 auto; min-height:0; padding: 14px 16px 0; display:flex; flex-direction:column; gap:10px; border-top: 3px solid var(--line); }
   .panel.busy { pointer-events:none; }   /* while an hour passes: no taps, and nothing on screen changes */
@@ -235,6 +236,7 @@
   <div class="scene">
     <div class="layer" id="bg"><img alt=""><canvas width="130" height="180" role="img" hidden></canvas></div>
     <div class="layer" id="bg2" aria-hidden="true"><img alt=""><canvas width="130" height="180" role="img" hidden></canvas></div>
+    <div class="layer" id="bg3" aria-hidden="true"><img alt=""><canvas width="130" height="180" role="img" hidden></canvas></div>
     <div class="hud"><div class="chip" id="hudTime"></div><div class="chip" id="hudMoney"></div></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </div>
@@ -366,9 +368,13 @@
 // (an engine in each of 31 iframes took two to three times the main thread's time of one engine drawing the same 31).
 //
 // The game carries a copy of this file: to_game.py puts it into the game's index.html. There each outdoor place is a
-// scene on a canvas, in one of two layers; a new hour or place is a new scene that starts at the `time` of the one
-// shown and fades in over it for 600 ms, then the old scene is destroyed. The canvas is scaled to the full width and
-// stands on the bottom edge. The izba stays a drawn picture (izba.py's room, its mask), lit with dayLight().
+// scene on a canvas, in one of three layers; a new hour or place is a new scene that starts at the `time` of the one
+// shown and fades in over it for 600 ms, then the old scene is destroyed. A new weather on the place shown fades in
+// over 4 s; at a water the new hour first comes in over 600 ms in the weather shown (a scene with the new hour's seed,
+// signs and life), and the same hour in its new weather, made in the same moment with the same `t`, fades in over it
+// slowly: the two keep time together and differ only in the weather, and a strike or a scare is given to both. The
+// canvas is scaled to the full width and placed so the rows the place can spare are cut (the game's aim()). The izba
+// is the game's own drawing (izba.py's room, its mask), lit with dayLight(), with a living window of its own.
 
 (() => {
 'use strict';
@@ -3073,7 +3079,7 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 //     alone, or null; scene: the LiveScenes scene on screen (its clock and cues), null in the izba; seed: the scene's
 //     seed; paused: true while the page holds its scene still (the game's handbook over it): the signs are silent, as
 //     under a paused scene, also with reduced motion, where the scene never plays and the module keeps the time itself
-//     (so a still scene cannot tell it); the beds and the life go on; false when it goes on. A new place crossfades in 1.5 s (between the izba and the yard 1 s), a new weather in 2.5 s; a new hour (a
+//     (so a still scene cannot tell it); the beds and the life go on; false when it goes on. A new place crossfades in 1.5 s (between the izba and the yard 1 s), a new weather in 4 s (WEATHER_XFADE, as slowly as the game's picture: its WEATHER_FADE); a new hour (a
 //     new scene, hour or life) keeps the bed and changes the birds over 4 s; what already sounds plays out, nothing new
 //     comes from the hour before.
 //   LiveSound.event(kind, o): what only the game knows. 'curtain': its soft swish; 'clock' with {n}: the wall clock's
@@ -3122,10 +3128,13 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 'use strict';
 if (window.LiveSound) return;
 
-const VERSION = '9';
+const VERSION = '10';
 const AC = window.AudioContext || window.webkitAudioContext;
 const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
 const MUTE_KEY = 'liveSound.muted';
+// a new weather on the same place crossfades over this many seconds, as slowly as the game's picture does (its
+// WEATHER_FADE; the author, 19 November 2026: «туман сменился на солнце одним кадром»; until v10 2.5 s)
+const WEATHER_XFADE = 4;
 const PLACES = ['home', 'shop', 'river', 'omut', 'lake', 'splash', 'story', 'izba'];
 const WEATHERS = ['overcast', 'sun', 'rain', 'wind', 'fog', 'downpour'];
 const WATERS = new Set(['river', 'omut', 'lake']);
@@ -3914,13 +3923,13 @@ class Engine {
     }
   }
   scape(now) {   // the scape the settings ask for, crossfaded in over the last (1.5 s for a new place, 1 s between the izba and
-    // the yard, 2.5 s for a new weather); never sooner than 0.25 s after the last one
+    // the yard, WEATHER_XFADE for a new weather); never sooner than 0.25 s after the last one
     // (then the pump makes it), so a page that switches fast does not pile up scapes. True if it made one.
     const c = this.cfg, S = this.cur;
     if (S && S.id === scapeId(c)) { this.later = false; return false; }
     if (S && now - S.t0 < .25) { this.later = true; return false; }
     const dur = !S ? .05 : S.place !== c.place ? (c.place === 'izba' || S.place === 'izba') && (c.place === 'home' || S.place === 'home') ? 1 : 1.5
-      : 2.5;
+      : WEATHER_XFADE;
     if (S) { S.retire(now, dur); this.retired.push(S); }
     this.cur = new Scape(this, c, now, dur); this.later = false;
     if (this.life && this.life.L.layer) { this.cur.lifeInsects = true; this.cur.update(c, now); }
@@ -5285,6 +5294,12 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   // saved before the life around the water: none this hour, and none written before
   if (!S.life || typeof S.life !== 'object') S.life = {};
   if (!S.lifeLast || typeof S.lifeLast !== 'object') S.lifeLast = {};
+  // saved at a water before a drawn life's line came as its hour opened (20 November 2026), when it waited for the
+  // hour's end: the scene shows it again now, so its line goes in now, under the hour
+  if (S.D && WATERS.includes(S.loc) && S.phase === 'water' && S.t < HOURS && Array.isArray(S.log)) try {
+    const L = lifeOf(S.loc, S.t);
+    if (L && L.draw) writeLife(S.loc, S.t);
+  } catch (e) { /* the game loads all the same */ }
   // saved before the scenes showed the signs: the hour at a water gets its signs back from its journal lines
   if (!S.signs || typeof S.signs !== 'object'){
     S.signs = {};
@@ -5423,13 +5438,20 @@ function soundPrune(){
 }
 
 // ---------- the scene picture ----------
-// Two layers lie one on the other, each with a still picture (<img>) and a living scene (<canvas>): a new frame fades
-// in over the one shown, then its layer is the one shown. The outdoor places are living scenes, and so are the
-// backstory and the yard before the first day (INTRO) and the izba, whose window lives (izbaLive); a new hour or a
-// new place is a new scene that starts at the time of the one shown, so its clouds and smoke go on from where they
-// were, and the scene that has faded out stops. A drawn frame (the izba) leaves the last picture on screen until it
-// is ready.
-const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600;
+// Three layers lie one on another, each with a still picture (<img>) and a living scene (<canvas>): a new frame fades
+// in over the ones shown, and once it shows whole the layers under it are let go. The outdoor places are living
+// scenes, and so are the backstory and the yard before the first day (INTRO) and the izba, whose window lives
+// (izbaLive); a new hour or a new place is a new scene that starts at the time of the one shown, so its clouds and
+// smoke go on from where they were, and the scene that has faded out stops. A drawn frame (the izba) leaves the last
+// picture on screen until it is ready.
+// A new weather on the place shown (the step at 11:00 at a water, at the shop or in the izba) comes slowly, over
+// WEATHER_FADE (the author, 19 November 2026: «туман сменился на солнце одним кадром»), and so does its sound
+// (sound.js crossfades a new weather over as long). At a water the signs and the life of the hour before must not
+// stay in sight into the new hour, so the new hour comes in as any hour does, over FADE, still in the weather shown
+// (f.under: the same scene but for the weather), and over it, from the same moment, the new hour in its new weather
+// fades in slowly: the two scenes start at the same time with the same seed, signs and life, so they differ only in
+// the weather, and a strike or a scare plays in both. Elsewhere the new frame itself fades in slowly.
+const FADE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600, WEATHER_FADE = FADE && 4000;
 const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba pictures: is the curtain pulled aside
 // The three screens before the first day are living scenes in one weather, overcast as the whole first day is
 // (INTRO_WEATHER), in the light of a grey late morning, 11:00 (INTRO_HOUR; the author, 19 November 2026: at 6:00 they
@@ -5438,8 +5460,13 @@ const IZBA = {izba: true, izbaEvening: true, izbaClosed: false};   // the izba p
 // them: no signs, no life; the day without power never comes on the first day. Their sound keeps its own hour (introSound).
 const INTRO = new Set(['intro', 'living']), INTRO_HOUR = 11;
 const introScene = place => ({place, weather: WEATHERS[INTRO_WEATHER], hour: INTRO_HOUR, src: IMG[place], lit: true, seed: sceneSeed(place, 0)});
-const pic = {front: 0, key: null, seq: 0, fading: null, live: [null, null], first: true, sound: null};   // sound: what the last frame gave it
-const layer = i => $(i ? 'bg2' : 'bg');
+// stack: the layers in use, bottom to top, as {i, seq, fade}: the bottom one shows whole, each above it fades in
+// (fade: {ms, started, timer}; null once it shows whole), and the top one is the frame the player sees, or will once
+// it has faded in; seq: the frame's number (a water's step of the weather fills two layers for one frame). at: the
+// place and weather of the last frame, to tell a new weather on the same place. sound: what the last frame gave it
+const LAYERS = ['bg', 'bg2', 'bg3'];
+const pic = {key: null, seq: 0, stack: [], live: LAYERS.map(() => null), first: true, sound: null, at: null};
+const layer = i => $(LAYERS[i]);
 // The scene shows the picture whole across, and a scene shorter than it gives up the rows it cannot show where the
 // place can best spare them (the author, 19 November 2026): the izba from the bottom (the table; the lamp, the window
 // and the clock stay); the river and the omut from the bottom first, down to the old man with his rod, so that the
@@ -5459,10 +5486,10 @@ function aim(i){
   l.querySelector('img').style.objectPosition = `center ${y}`;
   l.querySelector('canvas').style.top = y;
 }
-const aimAll = () => { aim(0); aim(1); };
+const aimAll = () => LAYERS.forEach((_, i) => aim(i));
 // layer i gets frame f, a still picture (f.url), a living scene (f.live) or the izba (f.izba, izbaPixels) starting at
-// time t; resolves once it shows
-function fill(i, f, alt, t){
+// time t; resolves once it shows. quiet: the sound does not take it (the weather shown under a water's new weather)
+function fill(i, f, alt, t, quiet){
   const l = layer(i), img = l.querySelector('img'), cv = l.querySelector('canvas');
   l.dataset.low = f.low || ''; l.dataset.keep = f.keep || ''; aim(i);
   if (pic.live[i]){ pic.live[i].destroy(); pic.live[i] = null; }
@@ -5470,50 +5497,85 @@ function fill(i, f, alt, t){
     img.hidden = true; img.removeAttribute('src'); img.alt = '';
     cv.hidden = false; cv.setAttribute('aria-label', alt);
     pic.live[i] = f.izba ? izbaLive(cv, f.izba, t) : LiveScenes.create(cv, Object.assign({t}, f.live));
-    soundShow(pic.sound = [f.snd, f.live ? pic.live[i] : null]);   // the sound goes with the picture coming in
+    if (!quiet) soundShow(pic.sound = [f.snd, f.live ? pic.live[i] : null]);   // the sound goes with the picture coming in
     return pic.live[i].ready();
   }
-  soundShow(pic.sound = [f.snd, null]);
+  if (!quiet) soundShow(pic.sound = [f.snd, null]);
   cv.hidden = true; img.hidden = false; img.alt = alt; img.src = f.url;
   return img.decode ? img.decode() : Promise.resolve();
 }
+// the layers in the stack's order; a layer not in use is hidden
+function restack(){
+  LAYERS.forEach((_, i) => {
+    const k = pic.stack.findIndex(e => e.i === i), l = layer(i);
+    l.style.zIndex = String(k + 1);
+    if (k < 0){ l.style.transition = 'none'; l.style.opacity = '0'; l.setAttribute('aria-hidden', 'true'); l.querySelector('img').alt = ''; }
+  });
+}
+const freeLayer = () => LAYERS.findIndex((_, i) => !pic.stack.some(e => e.i === i));
+// a layer let go: its scene stops
+function letGo(e){
+  if (e.fade) clearTimeout(e.fade.timer);
+  if (pic.live[e.i]){ pic.live[e.i].destroy(); pic.live[e.i] = null; }
+  const k = pic.stack.indexOf(e); if (k >= 0) pic.stack.splice(k, 1);
+}
+// layer e shows whole, its fade over or cut short, and the layers under it go
+function fadeDone(e){
+  if (!pic.stack.includes(e)) return;
+  const l = layer(e.i);
+  if (e.fade){ clearTimeout(e.fade.timer); e.fade = null; }
+  l.style.transition = 'none'; l.style.opacity = '1';
+  pic.stack.slice(0, pic.stack.indexOf(e)).forEach(letGo);
+  restack();
+}
 function showPicture(f, alt){
   if (f.key === pic.key) return;
-  pic.key = f.key; const seq = ++pic.seq;
-  if (pic.fading && pic.fading.started) endFade();   // a fade cut short by the next frame: it is shown in full at once
-  const live = pic.live[pic.front], t = live ? live.time : 0;   // a new scene goes on from the one shown
-  if (pic.first || !FADE){   // the first picture, or no motion wanted: at once
-    pic.first = false; pic.fading = null; fill(pic.front, f, alt, t); return;
+  pic.key = f.key; const seq = ++pic.seq, was = pic.at;
+  pic.at = {img: f.img, w: f.w};
+  pic.stack.filter(e => e.fade && !e.fade.started).forEach(letGo);   // a frame not shown yet gives way to this one
+  const top = pic.stack[pic.stack.length - 1], live = top && pic.live[top.i], t = live ? live.time : 0;   // a new scene
+  // goes on from the one shown
+  if (pic.first || !FADE || !top){   // the first picture, or no motion wanted: at once
+    pic.first = false;
+    const e = {i: top ? top.i : 0, seq, fade: null};
+    if (top && top.fade) clearTimeout(top.fade.timer);
+    pic.stack.filter(x => x !== top).forEach(letGo); pic.stack = [e];
+    fill(e.i, f, alt, t); fadeDone(e); layer(e.i).setAttribute('aria-hidden', 'false'); return;
   }
-  const shown = layer(pic.front), i = 1 - pic.front, next = layer(i);
-  next.style.transition = 'none'; next.style.opacity = '0'; next.style.zIndex = '2'; shown.style.zIndex = '1';
-  const fd = pic.fading = {el: next, started: false, timer: 0};
+  // the same place in another weather comes slowly; at a water the new hour first comes in the weather shown
+  const slow = !!was && !!f.img && was.img === f.img && was.w !== f.w;
+  const parts = slow && f.under ? [[f.under, FADE, true], [f, WEATHER_FADE]] : [[f, slow ? WEATHER_FADE : FADE]];
+  while (LAYERS.length - pic.stack.length < parts.length) fadeDone(pic.stack[1]);   // no layer free: the oldest fade is over at once
+  const es = parts.map(([g, ms, quiet]) => {
+    const e = {i: freeLayer(), seq, fade: {ms, started: false, timer: 0}}, l = layer(e.i);
+    pic.stack.push(e); restack();
+    l.style.transition = 'none'; l.style.opacity = '0'; l.setAttribute('aria-hidden', quiet ? 'true' : 'false');
+    return [e, fill(e.i, g, quiet ? '' : alt, t, quiet)];
+  });
+  pic.stack.filter(e => e.seq !== seq).forEach(e => layer(e.i).setAttribute('aria-hidden', 'true'));
   const start = () => {
     if (pic.seq !== seq) return;
-    fd.started = true;
-    next.getBoundingClientRect();   // lay out the transparent layer first, so the change below fades
-    next.style.transition = `opacity ${FADE}ms ease`; next.style.opacity = '1';
-    fd.timer = setTimeout(() => { if (pic.seq === seq) endFade(); }, FADE + 40);
+    for (const [e] of es){
+      if (!pic.stack.includes(e) || !e.fade) continue;
+      const l = layer(e.i), ms = e.fade.ms;
+      e.fade.started = true;
+      l.getBoundingClientRect();   // lay out the transparent layer first, so the change below fades
+      l.style.transition = `opacity ${ms}ms ${ms > FADE ? 'ease-in-out' : 'ease'}`; l.style.opacity = '1';
+      e.fade.timer = setTimeout(() => fadeDone(e), ms + 40);
+    }
   };
-  fill(i, f, alt, t).then(start, start);
+  Promise.all(es.map(([, p]) => p.then(() => {}, () => {}))).then(start);   // the two of a water's weather start together
 }
-function endFade(){
-  const f = pic.fading; if (!f) return;
-  clearTimeout(f.timer); f.el.style.transition = 'none'; f.el.style.opacity = '1'; f.el.setAttribute('aria-hidden', 'false');
-  const old = pic.front, o = layer(old);
-  o.setAttribute('aria-hidden', 'true'); o.querySelector('img').alt = '';
-  if (pic.live[old]){ pic.live[old].destroy(); pic.live[old] = null; }   // the scene that faded out stops
-  pic.front = 1 - old; pic.fading = null;
-}
-// the scene at hour t, in the weather of that hour: its key and how it is shown; outdoors a living scene, the izba a
-// drawn picture with a living window (and its plain picture if drawing fails)
-function frame(img, t){
-  if (INTRO.has(S.phase)){ const live = introScene(img); return {key: `intro/${img}/${live.weather}/${live.hour}`, live, low: cropLow(img), snd: introSound(live)}; }
-  const w = WEATHERS[S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
+// the scene at hour t, in the weather of that hour (or in weather wi, a WEATHERS index: f.under below): its key and how
+// it is shown; outdoors a living scene, the izba a drawn picture with a living window (and its plain picture if drawing
+// fails); img and w, the place and the weather, tell a new weather on the place shown (showPicture())
+function frame(img, t, wi){
+  if (INTRO.has(S.phase)){ const live = introScene(img); return {key: `intro/${img}/${live.weather}/${live.hour}`, img, w: live.weather, live, low: cropLow(img), snd: introSound(live)}; }
+  const w = WEATHERS[wi !== undefined ? wi : S.D.weathers ? S.D.weathers[Math.min(t, HOURS-1)] : S.D.weather], h = START + Math.min(t, HOURS);
   const np = S.noPower === true;   // a day without power: no lights outdoors at 18:00, the kerosene lamp in the izba
   if (img in IZBA){   // the izba at this hour of this day, the evening at 18:00 with the lamp (or the kerosene lamp) on
     const open = IZBA[img], keep = img === 'izbaEvening' && np ? KERO_KEEP : 0;
-    return {key: `${img}/${w}/${h}/${S.day}/${np}`, low: PIC_H, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w],
+    return {key: `${img}/${w}/${h}/${S.day}/${np}`, img, w, low: PIC_H, keep, draw: () => izbaScene(open, w, h, S.day, np), plain: IMG[open ? 'izba' : 'izbaClosed'][w],
       snd: soundOf('izba', t, {weather: w, lit: !np, curtain: open})};
   }
   if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed,
@@ -5523,7 +5585,7 @@ function frame(img, t){
     const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [], water = WATERS.includes(img) && !!S.life;
     const L = water ? lifeOf(img, t) : null, kind = L && L.draw || '', lilies = water && img === 'omut' && liliesOpen(t);
     const people = !(img === 'shop' && benchEmpty(t));
-    return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}/${kind}/${lilies}/${people}`, low: cropLow(img),
+    return {key: `${img}/${w}/${h}/${np}/${seed}/${signs}/${kind}/${lilies}/${people}`, img, w, low: cropLow(img),
       live: {place: img, weather: w, hour: h, src: IMG[img], lit: !np, seed, signs, life: kind ? {kind} : null, lilies, people},
       // the sound hears the hour's life line by its key, drawn or not (only those of sound.js's LIFE sound)
       snd: soundOf(img, t, {weather: w, lit: !np, people, signs, life: L ? {key: L.key, count: L.id === 'cuckoo-count' ? cuckooCount() : 0} : null})};
@@ -5548,10 +5610,15 @@ function setScene(img){
   if (!f){ const v = IMG[img], url = typeof v === 'string' ? v : v[WEATHERS[S.D ? nowWeather() : 0]];
     sceneKey = null; showPicture({key: url, url, low}, alt); return; }
   const key = sceneKey = f.key;
-  if (f.live){ showPicture(f, alt); return; }
-  const keep = f.keep;
-  sceneReady = f.draw().then(izba => { if (sceneKey === key) showPicture({key, izba, low, keep, snd: f.snd}, alt); },
-                             () => { if (sceneKey === key) showPicture({key, url: f.plain, low, keep, snd: f.snd}, alt); });
+  if (f.live){
+    // a water's step of the weather: the same hour in the weather shown comes first (showPicture())
+    const was = pic.at;
+    if (WATERS.includes(img) && was && was.img === img && was.w !== f.w && WEATHERS.includes(was.w)) f.under = frame(img, S.t, WEATHERS.indexOf(was.w));
+    showPicture(f, alt); return;
+  }
+  const keep = f.keep, at = {img, w: f.w};
+  sceneReady = f.draw().then(izba => { if (sceneKey === key) showPicture({key, izba, low, keep, snd: f.snd, ...at}, alt); },
+                             () => { if (sceneKey === key) showPicture({key, url: f.plain, low, keep, snd: f.snd, ...at}, alt); });
 }
 // After a screen is shown, the izba's frames the next taps will need are drawn in idle time, one at a time, so they
 // are ready to fade in. The living scenes need none of this: the engine draws them at once.
@@ -5774,17 +5841,23 @@ function lookAround(){
   if (D.midge[w][t]) sign('midge');
   if (!signs.length) logAdd(t, calm ? 'Вода гладкая, ни всплеска.' : wt === 3 ? 'По воде бежит рябь, всплесков не видно.' : 'Дождь рябит воду, всплесков не видно.');
   if (signs.length) S.signs[`${w}/${t}`] = signs; else delete S.signs[`${w}/${t}`];
-  S.life[`${w}/${t}`] = chooseLife(w, t);   // and what goes on around the water this hour, if anything
+  S.life[`${w}/${t}`] = chooseLife(w, t);   // and what goes on around the water this hour, if anything: a line the
+  // scene draws is in the journal as the scene shows it, from the start of the hour (writeLife())
+  const L = lifeOf(w, t);
+  if (L && L.draw) writeLife(w, t);
 }
 
 // ---------- life around the water ----------
 // While the old man sits, life goes on around the water, and none of it has to do with the fish: a log drifts by, a
 // kite circles over the village, an elk comes down to drink on the far bank. When an hour on a water opens, it may get
 // one line of it (S.life, by `${water}/${hour}`: the line's key, or '' for none), and the scene of that hour draws it
-// from the start if it is one the engine draws (LiveScenes.LIFE). The line goes into the journal under that hour's
-// time once the hour is sat out, before what the hour gave, and a drawn one also when the old man leaves the water in
-// that hour, before he goes: the scene has shown it; never into the evening's page or its counts. On the omut
-// the water lilies open on a summer morning and stand open till 16:00, when they close (the scene's `lilies`).
+// from the start if it is one the engine draws (LiveScenes.LIFE). A drawn line goes into the journal as the hour
+// opens, after its signs, under its time: the scene never shows a life its journal has not written (the author, 19
+// November 2026: «Текст может быть без анимации, а анимация без текста нет»; until then it came at the hour's end, and
+// the log drifted by in a silent journal). A line the scene does not draw goes in once the hour is sat out, before
+// what the hour gave, or when the old man leaves the water in that hour if its sound has begun (LiveSound.heard);
+// never into the evening's page or its counts. On the omut the water lilies open on a summer morning and stand open
+// till 16:00, when they close (the scene's `lilies`).
 // Each line: its water ('all': any), its words, the hours it may come at (the start of the hour, 6..17), the weathers
 // it fits (WEATHERS indices; a line that names none takes any but the downpour, and in fog only what is heard or is
 // close by), its months by the izba's calendar (dateOf), how often, and what the scene draws. How often: 'often',
@@ -5967,7 +6040,8 @@ function chooseLife(w, t){
   return '';
 }
 const lifeOf = (w, t) => LIFE_KEY[S.life && S.life[`${w}/${t}`]] || null;
-// the hour sat out (or a drawn life's hour left): its line into the journal, under the hour's time (once)
+// the hour's line into the journal, under the hour's time (once): a drawn one as the hour opens (lookAround()), one
+// not drawn when the hour is sat out, or left once its sound has begun
 function writeLife(w, t){
   const L = lifeOf(w, t);
   if (!L || S.lifeLast[L.key] === S.day) return;
@@ -6891,9 +6965,9 @@ function craftAll(){
   S.trail.push({k: 'craft', t: S.t, n: r}); logHome(S.t, `Мастерил снасти до вечера, +${rub(pay)}`);   // its hours go into the day's way (S.trail)
   advance(r, true); endDay(); soundClock();
 }
-// from a water or the village straight back to the izba; the day goes on there. A life the scene has drawn in this
-// hour has been seen, and one whose sound has begun has been heard: its line goes into the journal before he goes
-// (one neither drawn nor heard was not, and is not written)
+// from a water or the village straight back to the izba; the day goes on there. A life the scene draws has its line
+// in the journal since the hour opened; one not drawn whose sound has begun has been heard, and its line goes in
+// before he goes (one neither drawn nor heard was not, and is not written)
 function walkHome(){
   if (busy) return;
   if (S.t >= HOURS) return comeHome();   // the day is already over
@@ -6966,17 +7040,20 @@ let busy = false;
 // once. The taps stay off until the next hour is drawn, and come back whatever happens on the way.
 const HOUR_MS = 750, TOAST_MS = 1300;
 const wait = ms => new Promise(r => setTimeout(r, Math.max(0, ms)));
-// a one-shot over the scene the player sees, resolved true when it is over: a fade still going is finished first, as
-// it would destroy the scene it fades out; no scene, or one not drawn yet, resolves false at once, and so does a
-// one-shot that fails
+// a one-shot over the scene the player sees, resolved true when it is over: the fade from the frame before is finished
+// first, as it would destroy the scene it fades out; at a water's step of the weather the slow fade of the new weather
+// goes on, and the one-shot plays in both its scenes (they keep time together), resolved by the one on top; no scene,
+// or one not drawn yet, resolves false at once, and so does a one-shot that fails
 function oneShot(kind){
   try {
-    if (pic.fading){ if (!pic.fading.started) return Promise.resolve(false); endFade(); }
-    const live = pic.live[pic.front];
-    if (!live) return Promise.resolve(false);
-    const p = live.event(kind).catch(() => false);
+    const mine = pic.stack.filter(e => e.seq === pic.seq);
+    if (!mine.length || mine.some(e => e.fade && !e.fade.started)) return Promise.resolve(false);
+    fadeDone(mine[0]);
+    const lives = mine.map(e => pic.live[e.i]).filter(l => l && typeof l.event === 'function');
+    if (!lives.length) return Promise.resolve(false);
+    const ps = lives.map(l => l.event(kind).catch(() => false));
     sound(L => L.event(kind));   // its sound comes with the scene's frames of it (scene.cues), not from this call
-    return p;
+    return ps[ps.length - 1];
   } catch (e) { return Promise.resolve(false); }
 }
 // the journal on screen takes the lines written since it was drawn; the rest of the screen stays as it is
@@ -7007,13 +7084,13 @@ async function sit(){
       // the shadow and its toast come together, and the toast stays its time after the shadow has passed; a scene that
       // cannot show the shadow leaves the toast its usual time
       await wait(HOUR_MS);
-      writeLife(w, h);   // the hour's life comes before what it gave
+      writeLife(w, h);   // the hour's life (one not drawn: a drawn one is written) comes before what it gave
       logAdd(h, 'У берега мелькнула большая тень, мелочь брызнула врассыпную.'); showLog();
       told = true; toast(what, LiveScenes.EVENTS.scare.ms + TOAST_MS);
       if (!await oneShot('scare')) toast(what, TOAST_MS);
     }
     else await wait(HOUR_MS);
-    writeLife(w, h);   // the hour is sat out: its life, under its time, before its result (written once)
+    writeLife(w, h);   // the hour is sat out: its life not drawn, under its time, before its result (written once)
     if (!told) toast(what, TOAST_MS);
     // the hour's one result, as its toast said it: a fish, a lost fish, a scare (its line is written above) or a quiet
     // hour, one with none of them. A lost fish means it bites, a scare says nothing about the place (S.dry is null
