@@ -307,8 +307,9 @@
 //     lilies: true opens the omut's water lilies for the hour (the summer hours between «Раскрылись кувшинки» and
 //     «Кувшинки закрылись», which are the lives 'lilies-open' and 'lilies-close'; with reduced motion those are drawn as
 //     they end).
-//     people: false empties the shop's bench: the two babushki and their bag are not there (a day without power, from
-//     17:00, when they have gone home). The empty bench is painted over the picture before it is read (pix.py's
+//     people: false empties the shop's bench: the two babushki and their bag are not there (the game passes it when
+//     nobody is at the shop: a downpour, the shop shut, a day without power from 17:00, when they have gone home), in
+//     any weather and at any hour. The empty bench is painted over the picture before it is read (pix.py's
 //     scene_shop(people=False)), so the weather and the light fall on it as on the rest, ?baked=1 too (weather.py's
 //     shop-empty pictures). Only the shop has people; left out, or any other value, they sit there.
 //   scene.set({place, weather, hour, src, baked, lit, seed, signs, life, lilies, people}): any of them; the clock goes on.
@@ -865,8 +866,9 @@ function paintSun(buf, s, touchedOnly) {   // touchedOnly: just the pixels an ef
 }
 
 // ---------- the places: what the clean picture tells, found once ----------
-// The shop's bench without the two babushki and their bag (a scene's people: false: on a day without power they have
-// gone home by 17:00): pix.py's scene_shop(people=False), painted over the picture's pixels before they are read, so
+// The shop's bench without the two babushki and their bag (a scene's people: false: nobody is at the shop in a
+// downpour, once it is shut, and from 17:00 on a day without power): pix.py's scene_shop(people=False), painted over
+// the picture's pixels before they are read, so
 // every weather and every light falls on the empty bench as on the rest of the picture (weather.py paints its
 // shop-empty pictures from that scene). In the box where they sat shows what scene_shop drew before them: above the
 // wall's foot its planks, a darker one every third column, with the foot of the right window's frame on its row; under
@@ -3064,8 +3066,9 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 //     'downpour' the downpour: the game's two rains); hour 6..18; month 1..12, the izba's calendar (how much the birds
 //     sing, when the grasshoppers chirp; June when missing); lit is taken and changes nothing (an evening sounds the same
 //     with and without power); curtain: true in the izba when the curtain is pulled aside (the street a little nearer and
-//     brighter); people: false at the shop when its bench is empty and its door locked (a day without power from
-//     17:00): the door does not close then, the village's beasts and the far motorcycle go on; signs: the hour's signs as the scene got them (only to fetch the splashes early; what sounds comes from
+//     brighter); people: false at the shop when nobody is there (the game's empty bench: the shop shut, a day without
+//     power from 17:00, a downpour): the door does not close then, the village's beasts and the far motorcycle go on
+//     (in a downpour the village is silent anyway, AROUND.shop: only the rain); signs: the hour's signs as the scene got them (only to fetch the splashes early; what sounds comes from
 //     the scene); life: the hour's life line, {key: 'omut/woodpecker'}, {key: 'omut/cuckoo-count', count: 4}, its key
 //     alone, or null; scene: the LiveScenes scene on screen (its clock and cues), null in the izba; seed: the scene's
 //     seed; paused: true while the page holds its scene still (the game's handbook over it): the signs are silent, as
@@ -3119,7 +3122,7 @@ window.LiveScenes = Object.freeze({create, preload, names, dayLight: lightOf,
 'use strict';
 if (window.LiveSound) return;
 
-const VERSION = '8';
+const VERSION = '9';
 const AC = window.AudioContext || window.webkitAudioContext;
 const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
 const MUTE_KEY = 'liveSound.muted';
@@ -3211,14 +3214,17 @@ const AROUND = {
           {f: 'cow', hours: [8, 17], every: [300, 700], lufs: -39, x: [6, 54], dist: .95},
           {f: 'dog', every: [400, 900], lufs: -40, x: [6, 54], dist: .95}],
   omut: [{f: 'crack', every: [40, 120], lufs: -38, x: [0, 130], dist: .8, vs: ['crack-1', 'crack-2', 'crack-4'], wx: {downpour: 0, rain: 2}}],
+  // in a downpour nothing of the village's own: only the rain (the author, 19 November 2026: «Когда ливень, я не
+  // уверен, что вообще рядом с магазином нужны звуки. Ливня достаточно»; nobody is at the shop then either)
   shop: [{f: 'sparrows', every: [7, 14], lufs: -34, x: [60, 100], dist: .3, wx: {fog: 3, rain: 2, downpour: 0}},
-         {f: 'hens', every: [25, 70], lufs: -31, x: [85, 125], dist: .25},
-         {f: 'dog-near', every: [90, 240], lufs: -31, x: [90, 120], dist: .3},
-         {f: 'cow', hours: [7, 18], every: [120, 300], lufs: -33, x: [0, 30], dist: .6},
-         {f: 'rooster', hours: [6, 9], every: [90, 200], lufs: -30, x: [90, 125], dist: .5},
+         {f: 'hens', every: [25, 70], lufs: -31, x: [85, 125], dist: .25, wx: {downpour: 0}},
+         {f: 'dog-near', every: [90, 240], lufs: -31, x: [90, 120], dist: .3, wx: {downpour: 0}},
+         {f: 'cow', hours: [7, 18], every: [120, 300], lufs: -33, x: [0, 30], dist: .6, wx: {downpour: 0}},
+         {f: 'rooster', hours: [6, 9], every: [90, 200], lufs: -30, x: [90, 125], dist: .5, wx: {downpour: 0}},
          // the door closes softly, a rag tied on it (the author's second listening: no spring, no slam); only while
-         // the shop is open: not with people: false, when the bench is empty and the door locked
-         {f: 'door', hours: [8, 18], every: [60, 200], lufs: -32, x: [70, 95], dist: .3, people: true},
+         // somebody is at the shop: not with people: false, when the bench is empty (the shop shut, a day without
+         // power from 17:00, a downpour)
+         {f: 'door', hours: [8, 18], every: [60, 200], lufs: -32, x: [70, 95], dist: .3, people: true, wx: {downpour: 0}},
          {f: 'motorcycle', hours: [8, 19], every: [360, 900], lufs: -37, x: [0, 130], dist: .9, fade: [3, 4], pass: true, wx: {downpour: 0, fog: 2}}],
   story: [{f: 'rooster', once: [4, 8], lufs: -33, x: [50, 80], dist: .9}],
 };
@@ -4460,6 +4466,12 @@ const NEIGHBOR_P = .8, NEIGHBOR_SMART = .5;  // the neighbour: whether he fishes
 // some days the village has no power all day long (never a new game's first day). Only the story: no window or street
 // lamp lights up at 18:00, the kerosene lamp burns in the izba, a few journal lines; the fish and the money do not change
 const NO_POWER_P = 1/8;
+// some days the shop is shut (the author, 19 November 2026: «независимо от погоды в случайный момент времени магазин
+// может быть закрыт. И бабок нет»): one day in eight, never a new game's first day; half of them from 7:00, the first
+// hour anyone can be there, the others from an hour in 8-16, till the evening. The door is locked and nobody is on the
+// bench, so an arrival then hears no rumour, as in a downpour, when everyone is at home. Drawn from hashOf() (the
+// shop's shutHour()), never from rnd(): the fishing days stay as they were
+const SHUT_P = 1/8, SHUT_MORNING = .5, SHUT_FROM = [8, 16];
 const WEATHER_NAME = ['пасмурно', 'солнце', 'морось', 'ветер', 'туман', 'ливень'];
 const WEATHER_TEXT = ['Пасмурно, тепло, тихо.', 'Солнце, с утра уже жарко.', 'Дождь, моросит.', 'Сильный холодный ветер.', 'Туман над водой, тихо.', 'Ливень, льёт стеной.'];
 // the journal line when the weather steps at 11:00, by 'from-to'
@@ -5500,8 +5512,8 @@ function frame(img, t){
   }
   if (LIVE.has(img)){   // at a water, the signs the journal wrote for this water and hour, at the sites of this day's seed,
     // and the hour's life if the scene draws it; on the omut the lilies stand open in the summer hours after they opened.
-    // At the shop the bench is empty from 17:00 on a day without power (benchEmpty(t)): the engine paints it without
-    // the two babushki (people: false)
+    // At the shop the bench is empty when nobody is there (benchEmpty(t): a downpour, the shop shut, 17:00 on a day
+    // without power): the engine paints it without the two babushki (people: false), and the sound has no door
     const seed = sceneSeed(img, t), signs = (S.signs && S.signs[`${img}/${t}`]) || [], water = WATERS.includes(img) && !!S.life;
     const L = water ? lifeOf(img, t) : null, kind = L && L.draw || '', lilies = water && img === 'omut' && liliesOpen(t);
     const people = !(img === 'shop' && benchEmpty(t));
@@ -6381,19 +6393,29 @@ function yardLine(){
 // same people and the same next piece. Nothing here looks at the fish or at where the neighbour fishes; all it takes
 // from the day's draws is the weather of the hour and, in the minute the journal writes it, the change at 11:00.
 // A day without power: the talk is of that while such a piece is free, they leave in the hour from 16:00, and from
-// 17:00 nobody is at the shop and its lamp stays dark at 18:00.
+// 17:00 nobody is at the shop and its lamp stays dark at 18:00. Nobody is there in a downpour either, nor once the
+// shop is shut on one of its days (benchWhy(), the author, 19 November 2026): no rumour, no talk, the empty bench in
+// the journal and in the picture.
 const TALK_TAG = 0x54414c4b;
-const th = (...v) => hashOf(TALK_TAG, S.day, ...v);         // the day's: who comes (their number, from 1), the bread
+const th = (...v) => hashOf(TALK_TAG, S.day, ...v);         // the day's: who comes (their number, from 1), the bread (20), the shop shut (30)
 const tHour = (hr, k) => hashOf(TALK_TAG, S.day, -hr, k);   // an hour's: its piece (1), a quiet line (2), the empty bench (3)
 const tGame = (...v) => hashOf(TALK_TAG, -1, ...v);         // the game's: its slow changes, one of each a game, with no day
 const TALK_WHO = ['ny', 'va', 'lu', 'ta', 'pe', 'mi', 'ai', 'eg', 'ko', 'st'];   // their numbers in th(), from 1
 const LEAVE_HOUR = 16, EMPTY_FROM = 17;   // a day without power: they leave in the hour from 16:00; from 17:00 nobody
 const ROWS_HOUR = 5;   // an hour at the shop, its piece and its fixed lines, takes at most this many journal rows at 320 px
 const SHOP_ARRIVE = 'Деревня. Бабки на лавке у магазина.';   // trailFromLog() finds the arrival by it: keep its words
-const SHOP_EMPTY = ['Деревня. У магазина никого.', 'На двери замок.'];   // arriving at 17:00 on a day without power
-const NO_VALYA = 'Бабы Вали на лавке нет.', LEFT = 'Разошлись по домам.';
+// arriving where nobody is: the shop shut, or 17:00 on a day without power; trailFromLog() finds the arrival by the
+// first line, which a downpour's arrival shares (SHOP_RAIN after it)
+const SHOP_EMPTY = ['Деревня. У магазина никого.', 'На двери замок.'], SHOP_RAIN = 'В такой ливень все по домам.';
+// the bench empties as an hour ends (a day without power, the shop shut, a downpour from 11:00), or fills (the
+// downpour over at 11:00: the babushki, or baba Nyura on a day without Valya)
+const NO_VALYA = 'Бабы Вали на лавке нет.', LEFT = 'Разошлись по домам.', BACK = ['Бабки вышли на лавку.', 'Баба Нюра вышла на лавку.'];
 const LAMP_ON = 'Зажёгся фонарь у магазина.', LAMP_OFF = 'Фонарь так и не зажёгся.';
-const EMPTY_BENCH = [['Посидел на лавке один.'], ['На площади ни души.', 'Соболь спит у крыльца.'], ['Тихо.', 'По площади ходят куры.']];
+// an hour on the empty bench, one of these; in a downpour under the shop's awning
+const EMPTY_BENCH = [['Посидел на лавке один.'], ['На площади ни души.', 'Соболь спит у крыльца.'], ['Тихо.', 'По площади ходят куры.'],
+  ['Посидел, посмотрел на дорогу.']];
+const RAIN_BENCH = [['Посидел под навесом один.'], ['На площади ни души.', 'По площади бегут ручьи.'], ['С крыши магазина хлещет вода.'],
+  ['Лужа разлилась на полплощади.']];
 // a line of the old man's when no piece is free, by who is there and the weather (wx), each once a day
 const SHOP_QUIET = [{s: 'Помолчали.', two: true}, {s: 'Баба Нюра вяжет.', p: 'ny'}, {s: 'Соболь лёг на другой бок.'},
   {s: 'Люба гремит ящиками.', p: 'lu'}, {s: 'Петрович курит на крыльце.', p: 'pe'}, {s: 'Егорыч дремлет на солнце.', p: 'eg', wx: [1]},
@@ -6689,7 +6711,7 @@ const PE_HERE = /^Петрович[: ]/;
 // who is at the shop in the hour from hr:00 today, by their habits (11, «Кто у магазина»); Sobol is always there
 function atShop(hr){
   const at = new Set(), dow = weekday(), wx = lifeWeather(hr - START), put = (id, yes) => { if (yes) at.add(id); };
-  if (S.noPower && hr >= EMPTY_FROM || hr < 7 || hr > 17) return at;
+  if (hr < 7 || hr > 17 || benchWhy(hr)) return at;
   put('ny', true);
   put('va', valyaHere());
   put('lu', dow !== 0 && (hr >= 9 && hr <= 12 || hr >= 14));   // opens at nine, «Обед» at one, closes at six; Sunday shut
@@ -6734,12 +6756,13 @@ function rows320(lines){
   return [...el.children].reduce((n, r) => n + Math.max(1, Math.round(r.getBoundingClientRect().height / lh)), 0);
 }
 // the rows the piece of the hour from S.t may take: four, two in the hour from 17:00 (the lamp and «Вечереет» come
-// under it at 18:00), three for the leaving piece («Разошлись по домам.» under it), and what the weather change leaves
-// when the hour ends at 11:00 with one (it is written under the same time)
+// under it at 18:00), three when the bench empties as it ends («Разошлись по домам.» under it: the leaving piece of a
+// day without power, the shop shutting, a downpour from 11:00), and what the weather change leaves when the hour ends
+// at 11:00 with one (it is written under the same time, before «Разошлись по домам.»)
 function talkRoom(t){
-  const hr = START + t, ws = S.D.weathers;
-  let n = hr >= EMPTY_FROM ? 2 : S.noPower && hr === LEAVE_HOUR ? 3 : 4;
-  if (t + 1 === CHANGE_HOUR && ws && ws[CHANGE_HOUR] !== ws[CHANGE_HOUR - 1]) n = Math.min(n, ROWS_HOUR - rows320(changeAway()));
+  const hr = START + t, ws = S.D.weathers, leave = benchEmpty(t + 1);
+  let n = hr >= EMPTY_FROM ? 2 : leave ? 3 : 4;
+  if (t + 1 === CHANGE_HOUR && ws && ws[CHANGE_HOUR] !== ws[CHANGE_HOUR - 1]) n = Math.min(n, ROWS_HOUR - rows320([...changeAway(), ...(leave ? [LEFT] : [])]));
   return n;
 }
 // The piece of the hour from S.t (11, «Как игра выбирает»), or none: of those that fit, its people there, its rows
@@ -6768,18 +6791,33 @@ function shopQuiet(t){
   const fresh = fit.filter(L => !S.log.some(e => e.text === L.s)), list = fresh.length ? fresh : fit.filter(L => L.s !== last);
   return homePick(list.length ? list : fit, tHour(hr, 2), () => 1).s;
 }
-// the bench is empty from 17:00 on a day without power, in the journal and in the picture (frame(): people: false)
-const benchEmpty = t => !!S.noPower && START + Math.min(t, HOURS) >= EMPTY_FROM;
-// the lines of the hour at the shop from S.t, written under its end: the piece or a quiet line, then the hour's fixed
-// lines; on the empty bench one of its own
+// the hour from which the shop is shut today, or Infinity: SHUT_P of the days, never a new game's first; from 7:00
+// (SHUT_MORNING of them) or from an hour in SHUT_FROM, till the evening
+function shutHour(){
+  if (S.day <= 1 || th(30) >= SHUT_P) return Infinity;
+  return th(30, 1) < SHUT_MORNING ? 7 : SHUT_FROM[0] + Math.floor(th(30, 2)*(SHUT_FROM[1] - SHUT_FROM[0] + 1));
+}
+// why nobody is at the shop in the hour from hr:00, or '' when they are there: 'shut', the door locked (the shop shut
+// today from its hour, or a day without power from 17:00), or 'rain', a downpour that hour, everyone at home (the
+// author, 19 November 2026: «когда ливень, ... бабок убрать. Так и писать, что никого нет»)
+function benchWhy(hr){
+  if (hr >= shutHour() || S.noPower && hr >= EMPTY_FROM) return 'shut';
+  return lifeWeather(hr - START) === 5 ? 'rain' : '';
+}
+// the bench is empty then, in the journal and in the picture (frame(): people: false), and the arrival hears no rumour
+const benchEmpty = t => !!benchWhy(START + Math.min(t, HOURS));
+// the lines of the hour at the shop from S.t, written under its end: the piece or a quiet line; on the empty bench one
+// of its own (under the awning in a downpour), each once a day, and once all are used, any but the hour before's (a
+// shut shop leaves the bench empty up to eleven hours). Whether the bench empties or fills as the hour ends, stay() writes
 function shopHourLines(t){
   if (benchEmpty(t)){
-    const ways = EMPTY_BENCH.filter(v => !S.log.some(e => e.text === v[v.length - 1]));
-    return (ways.length ? ways : EMPTY_BENCH)[Math.floor(tHour(START + t, 3)*(ways.length || EMPTY_BENCH.length))];
+    const set = lifeWeather(t) === 5 ? RAIN_BENCH : EMPTY_BENCH, end = v => v[v.length - 1];
+    const before = S.log.filter(e => parseInt(e.t, 10) === START + t), fresh = set.filter(v => !S.log.some(e => e.text === end(v)));
+    const list = fresh.length ? fresh : set.filter(v => !before.some(e => e.text === end(v)));
+    return list[Math.floor(tHour(START + t, 3)*list.length)];
   }
   const c = pickTalk(t), out = c ? [...c.l] : [shopQuiet(t)];
   if (c) S.talkLast[c.id] = S.day;
-  if (S.noPower && START + t === LEAVE_HOUR) out.push(LEFT);
   return out;
 }
 
@@ -6866,10 +6904,11 @@ function go(dest){
   advance(TRAVEL[dest]); S.loc = dest; S.dry = null; S.hoursHere = 0;
   S.trail.push({k: dest, t: S.t});   // arrived at hour S.t
   if (dest === 'shop'){
-    // the rumour is drawn on every arrival, said or not, so that the days stay as they were; at 17:00 on a day
-    // without power nobody is there to say it (S.trail's `empty`); `n`, the hours sat there, stay() counts
-    const rumor = rumorLines();
-    if (benchEmpty(S.t)){ SHOP_EMPTY.forEach(x => logAdd(S.t, x)); S.trail[S.trail.length - 1].empty = true; }
+    // the rumour is drawn on every arrival, said or not, so that the days stay as they were; when nobody is there
+    // (benchWhy(): the shop shut, 17:00 on a day without power, a downpour) nobody says it (S.trail's `empty`); `n`,
+    // the hours sat there, stay() counts
+    const rumor = rumorLines(), why = benchWhy(START + S.t);
+    if (why){ [SHOP_EMPTY[0], why === 'shut' ? SHOP_EMPTY[1] : SHOP_RAIN].forEach(x => logAdd(S.t, x)); S.trail[S.trail.length - 1].empty = true; }
     else { logAdd(S.t, SHOP_ARRIVE); rumor.forEach(x => logAdd(S.t, x)); }
     S.phase = 'shop';
   }
@@ -6894,13 +6933,18 @@ function rumorLines(){
   return valya ? [...power, a, b] : [NO_VALYA, ...power, a];
 }
 // an hour at the shop (11): its piece of talk or a quiet line under the hour's end, the hours sat there in S.trail,
-// then the hour passes at once; at 18:00 the shop's lamp, lit or not, and the way home
+// then the hour passes at once. If the bench empties as it ends, «Разошлись по домам.» (a day without power at 17:00,
+// the shop shutting, a downpour from 11:00); if it fills (the downpour over at 11:00), the babushki come out; both
+// after the weather's change at 11:00, under the same time. At 18:00 the shop's lamp, lit or not, and the way home
 function stay(){
   if (busy || S.phase !== 'shop' || S.t >= HOURS) return;
-  const t = S.t, e = S.trail[S.trail.length - 1];
+  const t = S.t, e = S.trail[S.trail.length - 1], was = benchEmpty(t);
   shopHourLines(t).forEach(x => logAdd(t + 1, x));
   if (e && e.k === 'shop') e.n = (e.n || 0) + 1;
   advance(1);
+  const now = benchEmpty(S.t);
+  if (!was && now) logAdd(S.t, LEFT);
+  else if (was && !now) logAdd(S.t, BACK[atShop(START + S.t).has('va') ? 0 : 1]);
   if (S.t >= HOURS){ logAdd(S.t, S.noPower ? LAMP_OFF : LAMP_ON); logAdd(S.t, 'Вечереет, пора домой.'); }
   save(); render();
 }

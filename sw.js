@@ -1,4 +1,4 @@
-const CACHE='should-i-stay-v107';
+const CACHE='should-i-stay-v108';
 // the recordings (sound/<name>.m4a?v=<digest>) are kept apart: fetched when a place is first heard, never at install,
 // and kept across versions of the game, since a recording's address changes with its content (the page takes out the
 // ones its version no longer has: soundPrune() in index.html)
