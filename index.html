@@ -4452,7 +4452,7 @@ const RUMOR_TRUE = .7;   // the village's rumour: drawn from the day or made up 
 const RIPPLE = [.1,.35,.6];     // small fish playing
 const BOIL = [.01,.05,.25];     // a predator chasing fry
 const BUBBLES = [.05,.2,.4];    // bubbles from the bottom, fish feeding
-const LOST = [0,.2,.35];        // a bite, but the fish came off
+const LOST = [0,.2,.35];        // a bite, but the fish came off: only in an hour without a fish
 const SCARE = .05;              // a pike passes the shore: the hour is empty at any level
 const MIDGE = [.04,.15,.3];     // midges swarm over the water, fish feed at the surface
 const CALM = [0,1,4];           // midges only in still weather: overcast, sun, fog
@@ -4960,7 +4960,10 @@ function genDay(fix = null){
       const lv = level[w][h], sc = rnd() < SCARE, n = poisson(RATE[w][lv]);
       catchT[w].push(sc ? 0 : n); scare[w].push(sc);
       ripple[w].push(rnd() < RIPPLE[lv]); boil[w].push(rnd() < BOIL[lv]); bubbles[w].push(rnd() < BUBBLES[lv]);
-      lost[w].push(!sc && rnd() < LOST[lv]);
+      // an hour gives one result: a fish, a lost fish, a scare or nothing (the author, 19 November 2026). A lost fish
+      // is drawn as ever, so the generator moves as it always did, and an hour with a fish has none (the old draw
+      // let both into one hour: «Рыба +20 руб.» and «Клюнуло, но рыба сорвалась» under the same time)
+      lost[w].push(!sc && rnd() < LOST[lv] && !n);
       midge[w].push(CALM.includes(weathers[h]) && rnd() < MIDGE[lv]);
     }
   }
@@ -5219,6 +5222,9 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
     startDay();
   }
   if (S.D && !S.D.weathers) S.D.weathers = Array(HOURS).fill(S.D.weather);  // saved when the weather held all day
+  // saved before an hour gave one result: an hour with a fish loses none besides (genDay())
+  if (S.D && S.D.lost && S.D.catchT) WATERS.forEach(w => { const L = S.D.lost[w], C = S.D.catchT[w];
+    if (Array.isArray(L) && Array.isArray(C)) S.D.lost[w] = L.map((x, h) => !!x && !C[h]); });
   S.noPower = S.noPower === true;   // saved before the days without power: the power is on
   // saved before the life around the water: none this hour, and none written before
   if (!S.life || typeof S.life !== 'object') S.life = {};
@@ -6918,12 +6924,12 @@ async function sit(){
     else await wait(HOUR_MS);
     writeLife(w, h);   // the hour is sat out: its life, under its time, before its result (written once)
     if (!told) toast(what, TOAST_MS);
-    // a quiet hour is one with no fish, no fish lost and nothing scared: a lost fish means it bites,
-    // a scare says nothing about the place (S.dry is null until the first hour that counts)
+    // the hour's one result, as its toast said it: a fish, a lost fish, a scare (its line is written above) or a quiet
+    // hour, one with none of them. A lost fish means it bites, a scare says nothing about the place (S.dry is null
+    // until the first hour that counts)
     if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
-    else if (D.lost[w][h]) S.dry = 0;
+    else if (D.lost[w][h]){ logAdd(h+1, 'Клюнуло, но рыба сорвалась.'); S.dry = 0; }
     else if (!D.scare[w][h]){ logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
-    if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
     if (nb.w === w && nb.present[h]){
       logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
       if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
@@ -6932,7 +6938,7 @@ async function sit(){
     advance(1); S.hoursHere++;
     if (S.t < HOURS) lookAround();
     else {   // the day is over here: the screen offers only the way home. From the river the village across shows its light
-      if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне так и не зажёгся свет. Небось опять отключили.' : 'В деревне зажёгся свет.');
+      if (w === 'river') logAdd(S.t, S.noPower ? 'В деревне не зажглись фонари, света нет.' : 'В деревне зажёгся свет.');
       logAdd(S.t, 'Вечереет, пора домой.');
     }
   } finally { busy = false; $('panel').classList.remove('busy'); }   // an error on the way must not leave the game untappable
@@ -6947,13 +6953,15 @@ function endDay(){
 // ---------- the evening page ----------
 // The evening is a page of the old man's notebook (should_I_lab's docs/05-dnevnik-i-hozyaystvo.md, «Вечерняя
 // страница»; the author, 19 November 2026: the diary as a link of its own goes), there at once at home at 18:00 under
-// the lamp: the date and the weather, in bold; where he went, for how long and what he caught, a line for every part of
-// the day; at most one line of «если бы», what another choice would have given, in руб.; what he made at the tackle and
-// for how much; what he bought, in the morning's words; and the day's money in a column, as an old notebook keeps it:
-// what there was, what came in, what went out, a rule, what is left. Hours and fish in words, money in figures; no
-// table, no hours grid, no best plan. The evening screen builds the page from the day's state each time it is drawn
-// (S.D, S.trail, S.presence, S.purchases, S.money, S.earnFish, S.earnWork, S.noPower; the kind of tackle from
-// hashOf()), so a reload shows the same page, and an evening saved before this page shows it too. It takes no rnd().
+// the lamp: the date and the weather, in bold; on a day without power, under it, «Опять нет света, жгу керосин.»
+// (NO_POWER_PAGE; the author, 19 November 2026: until then «Без света.» after the weather); where he went, for how long
+// and what he caught, a line for every part of the day; at most one line of «если бы», what another choice would have
+// given, in руб., that in bold; what he made at the tackle and for how much; what he bought, in the morning's words;
+// and the day's money in a column, as an old notebook keeps it: what there was, what came in, what went out, a rule,
+// what is left. Hours and fish in words, money in figures; no table, no hours grid, no best plan. The evening screen
+// builds the page from the day's state each time it is drawn (S.D, S.trail, S.presence, S.purchases, S.money,
+// S.earnFish, S.earnWork, S.noPower; the kind of tackle from hashOf()), so a reload shows the same page, and an evening
+// saved before this page shows it too. It takes no rnd().
 // endDay() still puts the page into S.book and the day into S.totals (closePage()); nothing on screen reads them any
 // more, but load() tells by the book's last page whether a saved evening was counted, and a new game starts both empty.
 const MONTH_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -6961,6 +6969,7 @@ const WEEKDAY_NAME = ['воскресенье', 'понедельник', 'вт�
 const dateWords = day => { const t = dayDate(day); return `${t.getUTCDate()} ${MONTH_GEN[t.getUTCMonth()]}, ${WEEKDAY_NAME[t.getUTCDay()]}`; };
 const WATER_GEN = {river: 'реки', omut: 'омута', lake: 'озера'};       // «Дошёл до озера»
 const WATER_TO = {river: 'на реку', omut: 'на омут', lake: 'на озеро'};   // «Если бы пошёл на озеро»
+const NO_POWER_PAGE = 'Опять нет света, жгу керосин.';   // the author's words, as the evening's kerosene lamp burns
 // a count of fish in words, as «рыба» wants it: «одна», «две», «двадцать пять»; past 99 in figures. acc: as the object
 // of a verb («поймал двадцать одну»), which changes only «одна»
 const NUM_F = ['', 'одна', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять', 'десять', 'одиннадцать', 'двенадцать',
@@ -7025,7 +7034,10 @@ function whereLines(parts){
 // 3. Else no line.
 // «…поймал бы рыбы на N руб. больше.» when the other choice changes only the fish (in 1, no tackle from the arrival on;
 // in 2, none all day), else «…вышло бы на N руб. больше.»: N is the whole day's difference, and the other choice would
-// have taken the tackle's hours too; home is always «вышло бы». Returns {k: 1 or 2, p: the place, n: N, fish}, or null
+// have taken the tackle's hours too; home is always «вышло бы». A day that caught nothing, where the other choice is
+// set against nothing (base, what the day brought that N is reckoned less: in 1 from the arrival on, in 2 all day), has
+// N for all the other choice gives, and no «больше» (the author, 19 November 2026): «…поймал бы рыбы на 60 руб.»,
+// «Если бы весь день мастерил, вышло бы на 60 руб.» Returns {k: 1 or 2, p: the place, n: N, fish, base}, or null
 function ifCase(){
   const C = S.D.catchT, trail = S.trail || [], P = S.presence;
   const fishFrom = (w, a) => C[w].slice(a).reduce((s, x) => s + x, 0);
@@ -7037,22 +7049,23 @@ function ifCase(){
   trail.forEach(e => { if (WATERS.includes(e.k) && !came.some(c => c.w === e.k)) came.push({w: e.k, a: e.t}); });
   let best = null;
   for (const {w, a} of came){
-    const n = PRICE*fishFrom(w, a) - broughtFrom(a);
-    if (n > 0 && (!best || n >= best.n)) best = {k: 1, p: w, n, fish: !tackle(a)};
+    const base = broughtFrom(a), n = PRICE*fishFrom(w, a) - base;
+    if (n > 0 && (!best || n >= best.n)) best = {k: 1, p: w, n, fish: !tackle(a), base};
   }
   if (best) return best;
   const I = (S.earnFish || 0) + (S.earnWork || 0);
   for (const p of ['home', ...WATERS.filter(w => !came.some(c => c.w === w))]){
     const n = (p === 'home' ? HOURS*WAGE : PRICE*fishFrom(p, TRAVEL[p])) - I;
-    if (n > 0 && (!best || n > best.n)) best = {k: 2, p, n, fish: p !== 'home' && !S.earnWork};
+    if (n > 0 && (!best || n > best.n)) best = {k: 2, p, n, fish: p !== 'home' && !S.earnWork, base: I};
   }
   return best;
 }
+// the line, what the other choice gives in bold (the author, 19 November 2026): «Если бы весь день провёл на омуте,
+// <b>поймал бы рыбы на 60 руб.</b>»; the bold goes on the screen, the book keeps the words (closePage())
 function ifLine(){
   const c = ifCase(); if (!c) return '';
-  const more = `${c.fish ? 'поймал бы рыбы' : 'вышло бы'} на ${rub(c.n)} больше.`;
-  return c.k === 1 ? `Если бы весь день провёл ${WHERE[c.p]}, ${more}`
-    : c.p === 'home' ? `Если бы весь день мастерил, ${more}` : `Если бы пошёл ${WATER_TO[c.p]}, ${more}`;
+  const more = `${c.fish ? 'поймал бы рыбы' : 'вышло бы'} на ${rub(c.n)}${!S.earnFish && !c.base ? '' : ' больше.'}`;
+  return `${c.k === 1 ? `Если бы весь день провёл ${WHERE[c.p]}` : c.p === 'home' ? 'Если бы весь день мастерил' : `Если бы пошёл ${WATER_TO[c.p]}`}, <b>${more}</b>`;
 }
 // What he made at the tackle and for how much, all the tackle's pay of the day (S.earnWork): «Мастерил жерлицы на щуку
 // — на 25 руб.» The kind goes by the day's hours at it (S.trail, «Мастерить до вечера» among them): of the kinds whose
@@ -7087,22 +7100,24 @@ function buyLine(){
   return out.join(' ');
 }
 // The day's money in a column, as an old notebook keeps it: what there was this morning (the last evening's
-// remainder, «Долг» when in debt), what the fish and the tackle brought, what the day's purchases took (daySpend(), the
-// sum of the morning's figures), and under a rule what is left, as the hud has it: «Осталось», in debt «Долг», no
-// minus. No row for a nought. What there was is reckoned from the state: the money now, back over the day
+// remainder), what the fish and the tackle brought, what the day's purchases took (daySpend(), the sum of the
+// morning's figures), and under a rule what is left, as the hud has it. A debt has its minus, «Было −40 руб.»,
+// «Осталось −15 руб.», so that the column adds up as it is written (the author, 19 November 2026; until then the word
+// «Долг» and no minus). No row for a nought. What there was is reckoned from the state: the money now, back over the day
+const signed = n => n < 0 ? `−${rub(-n)}` : rub(n);
 function ledger(){
   const spend = daySpend(), fish = S.earnFish || 0, work = S.earnWork || 0, before = S.money + spend - fish - work;
-  const rows = [before < 0 ? ['Долг', rub(-before)] : ['Было', rub(before)]];
+  const rows = [['Было', signed(before)]];
   if (fish) rows.push(['Рыба', `+${rub(fish)}`]);
   if (work) rows.push(['Снасти', `+${rub(work)}`]);
   if (spend) rows.push(['Покупки', `−${rub(spend)}`]);
-  return {rows, end: S.money < 0 ? ['Долг', rub(-S.money)] : ['Осталось', rub(S.money)]};
+  return {rows, end: ['Осталось', signed(S.money)]};
 }
 // the evening's page: its lines (p, the date first) and its column (rows, then end under the rule)
 function eveningPage(parts = dayParts()){
   const D = S.D, ws = D.weathers || [D.weather], w0 = ws[0], w1 = ws[ws.length - 1];
-  const date = `${dateWords(S.day)}. ${cap(WEATHER_NAME[w0])}${w1 !== w0 ? ', к обеду ' + WEATHER_NAME[w1] : ''}.${S.noPower ? ' Без света.' : ''}`;
-  return {d: S.day, p: [date, ...whereLines(parts), ifLine(), craftLine(), buyLine()].filter(Boolean), ...ledger()};
+  const date = `${dateWords(S.day)}. ${cap(WEATHER_NAME[w0])}${w1 !== w0 ? ', к обеду ' + WEATHER_NAME[w1] : ''}.`;
+  return {d: S.day, p: [date, S.noPower ? NO_POWER_PAGE : '', ...whereLines(parts), ifLine(), craftLine(), buyLine()].filter(Boolean), ...ledger()};
 }
 // The evening: its page into the book, as plain lines (the column a line a row), and the day into the flyleaf's
 // counts: the days; the hours on the water and, of them, the quiet ones (no fish, none lost, nothing scared); the hours
@@ -7110,7 +7125,7 @@ function eveningPage(parts = dayParts()){
 // village; the days the neighbour was there; the weathers seen; what was earned, and what tackle alone would have given
 function closePage(){
   const D = S.D, T = S.totals, parts = dayParts(), trail = S.trail || [], pg = eveningPage(parts);
-  S.book.push({d: pg.d, p: [...pg.p, ...pg.rows.map(r => r.join(' ')), pg.end.join(' ')]});
+  S.book.push({d: pg.d, p: [...pg.p.map(s => s.replace(/<[^>]*>/g, '')), ...pg.rows.map(r => r.join(' ')), pg.end.join(' ')]});   // words, no bold
   const sat = WATERS.reduce((s, w) => s + S.presence[w].length, 0);
   const quiet = WATERS.reduce((s, w) => s + S.presence[w].filter(h => !D.catchT[w][h] && !D.lost[w][h] && !D.scare[w][h]).length, 0);
   const home = Math.max(0, HOURS - sat - trail.reduce((s, e) => s + (TRAVEL[e.k] || 0) + (e.k === 'shop' ? e.n || 0 : 0), 0));
