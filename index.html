@@ -419,10 +419,10 @@ const EXPOSURE = {lake: 1.4, river: .8, omut: .15, shop: 0, home: 0, splash: .8,
 // The game shows a scene whole across, one height on every screen of a phone (19 November 2026): 160 of its 180 rows
 // on a tall phone (390x844, 430x932, 360x740), 137 on 375x667, 131 on 390x664, 130 on 320x568 and 104 on 375x548. A
 // place gives up the rows it does not show where it can spare them: the river 24 rows from the bottom first, the omut
-// 18 (down to the old man) and the lake 8 (the grass under him), then the top; the yard and the village from the top.
-// So on 375x548, 320x568, 375x667 and 390x664 the river shows rows 52, 26, 19 and 25 down to 156, the omut 58, 32,
-// 25 and 31 down to 162, the lake 68, 42, 35 and 41 down to 172, the yard and the village 76, 50, 43 and 49 down to
-// 180; a tall phone the river's 0..160, the omut's 2..162, the lake's 12..172 and the others' 20..180. The hud's two
+// 24 (down to the old man's hands on the rod) and the lake 8 (the grass under him), then the top; the yard and the
+// village from the top. So on 375x548, 320x568, 375x667 and 390x664 the river and the omut show rows 52, 26, 19 and 25
+// down to 156, the lake 68, 42, 35 and 41 down to 172, the yard and the village 76, 50, 43 and 49 down to 180; a tall
+// phone the river's and the omut's 0..160, the lake's 12..172 and the others' 20..180. The hud's two
 // chips lie over its top corners, about 18 rows deep (20 at 320 px), outline and all: the left one from the left edge to x 47
 // on days 1..9 and to x 51 on days 10..99 (x 50 and 54 at 320 px), the right one from x 96 with a sum of up to three
 // digits or x 93 with four (x 94 and 91 at 320 px) to the right edge. So what a life starts at, and what it is drawn
@@ -5138,7 +5138,7 @@ function startDay(){
   else S.D = genDay();
   S.noPower = S.day > 1 && rnd() < NO_POWER_P;   // rolled after genDay(), so the day's weather, fish and rumours stay as they were
   S.t = 0; S.loc = 'home'; S.earnFish = 0; S.earnWork = 0; S.fishToday = 0; S.presence = {river:[],omut:[],lake:[]};
-  S.dry = 0; S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
+  S.hoursHere = 0; S.log = []; S.curtain = false; S.seen = null;   // the day starts in the izba with the curtain drawn
   S.signs = {};   // the signs lookAround() wrote, by water and hour
   S.life = {};    // the life around the water lookAround() chose, by water and hour
   S.trail = [];   // where the day went, for the evening's page
@@ -5419,6 +5419,7 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   if (!S.totals || typeof S.totals !== 'object' || !Array.isArray(S.totals.weathers)) S.totals = noTotals();
   if (S.phase === 'evening' && S.D && !(S.book.length && S.book[S.book.length - 1].d === S.day)) try { closePage(); } catch (e) {}
   delete S.path;   // the route was kept once and never shown
+  delete S.dry;    // the quiet hours' count, for the line over a water's journal that went on 19 November 2026
   return true; } }catch(e){} return false; }
 // another tab or the installed app saved the game: take its state, unless an hour is passing here
 function onStorage(e){
@@ -5570,15 +5571,17 @@ const pic = {key: null, seq: 0, stack: [], live: LAYERS.map(() => null), first: 
 const layer = i => $(LAYERS[i]);
 // The scene shows the picture whole across, and a scene shorter than it gives up the rows it cannot show where the
 // place can best spare them (the author, 19 November 2026): the izba from the bottom (the table; the lamp, the window
-// and the clock stay); the river and the omut from the bottom first, down to the old man with his rod, so that the
-// omut shows the sky over its spruce wall, and the lake its last rows of grass under him (f.low rows, CROP), then from
+// and the clock stay); the river and the omut from the bottom first, down to the old man's hands on his rod, so that
+// the omut shows the sky over its spruce wall, and the lake its last rows of grass under him (f.low rows, CROP), then from
 // the top; the yard and the village from the top (the sky). A drawn picture that must keep its rows down to f.keep in
 // sight (the evening's kerosene lamp on the sill) gives up its top for them. Placed again whenever the scene may have
 // changed its height: on every screen, when the window changes size and when the font has loaded.
 const PIC_W = 130, PIC_H = 180;   // the day's pictures in pixels
-// the rows kept: the river's to 156 (the old man, the near boat), the omut's to 162 (the old man to his waist), the
-// lake's to 172 (the old man's feet at 168), so that its hawk over the hill (row 47) stays in sight on 390x664
-const CROP = {river: 24, omut: 18, lake: 8};
+// the rows kept: the river's to 156 (the old man, the near boat), the omut's to 156 (the old man to his belt, his
+// hands on the rod at rows 154-155: the most its bottom can give, so that a short phone shows the sky over the spruce
+// wall's middle, rows 25-33 on 390x664; the author, 19 November 2026: «неба почти нет»), the lake's to 172 (the old
+// man's feet at 168), so that its hawk over the hill (row 47) stays in sight on 390x664
+const CROP = {river: 24, omut: 24, lake: 8};
 const cropLow = img => img in IZBA ? PIC_H : CROP[img] || 0;
 function aim(i){
   const l = layer(i), k = l.clientWidth / PIC_W; if (!k) return;
@@ -7078,7 +7081,7 @@ function walkHome(){
   if (S.t >= HOURS) return comeHome();   // the day is already over
   if (WATERS.includes(S.loc)){ const L = lifeOf(S.loc, S.t); if (L && (L.draw || soundHeard(L.key))) writeLife(S.loc, S.t); }
   logAdd(S.t, WATERS.includes(S.loc) ? 'Смотал удочки, пошёл домой.' : 'Пошёл домой.');
-  S.loc = 'home'; S.phase = 'izba'; S.dry = 0; S.hoursHere = 0;
+  S.loc = 'home'; S.phase = 'izba'; S.hoursHere = 0;
   save(); render();
 }
 // a trip must leave an hour of the day there: a water and the village alike are reached by 17:00 (the river, the
@@ -7087,7 +7090,7 @@ function walkHome(){
 function canGo(dest){ return S.t + TRAVEL[dest] < HOURS; }
 function go(dest){
   if (busy || WATERS.includes(S.loc) || !canGo(dest)) return;
-  advance(TRAVEL[dest]); S.loc = dest; S.dry = null; S.hoursHere = 0;
+  advance(TRAVEL[dest]); S.loc = dest; S.hoursHere = 0;
   S.trail.push({k: dest, t: S.t});   // arrived at hour S.t
   if (dest === 'shop'){
     // the rumour is drawn on every arrival, said or not, so that the days stay as they were; when nobody is there
@@ -7198,11 +7201,10 @@ async function sit(){
     writeLife(w, h);   // the hour is sat out: its life not drawn, under its time, before its result (written once)
     if (!told) toast(what, TOAST_MS);
     // the hour's one result, as its toast said it: a fish, a lost fish, a scare (its line is written above) or a quiet
-    // hour, one with none of them. A lost fish means it bites, a scare says nothing about the place (S.dry is null
-    // until the first hour that counts)
-    if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); S.dry = 0; }
-    else if (D.lost[w][h]){ logAdd(h+1, 'Клюнуло, но рыба сорвалась.'); S.dry = 0; }
-    else if (!D.scare[w][h]){ logAdd(h+1, 'Тихо.'); S.dry = (S.dry || 0) + 1; }
+    // hour, one with none of them
+    if (n){ const sum = n*PRICE; S.money += sum; S.earnFish += sum; S.fishToday += n; logAdd(h+1, `<b>${what}</b>`); }
+    else if (D.lost[w][h]) logAdd(h+1, 'Клюнуло, но рыба сорвалась.');
+    else if (!D.scare[w][h]) logAdd(h+1, 'Тихо.');
     if (nb.w === w && nb.present[h]){
       logAdd(h+1, nb.bites[h] ? 'У Михалыча клюнуло.' : 'У Михалыча пусто.');
       if (nb.leave === h) logAdd(h+1, nb.reason === 'full' ? 'Михалыч уходит с полным ведром.'
