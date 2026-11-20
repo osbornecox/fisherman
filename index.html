@@ -4577,7 +4577,7 @@ const NO_POWER_P = 1/8;
 const SHUT_P = 1/8, SHUT_MORNING = .5, SHUT_FROM = [8, 16];
 // ---------- texts/common.js, day: put here by should_I_lab/texts/to_game.py; change it there ----------
 const WEATHER_NAME = ['пасмурно', 'солнце', 'морось', 'ветер', 'туман', 'ливень'];
-const WEATHER_TEXT = ['Пасмурно, тепло, тихо.', 'Солнце, с утра уже жарко.', 'Дождь, моросит.', 'Сильный холодный ветер.', 'Туман над водой, тихо.', 'Ливень, льёт стеной.'];
+const WEATHER_TEXT = ['Пасмурно, тихо.', 'Солнце, ни облачка.', 'Дождь, моросит.', 'Сильный ветер.', 'Туман над водой, тихо.', 'Ливень, льёт стеной.'];
 // the journal line when the weather steps at 11:00, by 'from-to'
 const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1-3':'Поднялся ветер, гнёт деревья.', '0-2':'Заморосило.',
   '0-1':'Облака разошлись, выглянуло солнце.', '0-3':'Поднялся ветер, гнёт деревья.', '2-0':'Дождь перестал.',
@@ -4624,7 +4624,7 @@ const GOODS = {
   sugar:    {acc:'сахар', of:'сахару', price:90, days:25, nom:'сахар', low:'Сахару на пару дней.', out:'Сахар кончается.'},
   groats:   {acc:'крупу', of:'крупы', price:90, days:25, nom:'крупа', low:'Крупы на пару дней.', out:'Крупы осталось немного.'},
   tea:      {acc:'чай', of:'чаю', price:60, days:30, nom:'чай', low:'Чаю на пару дней.', out:'Чай на донышке.'},
-  kerosene: {acc:'керосин', of:'керосину', price:60, days:30, nom:'керосин', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит.'},
+  kerosene: {acc:'керосин', of:'керосину', price:60, days:30, nom:'керосин', low:'Керосину на пару вечеров.', out:'Лампа скоро выгорит.'},
   soap:     {acc:'мыло', of:'мыла', price:15, days:60},
   matches:  {acc:'спички', of:'спичек', price:10, days:90, nom:'спички', low:'Спичек осталось немного.', out:'Спички кончаются.'},
   hooks:    {acc:'крючки', of:'крючков', price:30, days:45},
@@ -4648,7 +4648,7 @@ const BREAKS = {
   roof:   {acc:'лист железа', buy:'лист железа', costs:'Лист железа стоит', price:120, thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
   glass:  {acc:'стекло', buy:'новое стекло', costs:'Новое стекло стоит', price:150, thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
   bucket: {acc:'ведро', buy:'новое ведро', costs:'Новое ведро стоит', price:45, thought:'Ведро дало течь.'},
-  shovel: {acc:'лопату', buy:'новую лопату', costs:'Новая лопата стоит', price:60, thought:'Лопата треснула по черенку.'},
+  shovel: {acc:'лопату', buy:'новую лопату', costs:'Новая лопата стоит', price:60, thought:'Лопата треснула.'},
   saw:    {acc:'точильный камень', buy:'точильный камень', costs:'Точильный камень стоит', price:30, thought:'Топор затупился — камень нужен.'},
 };
 // what is bought no more, for a day saved before then: the board on the roof (until 20 November 2026 evening; load()
@@ -5933,7 +5933,7 @@ function hud(){
   // the time in a box as wide as the widest hour (.clk), so the chip keeps its width as the hours pass
   const day = fillIn(SCREEN.day, {day: S.day});
   $('hudTime').innerHTML = S.phase==='evening' ? `${day} · ${SCREEN.evening}`
-    : S.D ? `${day} · <span class="clk">${clock(Math.min(S.t, HOURS))}</span><small>${fillIn(SCREEN.left, {n: left})}</small>` : day;
+    : S.D ? `${day} · <span class="clk">${clock(Math.min(S.t, HOURS))}</span><small>${left ? fillIn(SCREEN.left, {n: left}) : SCREEN.evening}</small>` : day;
   // below zero the piggy bank is in debt, with a true minus sign (the font has it)
   $('hudMoney').innerHTML = S.money < 0 ? `−${rub(-S.money)}<small>${SCREEN.debt}</small>` : `${rub(S.money)}<small>${SCREEN.bank}</small>`;
 }
@@ -5947,8 +5947,8 @@ const STORY = ['Река, поля, лес. В этих глухих краях 
   'Сколько вы уже живёте тут? 10\u00a0лет? Или все\u00a050? Никто не помнит уже, да и неважно.',
   'А что важно? Вам предстоит найти ответ на этот вопрос самостоятельно.'];
 const LIVING = ['Каждый день вы будете просыпаться в своём доме и решать, чем заняться.',
-  'Иногда вам нужно будет прикупить в местном магазине продуктов и разных мелочей. Заработать на жизнь вы можете ловлей рыбы и сдачей в магазин на продажу.',
-  'Когда клёва нет, можно мастерить снасти на продажу заезжим охотникам, но денег они приносят меньше.'];
+  'Иногда вам нужно будет прикупить в местном магазине продуктов и разных мелочей. Заработать на жизнь вы можете ловлей рыбы и сдачей её в магазин на продажу.',
+  'Когда клёва нет, вы можете мастерить снасти на продажу заезжим охотникам, но денег снасти приносят меньше.'];
 // ---------- end of texts/common.js, intro ----------
 const storyHTML = ps => `<div class="lines story">${ps.map(p => `<p>${tie(p)}</p>`).join('')}</div>`;
 // The third screen fits the screen as the yard of a day does: the scene gives its text and button the room they take
@@ -6115,7 +6115,8 @@ const SIGN_LINE = {'boil': 'У камыша раз за разом плещет,
   'splash/calm': 'По тихой воде тут и там расходятся круги.', 'splash/shore': 'У берега плеснуло, пошли круги.',
   'splash/under': 'Под берегом тихонько плеснуло.', 'midge': 'Над водой столбиками вьётся мошкара.'};
 // the hour at the water: who else is there, the still water, what the hour gave, the way home. {place}: the water
-// (NAME). trailFromLog() finds the arrival by `cast` (and by its words of 20 November 2026)
+// (NAME). trailFromLog() finds the arrival by `cast` (and by its words of 20 November 2026); the shop knows the
+// neighbour was at a water today by the beginnings of his lines (NB_SEEN in the game): changing them, change that too
 const WATER_SAY = {
   cast: '{place}. Закинул удочку.',
   nbCame: 'Пришёл Михалыч, сел рядом.', nbToo: 'Михалыч тоже пришёл сюда.', nbHere: 'Михалыч уже здесь.',
@@ -6182,7 +6183,7 @@ const LIFE_LINES = [
   {at: 'river', id: 'spruce', f: 'rare', w: '25', draw: 'spruce', s: 'Проплыла ёлка с корнями — где-то выше подмыло берег.'},
   {at: 'river', id: 'board', f: 'rare', w: '0123', s: 'Проплыла серая доска с ржавым гвоздём.'},
   {at: 'river', id: 'leaves', f: 'often', w: '0123', m: '9', draw: 'leaves', s: 'По воде плывут жёлтые листья.'},
-  {at: 'river', id: 'wagtail-log', f: 'season', w: '0123', m: '5-8', draw: 'wagtail', s: 'Проплыло бревно, на нём сидит трясогузка.'},
+  {at: 'river', id: 'wagtail-log', f: 'season', w: '0123', m: '5-8', draw: 'wagtail', s: 'Плывёт бревно, на нём сидит трясогузка.'},
   {at: 'river', id: 'foam', f: 'some', w: '25', s: 'Вдоль берега тянется полоса пены.'},
   // the river: the shingle and the boats
   {at: 'river', id: 'wagtail', f: 'often', w: '013', m: '5-8', s: 'По гальке у воды бегает трясогузка, качает хвостом.'},
@@ -6203,7 +6204,7 @@ const LIFE_LINES = [
   {at: 'river', id: 'geese', f: 'rare', w: '0123', m: '9-10', draw: 'geese', s: 'Высоко над рекой тянется гусиный клин, его долго слышно.'},
   {at: 'river', id: 'ducks', f: 'some', w: '0123', draw: 'ducks', s: 'Над рекой пролетела пара уток.'},
   {at: 'river', id: 'crows', f: 'some', w: '0123', h: '16-17', m: '9-11', s: 'Через реку к лесу тянутся вороны.'},
-  {at: 'river', id: 'haze', f: 'some', w: '1', h: '12-15', s: 'Над лугом на том берегу дрожит тёплый воздух.'},
+  {at: 'river', id: 'haze', f: 'some', w: '1', h: '12-15', m: '6-8', s: 'Над лугом на том берегу дрожит тёплый воздух.'},
   // the river: the village across, only its beasts
   {at: 'river', id: 'rooster', f: 'clock', w: '01234', h: '6-8', s: 'В деревне прокричал петух.'},
   {at: 'river', id: 'dog', f: 'some', w: '01234', s: 'За рекой залаяла собака и умолкла.'},
@@ -6218,7 +6219,7 @@ const LIFE_LINES = [
   {at: 'omut', id: 'hare', f: 'rare', w: '0123', h: '6-9', draw: 'hare', s: 'На том берегу из-за кочки выглянул заяц и ускакал.'},
   // the omut: the small neighbours
   {at: 'omut', id: 'squirrel', f: 'often', w: '01234', s: 'По поваленной ели пробежала белка.'},
-  {at: 'omut', id: 'husks', f: 'some', w: '013', s: 'Сверху сыплется шелуха: белка шелушит шишку.'},
+  {at: 'omut', id: 'husks', f: 'some', w: '013', s: 'Сверху летит шелуха: белка грызёт шишку.'},
   {at: 'omut', id: 'squirrel-chatter', f: 'some', w: '01234', s: 'Белка сердито цокает с ветки.'},
   {at: 'omut', id: 'chipmunk', f: 'some', w: '01234', m: '5-8', s: 'На ствол у воды выскочил бурундук, посидел столбиком и пропал.'},
   // the omut: the birds
@@ -6227,12 +6228,12 @@ const LIFE_LINES = [
   {at: 'omut', id: 'tits', f: 'often', w: '01234', s: 'По ельнику прошла стайка синиц, перекликаясь.'},
   {at: 'omut', id: 'jay', f: 'rare', w: '01234', s: 'Рядом на ветку села рыжехвостая лесная птица и смотрит, не боится.'},
   {at: 'omut', id: 'capercaillie', f: 'rare', w: '01234', h: '6-9', s: 'Из ельника с шумом сорвался глухарь.'},
-  {at: 'omut', id: 'hush', f: 'rare', w: '01', s: 'В ельнике разом умолкли птицы. Потом запели снова.'},
-  {at: 'omut', id: 'owl', f: 'season', w: '01234', h: '10-15', s: 'Среди бела дня в ельнике ухнула сова.'},
+  {at: 'omut', id: 'hush', f: 'rare', w: '01', h: '11-17', m: '5-7', s: 'В ельнике разом умолкли птицы. Потом запели снова.'},
+  {at: 'omut', id: 'owl', f: 'season', w: '01234', h: '16-17', m: '9-11', s: 'Под вечер в ельнике ухнула сова.'},
   {at: 'omut', id: 'hawk', f: 'some', w: '01', h: '11-15', draw: 'hawk', s: 'В просвете над омутом кружит ястреб.'},
   {at: 'omut', id: 'cuckoo', f: 'often', w: '01234', m: '5-7', s: 'Где-то кукует кукушка.'},
   {at: 'omut', id: 'cuckoo-count', f: 'rare', w: '01234', m: '5-7',   // how many times, by the day
-    s: () => `Кукушка прокуковала ${CUCKOO[cuckooCount() - 2]} и умолкла.`},
+    s: () => `Кукушка прокуковала ${CUCKOO[cuckooCount() - 2]}.`},
   {at: 'omut', id: 'geese', f: 'rare', w: '01234', m: '9-10', s: 'Высоко пролетели гуси, только голоса над лесом.'},
   // the omut: the forest
   {at: 'omut', id: 'bough', f: 'some', w: '01234', s: 'В лесу с треском сломался сук.'},
@@ -6277,20 +6278,20 @@ const LIFE_LINES = [
   {at: 'lake', id: 'dark-spot', f: 'season', w: '0123', h: '6-9,16-17', draw: 'dark-spot', s: 'По тому берегу бредёт что-то большое и тёмное. Медведь, наверно.'},
   {at: 'lake', id: 'elk', f: 'rare', w: '0123', h: '6-9,16-17', s: 'К воде на том берегу вышел лось.'},
   {at: 'lake', id: 'elk-swim', f: 'season', w: '0123', m: '9', s: 'Через озеро плывёт лось — над водой одна голова с рогами.'},
-  {at: 'lake', id: 'reindeer', f: 'season', w: '0123', m: '9-11', s: 'На том берегу к воде вышли олени, три, с большими рогами.'},
+  {at: 'lake', id: 'reindeer', f: 'season', w: '0123', m: '9-11', s: 'На том берегу к воде вышли три оленя с большими рогами.'},
   {at: 'lake', id: 'crash', f: 'rare', w: '01234', s: 'На том берегу кто-то ломится через сухостой, по воде далеко слышно.'},
   {at: 'lake', id: 'cloud-shadow', f: 'some', w: '1', draw: 'cloud-shadow', s: 'По сопке бежит тень от облака.'},
   {at: 'lake', id: 'fog-hill', f: 'often', w: '4', h: '6-9', s: 'Сопку до половины затянуло туманом.'},
   {at: 'lake', id: 'fog-thins', f: 'clock', w: '4', h: '10', s: 'Туман на сопке редеет.'},
   {at: 'lake', id: 'tin', f: 'some', w: '1', s: 'У того берега вода блестит, как жесть.'},
   {at: 'lake', id: 'downpour', f: 'often', w: '5', s: 'Ливень закрыл тот берег, будто его и нет.'},
-  {at: 'lake', id: 'loon', f: 'rare', w: '01234', h: '6-9,16-17', s: 'Над озером протяжно, тоскливо кричит какая-то птица.'},
+  {at: 'lake', id: 'loon', f: 'rare', w: '01234', h: '6-9,16-17', m: '5-8', s: 'Над озером протяжно, тоскливо кричит какая-то птица.'},
   // every water
   {at: 'all', id: 'dragonfly', f: 'some', w: '01', m: '5-8', s: 'На кончик удочки села стрекоза.'},
   {at: 'all', id: 'butterfly', f: 'some', w: '1', m: '5-8', s: 'На ведро села бабочка.'},
   {at: 'all', id: 'ladybird', f: 'some', w: '1', m: '9', s: 'По рукаву ползёт божья коровка.'},
   {at: 'all', id: 'gossamer', f: 'some', w: '1', h: '11-17', m: '9', s: 'На леске блестит паутинка.'},
-  {at: 'all', id: 'raven', f: 'some', w: '01234', s: 'Над головой пролетел ворон, гулко крикнул.'},
+  {at: 'all', id: 'raven', f: 'some', w: '01234', s: 'Над лесом пролетел ворон.'},
   // the old man himself: tea in the morning and a bite at noon. No tea on a day without power (the kettle is electric,
   // the thermos was not filled), and no bread on its last day, when the morning finds «Хлеба нет» (the day buys it
   // because it ran out: `gone`)
@@ -6407,7 +6408,7 @@ const HOME_LINES = [
   {id: 'clouds-crawl', k: 'weather', cur: 'open', w: '03', f: 'some', s: 'Облака медленно ползут над лесом.'},
   {id: 'river-grey', k: 'weather', cur: 'open', w: '02', f: 'some', s: 'Река за окном серая.'},
   {id: 'river-shine', k: 'weather', cur: 'open', w: '1', f: 'often', s: 'Река за окном блестит.'},
-  {id: 'sun-table', k: 'weather', cur: 'open', w: '1', h: '9-14', f: 'often', s: 'Солнце легло на стол светлым пятном.'},
+  {id: 'sun-table', k: 'weather', cur: 'open', w: '1', h: '9-14', f: 'often', s: 'В избе от солнца светло.'},
   {id: 'heat-meadow', k: 'weather', cur: 'open', w: '1', h: '12-15', m: '7-8', f: 'some', s: 'За окном жарко, трава на лугу не шелохнётся.'},
   {id: 'drops-glass', k: 'weather', cur: 'open', w: '25', f: 'often', s: 'Капли стекают по стеклу.'},
   {id: 'river-rain', k: 'weather', cur: 'open', w: '2', f: 'some', s: 'Река за окном рябая от дождя.'},
@@ -6433,13 +6434,13 @@ const HOME_LINES = [
   {id: 'rooster', k: 'sound', w: '01234', h: '6-8', f: 'often', s: 'За рекой прокричал петух.'},
   {id: 'cow', k: 'sound', w: '01234', h: '8-16', f: 'some', s: 'За рекой мычит корова.'},
   {id: 'dog', k: 'sound', w: '01234', f: 'some', s: 'Далеко за рекой лает собака.'},
-  {id: 'raven', k: 'sound', w: '01234', f: 'some', s: 'Над избой каркнул ворон.'},
+  {id: 'raven', k: 'sound', w: '01234', f: 'some', s: 'На берёзе у сарая стучит дятел.'},
   {id: 'woodpecker', k: 'sound', w: '01', f: 'some', s: 'На опушке стучит дятел.'},
   {id: 'grasshoppers', k: 'sound', w: '1', h: '11-15', m: '6-8', f: 'often', s: 'В траве под окном стрекочут кузнечики.'},
   {id: 'bumblebee', k: 'sound', w: '1', h: '10-16', m: '6-8', f: 'some', s: 'Под окном гудит шмель.'},
   {id: 'birches', k: 'sound', w: '3', f: 'often', s: 'За избой шумят берёзы.'},
   {id: 'crows', k: 'sound', w: '01234', h: '15-17', f: 'some', s: 'К вечеру раскаркались вороны.'},
-  {id: 'cow-fog', k: 'sound', w: '4', h: '6-10', f: 'some', s: 'В тумане за рекой мычит корова.'},
+  {id: 'cow-fog', k: 'sound', w: '4', h: '6-10', f: 'some', s: 'Глухо за рекой мычит корова.'},
   {id: 'rain-birds', k: 'sound', w: '2', f: 'some', s: 'В дождь и птицы примолкли.'},
   {id: 'birds-few', k: 'sound', w: '04', m: '8-12', f: 'some', s: 'Птиц почти не слышно.'},
   {id: 'geese', k: 'sound', w: '01234', m: '9-10', f: 'rare', s: 'Над избой пролетели гуси, их долго слышно.'},
@@ -6459,7 +6460,7 @@ const HOME_LINES = [
   {id: 'glass-cold', k: 'izba', w: '3', need: () => homeBroken('glass'), f: 'often', s: 'От окна тянет холодом.'},
   {id: 'roof-drip', k: 'izba', w: '25', need: () => homeBroken('roof'), f: 'often', s: 'В углу с потолка капает.'},
   {id: 'cricket', k: 'izba', h: '15-17', m: '9-12', th: 'stove', f: 'some', s: 'За печкой застрекотал сверчок.'},
-  {id: 'fly-sleepy', k: 'izba', m: '9', f: 'some', s: 'По стеклу ползает сонная муха.'},
+  {id: 'fly-sleepy', k: 'izba', cur: 'open', m: '9', f: 'some', s: 'По стеклу ползает сонная муха.'},
   {id: 'stove-crumble', k: 'izba', th: 'stove', f: 'rare', s: 'В печи что-то осыпалось.'},
   {id: 'moth', k: 'izba', th: 'chest', f: 'rare', s: 'Из-за сундука вылетела моль.'},
   {id: 'dusk', k: 'izba', h: '16-17', f: 'some', s: 'К вечеру в избе темнеет.'},
@@ -6481,8 +6482,8 @@ const HOME_LINES = [
   {id: 'sugar', k: 'deed', g: 'food', need: () => homeHas('sugar'), f: 'some', s: 'Пососал кусочек сахару.'},
   {id: 'bread', k: 'deed', g: 'food', need: () => homeHas('bread') || !homeSaid('bread-none'), f: 'some', s: 'Отрезал и пожевал кусок хлеба.'},
   {id: 'bread-none', k: 'deed', g: 'food', f: 'sub', s: 'Хотел отрезать хлеба, да хлеба нет.'},
-  {id: 'lunch', k: 'deed', g: 'food', meal: true, h: '12-13', power: true, need: () => homeHas('bread'), f: 'often', s: 'Пообедал: хлеб, луковица, кружка чаю.'},
-  {id: 'lunch-dry', k: 'deed', g: 'food', meal: true, h: '12-13', power: false, need: () => homeHas('bread'), f: 'often', s: 'Пообедал всухомятку: хлеб да луковица.'},
+  {id: 'lunch', k: 'deed', g: 'food', meal: true, h: '12-13', power: true, need: () => homeHas('bread') && homeHas('tea'), f: 'often', s: 'Пообедал: хлеб, луковица, кружка чаю.'},
+  {id: 'lunch-dry', k: 'deed', g: 'food', meal: true, h: '12-13', need: () => homeHas('bread') && (S.noPower || !homeHas('tea')), f: 'often', s: 'Пообедал всухомятку: хлеб да луковица.'},
   {id: 'porridge', k: 'deed', g: 'food', meal: true, h: '11-13', power: true, need: () => homeHas('groats'), f: 'some', s: 'Сварил на плитке каши.'},
   {id: 'pasta', k: 'deed', g: 'food', meal: true, h: '11-13', power: true, need: () => homeHas('pasta'), f: 'some', s: 'Сварил макарон, поел.'},
   {id: 'weights', k: 'deed', h: '6', f: 'often', s: 'Подтянул гири у ходиков.'},
@@ -6586,7 +6587,7 @@ const WAKE_AGAIN = [
   {id: 'am-before-dawn', f: 'some', s: 'Проснулся до света.'},
   {id: 'am-dream', f: 'some', s: 'Снилось что-то, не вспомнить.'},
   {id: 'am-back', f: 'some', s: 'Поясница ныла к ночи.'},
-  {id: 'am-tea', f: 'some', power: true, s: 'С утра чаю — и на воду.'},
+  {id: 'am-tea', f: 'some', power: true, s: 'С утра первым делом чай.'},
   {id: 'am-floor', f: 'some', m: '8-12', s: 'Половицы с утра холодные.'},
   {id: 'am-cold', f: 'often', m: '9-12', s: 'Изба за ночь выстыла.'},
   {id: 'am-mouse', f: 'rare', s: 'Ночью мышь скреблась за печкой.'},
@@ -6826,13 +6827,14 @@ const SHOP_QUIET = [{s: 'Помолчали.', two: true}, {s: 'Баба Нюр�
   {s: 'С крыши магазина капает.', wx: [2, 5]}, {s: 'На крыше чирикают воробьи.', wx: [0, 1, 2, 3, 4]}, {s: 'По площади ходят куры.', wx: [0, 1, 2, 3, 4]}];
 // the arrival: baba Nyura's rumour ({where}: на реке, на омуте, на озере) and baba Valya's reply; on a day without
 // power the power first ({who}: whichever of them is there to say it). By the words of «нигде не клюёт» the game knows
-// that Petrovich sat at the water today (PE_AWAY, PE_HERE in the game): changing them, change those too
+// that Petrovich sat at the water today (PE_AWAY, PE_HERE in the game), and by «Колька только что» of the big one that
+// Kolka was at a water (KO_AWAY): changing them, change those too
 const RUMOR_SAY = {
   big: 'Баба Нюра: «Колька только что {where} во какую рыбину взял!»',
   some: 'Баба Нюра: «Говорят, {where} клюёт помаленьку».',
   noneSeen: 'Баба Нюра: «Говорят, нигде не клюёт. Петрович утром зазря просидел».',
   noneMorning: 'Баба Нюра: «Говорят, нигде не клюёт. Петрович с утра сидит зазря».',
-  noneDay: 'Баба Нюра: «Говорят, нигде не клюёт, Петрович весь день просидел зазря».',
+  noneDay: 'Баба Нюра: «Говорят, нигде не клюёт. Петрович весь день просидел зазря».',
   power: '{who}: «Опять свет отключили».', valya: 'Баба Валя', nyura: 'Баба Нюра',
 };
 // baba Valya's reply, one of these by the day's draw (choice() from rnd()): another reply changes which one, not the days
@@ -6874,10 +6876,10 @@ const TALK = [
 {id:'t3-chg-sunday-no-lyuba', l:['Баба Нюра: «Любы нет — и поругаться не с кем».','Баба Валя: «Завтра поругаешься».'], p:['ny','va'], d:[0], c:12, ln:4},
 {id:'t3-chg-sunday-papirosy', l:['Петрович: «Папиросы кончились, а закрыто».','Баба Нюра: «Бросай».','Петрович: «Завтра брошу».'], p:['pe','ny'], d:[0], c:12, ln:4},
 {id:'t4-ev-pokupateli', l:['Люба: «За день и не зашёл никто».','Баба Нюра: «А мы?»','Люба: «Вы не покупатели».'], p:['lu','ny'], h:'16', d:[1,3,4,6], c:12, ln:4},
-{id:'t4-ev-ten', l:['Баба Валя: «Тень до крыльца дошла».','Баба Нюра: «Скоро Тамарины пойдут».'], p:['va','ny'], h:'16', wx:[1], c:12, ln:4},
+{id:'t4-ev-ten', l:['Баба Валя: «Тень до крыльца дошла».','Баба Нюра: «Скоро Тамарины пойдут».'], p:['va','ny'], h:'16', m:[6,7,8], wx:[1], c:12, ln:4},
 {id:'t4-ev-bukhanki', l:['Люба: «Хлеба ни буханки не осталось».','Баба Нюра: «Михалыч наверх половину увёз».'], p:['lu','ny'], h:'14-16', d:[5], br:1, c:12, ln:4},
 {id:'t4-ev-zakryvayu', l:['Люба: «Всё, закрываю. Сидите на здоровье».'], p:['lu'], h:'17', c:12, ln:2},
-{id:'t4-ev-tvoi-idut', l:['Баба Нюра: «Твои идут».','Тамара: «Вижу».'], p:['ny','ta'], h:'17', c:12, ln:2},
+{id:'t4-ev-tvoi-idut', l:['Баба Нюра: «Твои идут».','Тамара: «Вижу».'], p:['ny','ta'], h:'17', m:[6,7,8], c:12, ln:2},
 {id:'t4-ev-schyoty', l:['Люба щёлкает счётами.','Баба Нюра: «Сошлось?»'], p:['lu','ny'], h:'16-17', c:12, ln:2},
 {id:'t4-mih-chetyre', l:['Люба: «Ульяне сколько?»','Михалыч: «Четыре».','Михалыч сложил хлеб в мешок.'], p:['mi','lu'], d:[5], br:1, c:12, ln:4},
 {id:'t4-ai-rano', l:['Баба Нюра: «Не звонила ещё?»','Анатолий Иванович: «Рано ещё».'], p:['ny','ai'], h:'10-12', d:[6], c:12, ln:4},
@@ -6909,7 +6911,7 @@ const TALK = [
 {id:'t3-drizzle-ceiling', l:['Петрович: «В сенях опять капает».','Баба Нюра: «А ведро?»','Петрович: «Кружка».'], p:['pe','ny'], wx:[2], c:12, ln:4},
 {id:'t3-drizzle-lyuba-in', l:['Люба из дверей: «Заходите, чего мокнуть».','Баба Нюра: «Нам и тут хорошо».'], p:['lu','ny'], wx:[2], c:12, ln:4},
 {id:'t3-drizzle-kolka', l:['Колька: «Мам, пошли, сыро же».','Баба Нюра: «Посижу ещё».','Колька: «Мам, ну хватит».'], p:['ko','ny'], wx:[2], c:12, ln:4},
-{id:'t3-rain-pressure-ai', l:['Анатолий Иванович: «В сырость голова тяжёлая».','Баба Валя: «Давайте померяю».'], p:['ai','va'], wx:[2,5], c:12, ln:4},
+{id:'t3-rain-pressure-ai', l:['Анатолий Иванович: «В сырость голова тяжёлая».','Баба Валя: «Давайте померю».'], p:['ai','va'], wx:[2,5], c:12, ln:4},
 {id:'t3-after-ural', l:['Петрович: «Развезло. Разве на „Урале“ проехать».','Баба Нюра: «Не заведёшь».','Петрович: «Не заведу».'], p:['pe','ny'], af:'d', c:12, ln:4},
 {id:'t3-after-vahtovka', l:['Люба из дверей: «Вовка звонил — вахтовки не будет».','Баба Нюра: «Развезло?»','Люба: «Развезло».'], p:['lu','ny'], d:[2,5], af:'d', br:0, c:12, ln:4},
 {id:'t3-after-oldman', l:['Баба Нюра: «Вам-то через реку по такой грязи».','Кивнул.'], p:['ny'], af:'d', c:30, q:0.3, ln:3},
@@ -6953,8 +6955,8 @@ const TALK = [
 {id:'t1-garden-onion-bolted', l:['Баба Валя: «Лук-то у тебя стрелку пустил».','Баба Нюра: «Пустил, холера».'], p:['ny','va'], m:[6,7], c:12, ln:3},
 {id:'t1-well-low', l:['Баба Нюра: «В колодце воды мало стало».','Баба Валя: «Лето».'], p:['ny','va'], m:[7], c:12, ln:3},
 {id:'t1-berries-past-farm', l:['Баба Нюра: «Земляника, говорят, пошла».','Баба Валя: «За фермой».','Баба Нюра: «Мне не дойти».'], p:['ny','va'], m:[7], c:12, ln:4},
-{id:'t1-firewood-kolka-enough', l:['Колька: «В субботу дрова пилим».','Баба Нюра: «А колоть кто?»','Колька: «Мам, ну хватит».'], p:['ko','ny'], c:12, ln:4},
-{id:'t1-cow-limping', l:['Тамара: «Младшая захромала».','Баба Нюра: «Копыто?»','Тамара: «Вечером гляну».'], p:['ta','ny'], h:'7', c:12, ln:4},
+{id:'t1-firewood-kolka-enough', l:['Колька: «На днях дрова пилим».','Баба Нюра: «А колоть кто?»','Колька: «Мам, ну хватит».'], p:['ko','ny'], c:12, ln:4},
+{id:'t1-cow-limping', l:['Тамара: «Младшая захромала».','Баба Нюра: «Копыто?»','Тамара: «Вечером гляну».'], p:['ta','ny'], h:'7', m:[6,7,8], c:12, ln:4},
 {id:'t1-milk-tonight', l:['Тамара: «Нюра, молоко вечером занесу».','Баба Нюра: «Занеси. Колька всё выпил».'], p:['ta','ny'], h:'7', c:12, ln:4},
 {id:'t1-goat-stayed-home', l:['Тамара: «Нюра, Майка в стадо не пошла».','Баба Нюра: «Холера. В огород залезет».'], p:['ta','ny'], h:'7', c:12, ln:4},
 {id:'t1-ai-pills-every-day', l:['Баба Валя: «Таблетки пьёте?»','Анатолий Иванович: «Пью».','Баба Валя: «Каждый день?»'], p:['va','ai'], c:12, ln:4},
@@ -7127,6 +7129,9 @@ const PE_AWAY = /Петрович (?:с утра сидит|весь день п
 // them: «Петрович: «…».», «Петрович курит на крыльце.»; every piece with him has one, no other piece does), that
 // rumour on a later arrival has him at the water only in the morning, so he stays at the shop
 const PE_HERE = /^Петрович[: ]/;
+// the rumour of a big fish has Kolka at a water just now (RUMOR_SAY.big): once the journal has it today, he does not
+// come to the shop that day either (the author, 20 November 2026: the lake is two hours away)
+const KO_AWAY = /Колька только что/;
 // who is at the shop in the hour from hr:00 today, by their habits (11, «Кто у магазина»); Sobol is always there
 function atShop(hr){
   const at = new Set(), dow = weekday(), wx = lifeWeather(hr - START), put = (id, yes) => { if (yes) at.add(id); };
@@ -7142,7 +7147,7 @@ function atShop(hr){
   if (comes('eg', SHOP_P.eg) && (wx === 0 || wx === 1)){   // in the sun or overcast, two to four hours in a row in 11-15
     const n = 2 + comesAt('eg', 3), a = 11 + Math.floor(th(who('eg'), 2)*(6 - n)); put('eg', hr >= a && hr < a + n);
   }
-  put('ko', comes('ko', SHOP_P.ko) && hr === 9 + comesAt('ko', 8));
+  put('ko', !S.log.some(e => KO_AWAY.test(e.text)) && comes('ko', SHOP_P.ko) && hr === 9 + comesAt('ko', 8));
   put('st', inPhase('students') && hr >= 10 && hr <= 14);
   return at;
 }
@@ -7259,7 +7264,7 @@ function advance(n, home = false){
 function changeAway(){ const ws = S.D.weathers; return [CHANGE_TEXT[`${ws[CHANGE_HOUR-1]}-${ws[CHANGE_HOUR]}`]]; }
 // the weather goes into the journal, in bold, the first time the old man sees it: through the window in the house's
 // words (WEATHER_HOME), outside in the game's (WEATHER_TEXT), and outside after a change at 11:00 he only heard in
-// the change's (CHANGE_TEXT: «Облака разошлись, выглянуло солнце.», not the morning's «Солнце, с утра уже жарко.»)
+// the change's (CHANGE_TEXT: «Облака разошлись, выглянуло солнце.», not the morning's «Солнце, ни облачка.»)
 function seeWeather(inside){
   const w = nowWeather(), ws = S.D.weathers, step = S.t >= CHANGE_HOUR && ws && ws[CHANGE_HOUR] !== ws[CHANGE_HOUR - 1];
   if (S.seen === w) return;
