@@ -4586,74 +4586,86 @@ const CHANGE_TEXT = {'1-0':'Солнце затянуло облаками.', '1
   '4-1':'Туман сошёл, выглянуло солнце.', '4-0':'Туман поднялся, небо серое.', '5-2':'Ливень стих, моросит.'};
 
 // ---------- household numbers ----------
-// What life takes from the piggy bank (the household block below): food, kerosene and soap run out, the line wears,
-// now and then something breaks, the summer asks for its things, now and then a treat. Not every day buys (the author,
-// 19 November 2026: «покупать что-то нужно было раз в два-три дня, и чтобы это было одно-два наименования»): a
-// purchase day comes every two or three days (BUY_EVERY) and buys one thing or two (BUY_MAX), and the days between buy
-// nothing. Its morning names every purchase with its price; the evening takes exactly that. It never touches the fish
-// or the decisions. A purchase never waits: what is needed is bought that day, and the piggy bank may go below zero,
-// into debt, with no other effect. At home there is no way out of debt: by every evening the purchases since the
-// house began are not less than that many days of tackle (LIFE_MIN a day), so a player who only crafts is never above
-// zero; a day costs about 65 on average. What would run out before the next purchase day is bought ahead, and a big
-// thing is paid in parts, so no purchase day is much dearer than another. Keep these numbers and should_I_lab's
-// docs/05-dnevnik-i-hozyaystvo.md the same.
+// What life takes from the piggy bank (the household block below): bread, tea, sugar, groats, kerosene, pills and soap
+// run out, firewood is laid in for the winter cart by cart, matches and hooks now and then, now and then something
+// breaks, the summer asks for its things, now and then a treat. Not every day buys (the author, 19 November 2026:
+// «покупать что-то нужно было раз в два-три дня, и чтобы это было одно-два наименования»): a purchase day comes every
+// two or three days (BUY_EVERY) and buys one thing or two (BUY_MAX), and the days between buy nothing. The prices are
+// the game's own scale, a fish 20 and an hour of tackle 5 (the author, 20 November 2026: «Хлеб по 90
+// неправдоподобно»): what is cheap is cheap, bread for six days 30, and what a day costs is carried by what is dear and
+// lasts, firewood above all. Its morning names every purchase with its price; the evening takes exactly that. It never
+// touches the fish or the decisions. A purchase never waits: what is needed is bought that day, and the piggy bank may
+// go below zero, into debt, with no other effect. At home there is no way out of debt: from the second evening on the
+// purchases since the house began are not less than that many days of tackle (LIFE_MIN a day), so a player who only
+// crafts is never above zero after his first evening, which buys only a few small things (the author, 20 November
+// 2026: «Первые дни сделай не так жёстко в долг. Сделай первую покупку мелкую… Типа спички и крючки на 40 рублей»); a
+// day costs about 65 on average. What would run out before the next purchase day is bought ahead, and a big thing is
+// paid in parts. Keep these numbers and should_I_lab's docs/05-dnevnik-i-hozyaystvo.md the same.
 // GOODS: what one purchase costs and how many days it lasts; `acc`: its name in the accusative (the evening said «На
 // хлеб и молоко ушло …» until 19 November 2026; a big thing's parts still say «За стекло отдал …» by theirs); `of`: how
-// much of it, in the day's list, the morning's «Надо купить хлеба на 90 руб.» and the evening's «Купил хлеба на 90
-// руб.»; the morning's thought when it is low, two days left (`low`), and on its last day (`out`), a good with no words
-// being bought without a thought; `nom`: its name on a morning that thinks of two goods («Кончаются хлеб и крупа.»).
-// The goods marked `old` are bought no more (19 November 2026: milk every day and many small things made every day a
-// purchase day of three or four): only their words stay, for a day saved before then.
+// much of it, in the day's list, the morning's «Надо купить хлеба на 30 руб.» and the evening's «Купил хлеба на 30
+// руб.»: several of a thing bought at once are one purchase; the morning's thought when it is low, two days left
+// (`low`), and on its last day (`out`), a good with no words being bought without a thought; `nom`: its name on a
+// morning that thinks of two goods («Кончаются хлеб и крупа.»). A good is bought whole, firewood too. The goods marked
+// `old` are bought no more (milk, flour, pasta, salt, nails and tar since the purchase days of 20 November 2026, oil
+// and line since that evening's prices): only their words stay, for a day saved before then.
 const GOODS = {
-  bread:    {acc:'хлеб', of:'хлеба', price:90, days:6, nom:'хлеб', low:'Хлеб почти весь.', out:'Хлеба нет.'},
-  sugar:    {acc:'сахар', of:'сахару', price:120, days:15, nom:'сахар', low:'Сахару на пару дней.', out:'Сахар кончается.'},
-  groats:   {acc:'крупу', of:'крупы', price:120, days:15, nom:'крупа', low:'Крупы на пару дней.', out:'Крупы осталось немного.'},
-  tea:      {acc:'чай', of:'чаю', price:120, days:18, nom:'чай', low:'Чаю на пару дней.', out:'Чай на донышке.'},
-  oil:      {acc:'масло', of:'масла', price:120, days:20, nom:'масло', low:'Масла на пару дней.', out:'Масло кончается.'},
-  kerosene: {acc:'керосин', of:'керосину', price:90, days:30, nom:'керосин', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит.'},
-  soap:     {acc:'мыло', of:'мыла', price:60, days:30},
-  line:     {acc:'леску', of:'лески', price:90, days:30},
+  bread:    {acc:'хлеб', of:'хлеба', price:30, days:6, nom:'хлеб', low:'Хлеб почти весь.', out:'Хлеба нет.'},
+  firewood: {acc:'дрова', of:'дров', price:180, days:5},
+  sugar:    {acc:'сахар', of:'сахару', price:60, days:25, nom:'сахар', low:'Сахару на пару дней.', out:'Сахар кончается.'},
+  groats:   {acc:'крупу', of:'крупы', price:60, days:25, nom:'крупа', low:'Крупы на пару дней.', out:'Крупы осталось немного.'},
+  tea:      {acc:'чай', of:'чаю', price:60, days:25, nom:'чай', low:'Чаю на пару дней.', out:'Чай на донышке.'},
+  kerosene: {acc:'керосин', of:'керосину', price:60, days:25, nom:'керосин', low:'Керосину на несколько вечеров.', out:'Лампа скоро выгорит.'},
+  pills:    {acc:'таблетки', of:'таблеток', price:120, days:18, nom:'таблетки', low:'Таблеток на пару дней.', out:'Таблетки кончаются.'},
+  soap:     {acc:'мыло', of:'мыла', price:15, days:60},
+  matches:  {acc:'спички', of:'спичек', price:10, days:90, nom:'спички', low:'Спичек осталось немного.', out:'Спички кончаются.'},
+  hooks:    {acc:'крючки', of:'крючков', price:30, days:45},
+  oil:      {acc:'масло', of:'масла', price:120, days:20, nom:'масло', old:true},
+  line:     {acc:'леску', of:'лески', price:90, days:30, old:true},
   milk:     {acc:'молоко', of:'молока', price:20, days:1, old:true},
   flour:    {acc:'муку', of:'муки', price:20, days:8, nom:'мука', old:true},
   pasta:    {acc:'макароны', of:'макарон', price:15, days:5, nom:'макароны', old:true},
   salt:     {acc:'соль', of:'соли', price:5, days:15, nom:'соль', old:true},
-  matches:  {acc:'спички', of:'спичек', price:5, days:10, nom:'спички', old:true},
-  hooks:    {acc:'крючки', of:'крючков', price:10, days:5, old:true},
   nails:    {acc:'гвозди', of:'гвоздей', price:15, days:8, old:true},
   tar:      {acc:'смолу', of:'смолы', price:30, days:20, old:true},
 };
 // what breaks now and then (never in a new game's first BREAK_FROM days, never two close together): the morning's
-// thought, and what that day buys for it. In the morning's list a thing bought whole is `buy` («новое ведро за 90
+// thought, and what that day buys for it. In the morning's list a thing bought whole is `buy` («новое ведро за 45
 // руб.»); its first part, when it is paid in parts, is a line of its own, `costs` («Новое стекло стоит 150 руб., пока
-// отдать 90 руб.»); a later part «За стекло отдать последние 60 руб.» (`acc`)
+// отдать 90 руб.»); a later part «За стекло отдать последние 60 руб.» (`acc`). The roof's hole takes a sheet of iron
+// since 20 November 2026 (a board for 120 until then; the roof is tin)
 const BREAKS = {
-  roof:   {acc:'доску', buy:'доску', costs:'Доска стоит', price:120, thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
+  roof:   {acc:'лист железа', buy:'лист железа', costs:'Лист железа стоит', price:120, thought:'Ночью дождь стучал по железу. Дыра в крыше, видать, шире стала.'},
   glass:  {acc:'стекло', buy:'новое стекло', costs:'Новое стекло стоит', price:150, thought:'Ночью из окна потянуло. Стекло, что ли, треснуло.'},
-  bucket: {acc:'ведро', buy:'новое ведро', costs:'Новое ведро стоит', price:90, thought:'Ведро дало течь.'},
-  shovel: {acc:'лопату', buy:'новую лопату', costs:'Новая лопата стоит', price:90, thought:'Лопата треснула по черенку.'},
-  saw:    {acc:'точильный камень', buy:'точильный камень', costs:'Точильный камень стоит', price:60, thought:'Пила тупая — камень нужен.'},
+  bucket: {acc:'ведро', buy:'новое ведро', costs:'Новое ведро стоит', price:45, thought:'Ведро дало течь.'},
+  shovel: {acc:'лопату', buy:'новую лопату', costs:'Новая лопата стоит', price:60, thought:'Лопата треснула по черенку.'},
+  saw:    {acc:'точильный камень', buy:'точильный камень', costs:'Точильный камень стоит', price:30, thought:'Пила тупая — камень нужен.'},
 };
 // once a summer (SUMMER days, then it comes round again), on a purchase day between days `from` and `to` of it (or up
 // to SEASON_LATE days later, when those purchase days had no room): the thought, and that day the thing (`buy`, `costs`
-// as in BREAKS; seeds are bought as a good, «семян на 90 руб.», `of`)
+// as in BREAKS; seeds are bought as a good, «семян на 30 руб.», `of`). A summer thing comes before a breakdown: the
+// breakdown is only a chance of the day, the summer thing must find its room
 const SEASON = {
-  net:   {acc:'накомарник', buy:'накомарник', costs:'Накомарник стоит', price:60, from:3, to:10, thought:'Комары замучили — накомарник нужен.'},
-  seeds: {acc:'семена', of:'семян', costs:'Семена стоят', price:90, from:10, to:20, thought:'Огород бы посадить, срок подходит.'},
-  socks: {acc:'носки', buy:'носки', costs:'Носки стоят', price:90, from:35, to:45, thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
+  net:   {acc:'накомарник', buy:'накомарник', costs:'Накомарник стоит', price:30, from:5, to:12, thought:'Комары замучили — накомарник нужен.'},
+  seeds: {acc:'семена', of:'семян', costs:'Семена стоят', price:30, from:10, to:20, thought:'Огород бы посадить, срок подходит.'},
+  socks: {acc:'носки', buy:'носки', costs:'Носки стоят', price:45, from:35, to:45, thought:'Носков тёплых нет. Соседка, говорят, вяжет.'},
   boots: {acc:'сапоги', buy:'сапоги', costs:'Сапоги стоят', price:240, from:70, to:85, thought:'К осени сапоги бы новые.'},
 };
 // every TREAT_GAP days, on a purchase day with room, with no thought, but named in the morning's list as all it buys
-const TREATS = {gingerbread: {acc:'пряники', of:'пряников', price:45}, condensed: {acc:'сгущёнку', of:'сгущёнки', price:60}};
-const LIFE_MIN = HOURS*WAGE;      // a day of tackle: by every evening the purchases are not behind that many of them
+const TREATS = {gingerbread: {acc:'пряники', of:'пряников', price:15}, condensed: {acc:'сгущёнку', of:'сгущёнки', price:20}};
+const LIFE_MIN = HOURS*WAGE;      // a day of tackle: from the second evening the purchases are not behind that many of them
 const BUY_EVERY = [2, 3];         // days from a purchase day to the next
 const BUY_LONG_P = .5;            // the chance a purchase day aims for the longer wait, when it can
 const BUY_MAX = 2;                // a purchase day buys one thing or two (a part of a big thing is one of them)
 const LOOK_K = 5;                 // a purchase day looks this many purchase days ahead
 const NEED_DAYS = 2;              // a good is thought of in the morning with NEED_DAYS left
 const BIG = 150, PART = 90;       // a thing from BIG up is paid in parts of up to PART
-const SUMMER = 90, SEASON_LATE = 10, TREAT_GAP = [12, 20];
-const BREAK_FROM = 10, BREAK_GAP = 12, BREAK_P = .35;   // a breakdown: on a purchase day with room for it
-const HOUSE_STAIR = [4, 3];       // a new house: after its first purchase day's two goods, one runs out on day 4, then every 3
+const SUMMER = 90, SEASON_LATE = 15, TREAT_GAP = [12, 20];
+const BREAK_FROM = 10, BREAK_GAP = 12, BREAK_P = .45;   // a breakdown: on a purchase day with room for it
+// a new house: its first day buys only matches and hooks (40), the next day is its first full purchase day, from bread
+// on; firewood and soap last a while, and the rest run out one by one, from day HOUSE_STAIR[0] every HOUSE_STAIR[1]
+const HOUSE_START = {matches: 1, hooks: 1, bread: 2, firewood: 10, soap: 40};
+const HOUSE_STAIR = [4, 3];
 
 // ---------- daylight ----------
 // The outdoor places are living scenes: the engine (scenes.js, the script before this one) paints each from its clean
@@ -5157,7 +5169,8 @@ function startDay(){
 // State, all saved: S.stock, the days each good still lasts counting the day it is reckoned for (a good is bought on or
 // before the day it comes to 0): this morning's until spendDay() has decided the day, the next morning's from then on;
 // S.house, the next purchase day (`next`), how far the purchases are ahead of the days of tackle (`lead`, rub.: what
-// has been bought since the house began less LIFE_MIN for each day of it, never below 0 at an evening), what is owed
+// has been bought since the house began less LIFE_MIN for each day of it, never below 0 at an evening after the
+// house's first, whose few small things leave it a little behind: a crafter ends that day a little above zero), what is owed
 // for big things, this morning's breakdown and thought, the summer's purchases and the next treat (and, in a game from
 // before 19 November 2026, its last background thought, `thought`, read no more); S.purchases, what the day buys,
 // [{id, price, part, gone}], `part` 'first', 'more' or 'last' for a big thing paid in parts, `gone` for a good bought
@@ -5173,12 +5186,14 @@ const hh = (...v) => hashOf(HOUSE_TAG, S.day, ...v);
 const GOOD_IDS = Object.keys(GOODS).filter(g => !GOODS[g].old);   // the goods still bought
 const firstPart = price => price >= BIG ? PART : price;   // what a thing costs on the day it is bought
 // The household of a new game, or of a game saved before it had one, from the morning of day `from`, its first purchase
-// day: that day bread and soap run out (two days of tackle and a little more, so a day of tackle is behind from the
-// first evening on), and the rest one by one, from day HOUSE_STAIR[0] every HOUSE_STAIR[1] days, in an order by the
-// game's hash. `keep`: the household of a game saved before the purchase days (20 November 2026), whose debts for big
-// things, summer things, last breakdown, next treat and this morning's thought go on
+// day: that day matches and hooks run out, 40 in all (the author, 20 November 2026: the first purchase a small one),
+// the next day bread, and that day is the first full purchase day, two days of tackle ahead; then the rest one by one,
+// from day HOUSE_STAIR[0] every HOUSE_STAIR[1] days, in an order by the game's hash (HOUSE_START). Until 20 November
+// 2026 evening the first day bought bread and soap, 150, and its crafter's evening was −90. `keep`: the household of a
+// game saved before the purchase days (20 November 2026), whose debts for big things, summer things, last breakdown,
+// next treat and this morning's thought go on
 function newHouse(from = S.day, keep = null){
-  const hf = (...v) => hashOf(HOUSE_TAG, from, ...v), stock = {bread: 1, soap: 1};
+  const hf = (...v) => hashOf(HOUSE_TAG, from, ...v), stock = {...HOUSE_START};
   GOOD_IDS.filter(g => !(g in stock)).sort((a, b) => hf(14, GOOD_IDS.indexOf(a)) - hf(14, GOOD_IDS.indexOf(b)))
     .forEach((g, i) => { stock[g] = Math.min(HOUSE_STAIR[0] + HOUSE_STAIR[1]*i, GOODS[g].days); });
   const H = {from, next: from, lead: 0, owe: [], broke: null, said: null, lastBreak: from, lastBroke: null, season: {},
@@ -5199,7 +5214,10 @@ const buyToday = () => S.day >= S.house.next || GOOD_IDS.some(g => !(S.stock[g] 
 // summer thing costing `xsum` today, the purchases `lead` rub. ahead of the days of tackle after today's: what runs out
 // before the next purchase day (the fewest days left first); then, most urgent first, what the purchase days after it
 // could not take, looking LOOK_K of them ahead at the longer wait (BUY_MAX each); then, while the day of tackle would
-// catch up before the next purchase day, the dearest goods not full. `left`: each good's days left after today.
+// catch up before the next purchase day, or before the one after it with all the next one could buy (the goods it
+// must buy and the dearest it could buy ahead: with cheap goods due together, bread and soap, it could not keep up
+// alone), goods not full, the dearest, or in the last slot the most used up of those that are enough. A good is
+// bought ahead only once it has begun (fewer days left than it lasts). `left`: each good's days left after today.
 // Returns {got: [good], ok}: ok when all of it fits in BUY_MAX, leaves the purchase days after room and keeps the lead
 function buyPlan(left, gap, extra, xsum, lead){
   const st = {...left}, got = [], add = g => { got.push(g); st[g] += GOODS[g].days; };
@@ -5207,20 +5225,34 @@ function buyPlan(left, gap, extra, xsum, lead){
   const tight = () => { const rs = GOOD_IDS.map(g => st[g]);
     for (let k = 1; k <= LOOK_K; k++) if (rs.filter(r => r < gap + BUY_EVERY[1]*k).length > BUY_MAX*k) return true;
     return false; };
-  const notFull = () => GOOD_IDS.filter(g => !got.includes(g) && st[g] <= GOODS[g].days);
-  const sum = () => xsum + got.reduce((s, g) => s + GOODS[g].price, 0), need = LIFE_MIN*(gap - 1) - lead;
+  const notFull = () => GOOD_IDS.filter(g => !got.includes(g) && st[g] < GOODS[g].days);
+  const sum = () => xsum + got.reduce((s, g) => s + GOODS[g].price, 0);
+  // the lead to the evening before the next purchase day, and to the evening before the one after it at the shorter
+  // wait, with the most the next one can buy: the goods it must buy, then the dearest it may buy ahead
+  const need = () => { const due = GOOD_IDS.filter(g => st[g] < gap + BUY_EVERY[0]).sort((a, b) => st[a] - st[b]).slice(0, BUY_MAX);
+    const more = GOOD_IDS.filter(g => !due.includes(g) && st[g] - gap < GOODS[g].days).map(g => GOODS[g].price).sort((a, b) => b - a);
+    const next = [...due.map(g => GOODS[g].price), ...more].slice(0, BUY_MAX).reduce((s, p) => s + p, 0);
+    return Math.max(LIFE_MIN*(gap - 1), LIFE_MIN*(gap + BUY_EVERY[0] - 1) - next) - lead; };
+  const last = () => got.length + extra + 1 === BUY_MAX;
+  const tries = (g, f) => { add(g); const ok = f(); got.pop(); st[g] -= GOODS[g].days; return ok; };
+  // the most urgent first; the last slot, the most urgent that also keeps the lead, if one does
   while (got.length + extra < BUY_MAX && tight()){
-    const g = notFull().sort((a, b) => st[a] - st[b] || GOODS[b].price - GOODS[a].price)[0];
+    const can = notFull().sort((a, b) => st[a] - st[b] || GOODS[b].price - GOODS[a].price);
+    const g = last() && can.find(g => tries(g, () => !tight() && sum() >= need())) || can[0];
     if (!g) break; add(g);
   }
-  while (got.length + extra < BUY_MAX && sum() < need){
-    const g = notFull().sort((a, b) => GOODS[b].price - GOODS[a].price || st[a] - st[b])[0];
+  // the dearest; the last slot, the most used up of the goods that are enough, if one is
+  while (got.length + extra < BUY_MAX && sum() < need()){
+    const can = notFull().sort((a, b) => GOODS[b].price - GOODS[a].price || st[a] - st[b]);
+    const g = last() && can.filter(g => tries(g, () => sum() >= need())).sort((a, b) => st[a] / GOODS[a].days - st[b] / GOODS[b].days)[0] || can[0];
     if (!g) break; add(g);
   }
-  return {got, ok: got.length + extra <= BUY_MAX && !tight() && sum() >= need};
+  return {got, ok: got.length + extra <= BUY_MAX && !tight() && sum() >= need()};
 }
-// The morning's thought, by priority: what broke, only on a purchase day with room for it (today and the purchase days
-// after), so it is told and never piles on; the season's thing in its time (or a little after), the same way; what
+// The morning's thought, by priority: the season's thing in its time (or a little after), only on a purchase day with
+// room for it (today and the purchase days after), so it is told and never piles on; what broke, the same way (since
+// 20 November 2026 evening after the season's thing: a breakdown is only the day's chance, the season's thing must
+// find its room, and before it went first it now and then took that room till the season was over); what
 // runs low, NEED_DAYS or fewer days left (the good with the fewest, and a second one when both are on their last day;
 // on a day between purchase days only «… на пару дней»: what would run out before the next one is bought ahead); else
 // none, a quiet morning (its background thoughts went to the waking message on 19 November 2026, WAKE_AGAIN and
@@ -5234,12 +5266,12 @@ function morningThought(){
   H.broke = null; H.said = null;
   GOOD_IDS.forEach(g => { left[g] = S.stock[g] - 1; });
   const room = price => today && buyPlan(left, BUY_EVERY[0], 1, firstPart(price), H.lead - LIFE_MIN).ok;
+  const due = Object.keys(SEASON).find(s => H.season[s] !== yr && cyc >= SEASON[s].from && cyc <= SEASON[s].to + SEASON_LATE && room(SEASON[s].price));
+  if (due) return say('season', due);
   if (today && S.day > BREAK_FROM && S.day - H.lastBreak >= BREAK_GAP && hh(1) < BREAK_P){
     const ids = Object.keys(BREAKS).filter(b => b !== H.lastBroke), b = ids[Math.floor(hh(2)*ids.length)];
     if (room(BREAKS[b].price)){ H.broke = H.lastBroke = b; H.lastBreak = S.day; return say('break', b); }
   }
-  const due = Object.keys(SEASON).find(s => H.season[s] !== yr && cyc >= SEASON[s].from && cyc <= SEASON[s].to + SEASON_LATE && room(SEASON[s].price));
-  if (due) return say('season', due);
   const low = GOOD_IDS.filter(g => GOODS[g].out && S.stock[g] <= NEED_DAYS).sort((a, b) => S.stock[a] - S.stock[b] || GOODS[b].days - GOODS[a].days);
   if (low.length){
     const words = g => [g, S.stock[g] > 1 && GOODS[g].low ? 'low' : 'out'];
@@ -5252,7 +5284,7 @@ function morningThought(){
 // itself with its price, no total to puzzle over): the thought, with no price; on a purchase day, the first part of a
 // thing paid in parts, a line of its own («Новое стекло стоит 150 руб., пока отдать 90 руб.»); the day's list, one
 // sentence naming all the rest it buys, what the thought is about first (two goods in the thought's order), then in the
-// order of S.purchases: a good or a treat as how much of it («хлеба на 90 руб.»), a thing as itself («новое ведро за 90
+// order of S.purchases: a good or a treat as how much of it («хлеба на 30 руб.»), a thing as itself («новое ведро за 45
 // руб.»); and a later part of a big thing a line after it («За сапоги отдать ещё 90 руб.», the last «За сапоги отдать
 // последние 60 руб.»). A day between purchase days has no list and no parts. The figures of these lines (a first
 // part's after «пока отдать») come to daySpend(), which the evening takes. A sum keeps its «руб.» on its line (rub()),
@@ -5281,7 +5313,7 @@ const aboutOf = m => !m ? [] : m.kind === 'need' ? (Array.isArray(m.goods) ? m.g
 const andList = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' и ' + a[a.length - 1] : a[0];
 // The day's list, the morning's «Надо купить …» and the evening's «Купил …» alike: all the day buys but the parts of big
 // things, what the thought is about first (two goods in the thought's order), then in the order of S.purchases; a good
-// or a treat as how much of it («хлеба на 90 руб.»), a thing as itself («новое ведро за 90 руб.»)
+// or a treat as how much of it («хлеба на 30 руб.»), a thing as itself («новое ведро за 45 руб.»)
 function buyList(about){
   const whole = (S.purchases || []).filter(known).filter(p => !p.part), rank = p => about.includes(p.id) ? about.indexOf(p.id) : about.length;
   return whole.map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
@@ -5290,7 +5322,7 @@ function buyList(about){
 const daySpend = () => S.purchases.reduce((s, p) => s + p.price, 0);   // what the day takes, all of it
 // The day's purchases, decided in the morning; sets S.purchases and S.planned. A day between purchase days buys
 // nothing. A purchase day waits BUY_EVERY[1] days to the next one, by the house's hash with the chance BUY_LONG_P, when
-// that still fits (buyPlan()), else BUY_EVERY[0]; it buys the goods of its plan, then what broke this morning or the
+// that still fits (buyPlan()), else BUY_EVERY[0]; a house's first day waits one, its next always the shorter wait; it buys the goods of its plan, then what broke this morning or the
 // season's thing thought of (a thing from BIG up in parts, the first one PART), then, while there is room, a part of
 // what is owed for a big thing bought on another day, then a treat when one is due; and one thing at least, the most
 // urgent good, when nothing else came. At most BUY_MAX in all.
@@ -5305,8 +5337,8 @@ function spendDay(){
     if (H.broke) xs.push(H.broke);
     if (H.said && H.said.kind === 'season'){ H.season[H.said.id] = Math.floor((S.day - 1)/SUMMER); xs.push(H.said.id); }
     const xsum = xs.reduce((s, id) => s + firstPart(itemOf(id).price), 0);
-    const long = S.day > H.from && hh(8) < BUY_LONG_P && buyPlan(left, BUY_EVERY[1], xs.length, xsum, H.lead).ok;
-    const gap = BUY_EVERY[long ? 1 : 0];
+    const long = S.day > H.from + 1 && hh(8) < BUY_LONG_P && buyPlan(left, BUY_EVERY[1], xs.length, xsum, H.lead).ok;
+    const gap = S.day === H.from ? 1 : BUY_EVERY[long ? 1 : 0];
     buyPlan(left, gap, xs.length, xsum, H.lead).got.forEach(g => {
       add(g, GOODS[g].price); if (S.stock[g] <= 0) buy[buy.length - 1].gone = true; S.stock[g] += GOODS[g].days; });
     xs.forEach(id => { const price = itemOf(id).price, first = firstPart(price);
@@ -5366,6 +5398,13 @@ function load(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if(v
   // money stays as it was
   if (!Number.isInteger(S.house.next) || !Number.isFinite(S.house.lead))
     newHouse(S.planned === S.day || S.phase === 'evening' ? S.day + 1 : S.day, S.house);
+  // saved on the screens before the first day, before the first days were made gentle (20 November 2026 evening): its
+  // household has not begun, so it begins now, as a new game's does, with its small first purchase
+  if (INTRO.has(S.phase) && S.planned !== S.day) newHouse(S.day);
+  // saved with the purchase days, before the prices of 20 November 2026 evening: the goods it did not buy (firewood,
+  // pills, matches, hooks) come in one by one, as the rest of a new house's do; oil and line are bought no more
+  GOOD_IDS.filter(g => !Number.isFinite(S.stock[g]))
+    .forEach((g, i) => { S.stock[g] = Math.min(HOUSE_STAIR[0] + HOUSE_STAIR[1]*i, GOODS[g].days); });
   // saved before the morning's thought kept its goods for the evening's list: a thought of two goods has them in its
   // line at 6:00 («Кончаются хлеб и крупа.»; before 19 November 2026 with the sum after them, «Кончаются хлеб и
   // крупа — надо купить на 45.», then «… на 45 руб.»), and the evening names them first in that order, as the morning did
@@ -6660,7 +6699,7 @@ const TALK = [
 {id:'t1-overcast-grey', l:['Баба Нюра: «Серенько сегодня».','Баба Валя: «Зато не печёт».'], p:['ny','va'], wx:[0], c:12, ln:3},
 {id:'t1-drizzle-sows', l:['Баба Нюра: «Сеет и сеет».','Баба Валя: «Сеет».','Баба Нюра: «Бельё не высохнет».'], p:['ny','va'], wx:[2], c:12, ln:4},
 {id:'t1-drizzle-hay-asleep', l:['Тамара: «Сено мокнет, а мой спит».','Баба Нюра: «Разбуди».','Тамара: «Его разбудишь».'], p:['ta','ny'], h:'7', m:[7], wx:[2], c:12, ln:4},
-{id:'t1-downpour-goat-wet', l:['Под навесом тесно.','Баба Нюра: «Майку-то не загнала. Мокнет, холера».','Баба Валя: «Не растает».'], p:['ny','va'], wx:[5], c:12, ln:4},
+{id:'t1-drizzle-goat-wet', l:['Баба Нюра: «Майку-то не загнала. Мокнет, холера».','Баба Валя: «Не растает».'], p:['ny','va'], wx:[2], c:12, ln:3},
 {id:'t1-after-rain-puddle', l:['Баба Нюра: «Вчера-то как лило».','Баба Валя: «Лило».','Баба Нюра: «В огороде лыва».'], p:['ny','va'], af:'d', c:12, ln:4},
 {id:'t1-nopower-night', l:['Баба Нюра: «Ночью погасло. Я не спала».','Баба Валя: «А я спала».'], p:['ny','va'], h:'7-11', pw:0, c:10, ln:3},
 {id:'t1-nopower-diesel', l:['Баба Нюра: «Петрович опять про дизель начнёт».','Баба Валя: «Начнёт».'], p:['ny','va'], h:'7-11', pw:0, c:10, ln:3},
@@ -6675,10 +6714,10 @@ const TALK = [
 {id:'t3-rain-stacks', l:['Баба Нюра: «Сметали стога?»','Баба Валя: «Не все».','Баба Нюра: «Михалыч, поди».','Баба Валя: «Михалыч».'], p:['ny','va'], m:[8], wx:[2,5], c:12, ln:4},
 {id:'t3-damp-knees', l:['Баба Нюра: «Колени-то в сырость крутит».','Баба Валя: «Мазь есть».','Баба Нюра: «Мне бы новые».'], p:['ny','va'], wx:[2,5], c:12, ln:4},
 {id:'t3-sunday-rain-warm', l:['Баба Нюра: «Открыла бы Люба — посидели бы в тепле».','Баба Валя: «Воскресенье».'], p:['ny','va'], d:[0], wx:[2,5], c:12, ln:3},
-{id:'t3-downpour-greenhouse', l:['Баба Нюра: «Парник-то закрыла?»','Баба Валя: «С утра».','Баба Нюра: «А я забыла».'], p:['ny','va'], m:[8], wx:[5], c:12, ln:4},
-{id:'t3-downpour-ceiling', l:['Петрович: «В сенях опять с потолка».','Баба Нюра: «А ведро?»','Петрович: «Два».'], p:['pe','ny'], wx:[5], c:12, ln:4},
-{id:'t3-downpour-lyuba-in', l:['Люба из дверей: «Заходите, чего мокнуть».','Баба Нюра: «Нам и тут хорошо».'], p:['lu','ny'], wx:[5], c:12, ln:4},
-{id:'t3-downpour-kolka', l:['Колька: «Мам, пошли, довезу».','Баба Нюра: «Переждём».','Колька: «Мам, ну хватит».'], p:['ko','ny'], wx:[5], c:12, ln:4},
+{id:'t3-drizzle-greenhouse', l:['Баба Нюра: «Парник-то закрыла?»','Баба Валя: «С утра».','Баба Нюра: «А я забыла».'], p:['ny','va'], m:[8], wx:[2], c:12, ln:4},
+{id:'t3-drizzle-ceiling', l:['Петрович: «В сенях опять капает».','Баба Нюра: «А ведро?»','Петрович: «Кружка».'], p:['pe','ny'], wx:[2], c:12, ln:4},
+{id:'t3-drizzle-lyuba-in', l:['Люба из дверей: «Заходите, чего мокнуть».','Баба Нюра: «Нам и тут хорошо».'], p:['lu','ny'], wx:[2], c:12, ln:4},
+{id:'t3-drizzle-kolka', l:['Колька: «Мам, пошли, сыро же».','Баба Нюра: «Посижу ещё».','Колька: «Мам, ну хватит».'], p:['ko','ny'], wx:[2], c:12, ln:4},
 {id:'t3-rain-pressure-ai', l:['Анатолий Иванович: «В сырость голова тяжёлая».','Баба Валя: «Давайте померяю».'], p:['ai','va'], wx:[2,5], c:12, ln:4},
 {id:'t3-after-ural', l:['Петрович: «Развезло. Разве на „Урале“ проехать».','Баба Нюра: «Не заведёшь».','Петрович: «Не заведу».'], p:['pe','ny'], af:'d', c:12, ln:4},
 {id:'t3-after-vahtovka', l:['Люба из дверей: «Вовка звонил — вахтовки не будет».','Баба Нюра: «Развезло?»','Люба: «Развезло».'], p:['lu','ny'], d:[2,5], af:'d', br:0, c:12, ln:4},
@@ -6710,7 +6749,7 @@ const TALK = [
 {id:'t4-dali-pilili', l:['Петрович: «Электрики сами сосну пилили».','Баба Нюра: «А ты где был?»','Петрович: «Не звали».'], p:['pe','ny'], pw:1, af:'n', c:10, ln:4},
 {id:'t4-ev-paut', l:['Баба Нюра: «Паут-то к вечеру злее».','Петрович: «Меня не берёт. Я прокуренный».'], p:['ny','pe'], h:'15-16', m:[7], wx:[1], c:12, ln:4},
 {id:'t4-eg-basko', l:['Егорыч: «Сёдни баско. Посижу».','Баба Валя: «Посидите».'], p:['eg','va'], wx:[1], c:12, ln:3},
-{id:'t4-liven-navec', l:['Баба Нюра: «Льёт-то как».','Баба Валя: «Льёт».','Посидели под навесом.'], p:['ny','va'], wx:[5], c:12, ln:3},
+{id:'t4-moros-navec', l:['Баба Нюра: «Сыро-то как».','Баба Валя: «Сыро».','Посидели под навесом.'], p:['ny','va'], wx:[2], c:12, ln:3},
 {id:'t4-most-svai', l:['Петрович: «Мост у ручья опять унесло».','Баба Нюра: «Унесло?»','Петрович: «Одни сваи».'], p:['pe','ny'], af:'d', c:12, ln:4},
 {id:'t4-provoda-gudeli', l:['Петрович: «Гудят провода».','Баба Нюра: «Лишь бы гудели».'], p:['pe','ny'], wx:[3], pw:1, c:12, ln:2},
 {id:'t1-hay-to-the-meadow', l:['Тамара: «Коров отгоню — и на покос».','Баба Нюра: «Отдохни хоть».','Тамара: «Зимой отдохну».'], p:['ta','ny'], h:'7', m:[7], c:12, ln:4},
@@ -7309,10 +7348,11 @@ function whereLines(parts){
 // 3. Else no line.
 // «…поймал бы рыбы на N руб. больше.» when the other choice changes only the fish (in 1, no tackle from the arrival on;
 // in 2, none all day), else «…вышло бы на N руб. больше.»: N is the whole day's difference, and the other choice would
-// have taken the tackle's hours too; home is always «вышло бы». A day that caught nothing, where the other choice is
-// set against nothing (base, what the day brought that N is reckoned less: in 1 from the arrival on, in 2 all day), has
-// N for all the other choice gives, and no «больше» (the author, 19 November 2026): «…поймал бы рыбы на 60 руб.»,
-// «Если бы весь день мастерил, вышло бы на 60 руб.» Returns {k: 1 or 2, p: the place, n: N, fish, base}, or null
+// have taken the tackle's hours too; home is always «вышло бы». A day that earned nothing at all, no fish and no
+// tackle, has no «больше» (the author, 19 November 2026: «когда он ничего не поймал… слово „больше“ звучит странно»;
+// 20 November 2026: «"Больше" можно оставить, если есть любой заработок за день»): «…поймал бы рыбы на 60 руб.»,
+// «Если бы весь день мастерил, вышло бы на 60 руб.» (until 20 November 2026 also a day that caught nothing and had no
+// tackle from the hour the line reckons from). Returns {k: 1 or 2, p: the place, n: N, fish}, or null
 function ifCase(){
   const C = S.D.catchT, trail = S.trail || [], P = S.presence;
   const fishFrom = (w, a) => C[w].slice(a).reduce((s, x) => s + x, 0);
@@ -7325,13 +7365,13 @@ function ifCase(){
   let best = null;
   for (const {w, a} of came){
     const base = broughtFrom(a), n = PRICE*fishFrom(w, a) - base;
-    if (n > 0 && (!best || n >= best.n)) best = {k: 1, p: w, n, fish: !tackle(a), base};
+    if (n > 0 && (!best || n >= best.n)) best = {k: 1, p: w, n, fish: !tackle(a)};
   }
   if (best) return best;
   const I = (S.earnFish || 0) + (S.earnWork || 0);
   for (const p of ['home', ...WATERS.filter(w => !came.some(c => c.w === w))]){
     const n = (p === 'home' ? HOURS*WAGE : PRICE*fishFrom(p, TRAVEL[p])) - I;
-    if (n > 0 && (!best || n > best.n)) best = {k: 2, p, n, fish: p !== 'home' && !S.earnWork, base: I};
+    if (n > 0 && (!best || n > best.n)) best = {k: 2, p, n, fish: p !== 'home' && !S.earnWork};
   }
   return best;
 }
@@ -7339,7 +7379,7 @@ function ifCase(){
 // <b>поймал бы рыбы на 60 руб.</b>»; the bold goes on the screen, the book keeps the words (closePage())
 function ifLine(){
   const c = ifCase(); if (!c) return '';
-  const more = `${c.fish ? 'поймал бы рыбы' : 'вышло бы'} на ${rub(c.n)}${!S.earnFish && !c.base ? '' : ' больше.'}`;
+  const more = `${c.fish ? 'поймал бы рыбы' : 'вышло бы'} на ${rub(c.n)}${(S.earnFish || 0) + (S.earnWork || 0) ? ' больше.' : ''}`;
   return `${c.k === 1 ? `Если бы весь день провёл ${WHERE[c.p]}` : c.p === 'home' ? 'Если бы весь день мастерил' : `Если бы пошёл ${WATER_TO[c.p]}`}, <b>${more}</b>`;
 }
 // What he made at the tackle and for how much, all the tackle's pay of the day (S.earnWork): «Мастерил жерлицы на щуку
@@ -7364,7 +7404,7 @@ function craftKind(n = craftHours() || Math.round((S.earnWork || 0)/WAGE)){
 }
 const craftLine = () => S.earnWork ? `${craftKind()} — на ${rub(S.earnWork)}` : '';   // «на 25 руб.» on one line
 // What he bought, on a purchase day: the morning's list in its words and its order (buyList(), the thought of
-// S.house.said first), «Купил хлеба на 90 руб. и мыла на 60 руб.», then the parts of big things: the first «За стекло
+// S.house.said first), «Купил хлеба на 30 руб. и дров на 180 руб.», then the parts of big things: the first «За стекло
 // отдал 90 руб. из 150 руб.», a later one «За сапоги отдал ещё 90 руб.», the last «За сапоги отдал последние 60 руб.».
 // A day between purchase days bought nothing: no line (and no «Покупки» in the column)
 function buyLine(){
